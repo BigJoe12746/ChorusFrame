@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# VerseFrame — stage-gate MVP
 
-## Getting Started
+Landing page + waitlist + free sample-clip upload flow, per the 30-day
+validation plan. Next.js (App Router) + Tailwind + Supabase.
 
-First, run the development server:
+## Run locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Without Supabase keys the app runs in **demo mode**: forms validate and
+succeed, but nothing is persisted (a warning is logged server-side).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Connect Supabase (one-time, ~5 minutes)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Create a free project at https://supabase.com
+2. Dashboard → **SQL Editor** → paste and run `supabase/schema.sql`
+   (creates `waitlist` + `submissions` tables and the private
+   `submissions` storage bucket)
+3. Dashboard → **Project Settings → API** → copy the Project URL and
+   the `service_role` key
+4. `cp .env.local.example .env.local` and fill both values in
+5. Restart the dev server
 
-## Learn More
+## Deploy to Vercel
 
-To learn more about Next.js, take a look at the following resources:
+1. Push this repo to GitHub
+2. Import it in Vercel
+3. Add the same two env vars in Vercel → Project → Settings →
+   Environment Variables
+4. Deploy
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Reviewing submissions
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Stage-gate is intentionally manual: check the `submissions` table in
+the Supabase dashboard (Table Editor), download files from the
+`submissions` storage bucket, build the sample clip, email it back, and
+set the row's `status` to `delivered`. Instrument later — validate first.
 
-## Deploy on Vercel
+## What's intentionally NOT here
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+No auth, no billing, no editor, no render pipeline. Those come after
+the stage gate: ≥50 beta commitments, 10 repeat users, output quality
+that beats current templates.
