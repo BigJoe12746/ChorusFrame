@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "VerseFrame — Turn every song into a scene",
+  title: "ChorusFrame — Upload one song, get your entire release campaign",
   description:
-    "Upload a song, get a complete short-form release kit: lyric clips, visualizers, canvas loops, and vertical promos — in minutes.",
+    "Song, cover, and lyrics in — vertical cuts, lyric video, Canvas loop, visualizer, and teasers out. One project, every format, in minutes.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

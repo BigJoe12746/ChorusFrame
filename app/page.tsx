@@ -1,31 +1,53 @@
 import Link from "next/link";
+import Logo from "@/components/Logo";
 import WaitlistForm from "@/components/WaitlistForm";
 
-function Logo() {
-  return (
-    <span className="inline-flex items-center gap-2 font-semibold tracking-tight">
-      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden>
-        <rect x="1.5" y="1.5" width="23" height="23" rx="5" stroke="var(--violet)" strokeWidth="2" />
-        <path d="M10 8.5L17.5 13L10 17.5V8.5Z" fill="var(--coral)" />
-        <path d="M5 13c1.2-2.2 2.2 2.2 3.4 0" stroke="var(--violet)" strokeWidth="1.4" strokeLinecap="round" fill="none" />
-      </svg>
-      VerseFrame
-    </span>
-  );
-}
-
 const kit = [
-  { name: "Lyric clip", detail: "Beat-synced animated lyrics, caption-safe" },
-  { name: "Visualizer", detail: "Cover art in motion with waveform pulse" },
+  { name: "TikTok / Reels", detail: "9:16 vertical, caption-safe zones" },
+  { name: "YouTube Shorts", detail: "Vertical cut sized for Shorts" },
+  { name: "Square post", detail: "1:1 for feed and carousels" },
+  { name: "Lyric video", detail: "Full-length 16:9 for YouTube" },
   { name: "Canvas loop", detail: "Short looping vertical for streaming profiles" },
-  { name: "Teaser", detail: "15s hook clip picked from your strongest moment" },
-  { name: "Story + square", detail: "Every ratio: 9:16, 1:1, 16:9 — auto-framed" },
+  { name: "Visualizer", detail: "Cover art in motion, reacting to your mix" },
+  { name: "Teasers", detail: "15s, 30s, and 60s hook cuts" },
 ];
 
 const steps = [
-  { n: "01", title: "Upload", body: "Your finished song, cover art, and lyrics. That's all we need." },
-  { n: "02", title: "We find the moments", body: "Song structure and beat detection pick your strongest 15, 30, and 60 seconds." },
-  { n: "03", title: "Get your release kit", body: "A coordinated set of clips in every format — ready to post, not just to edit." },
+  {
+    n: "01",
+    title: "Upload",
+    body: "Your mastered song, cover art, and the official lyrics. That's the whole setup.",
+  },
+  {
+    n: "02",
+    title: "We read the song",
+    body: "Tempo, beats, sections, and energy changes get detected automatically — then lyrics align to the audio.",
+  },
+  {
+    n: "03",
+    title: "Pick a vibe",
+    body: "Hyperpop, dark anime, dreamy, cinematic, reggae, minimal. You get several directions, not one guess.",
+  },
+  {
+    n: "04",
+    title: "Fix timing in seconds",
+    body: "Tap-to-sync on the waveform. Nudge a word or a line — no timeline editing required.",
+  },
+  {
+    n: "05",
+    title: "Export the campaign",
+    body: "Every format above, from one project, in one pass.",
+  },
+];
+
+const promises = [
+  "You always know what an export costs before you run it.",
+  "Failed renders never consume credits.",
+  "Your projects are never deleted out from under you.",
+  "Your master audio stays at full quality.",
+  "The preview matches the export.",
+  "Every release format comes from one project.",
+  "Paste your real lyrics — timing is our job.",
 ];
 
 export default function Home() {
@@ -36,7 +58,7 @@ export default function Home() {
         <Logo />
         <Link
           href="/upload"
-          className="rounded-lg border border-borderline px-4 py-2 text-sm text-muted transition hover:border-violet hover:text-foreground"
+          className="rounded-lg border border-borderline px-4 py-2 text-sm text-muted transition hover:border-cyan hover:text-foreground"
         >
           Get a free sample clip
         </Link>
@@ -44,16 +66,17 @@ export default function Home() {
 
       {/* Hero */}
       <section className="py-16 text-center sm:py-24">
-        <p className="mb-4 text-sm font-medium uppercase tracking-[0.2em] text-coral">
+        <p className="mb-4 text-sm font-medium uppercase tracking-[0.2em] text-cyan">
           For artists, producers &amp; labels
         </p>
         <h1 className="mx-auto max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
-          Turn every song into a <span className="text-violet">scene</span>.
+          Upload one song. Get your entire{" "}
+          <span className="brand-text">release campaign</span>.
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-muted">
-          Upload one song. Get a complete short-form release kit — lyric clips,
-          visualizers, canvas loops, and vertical promos — in under 10 minutes.
-          No timeline. No editor. No excuses before release day.
+          Song, cover, lyrics in — a full set of platform-ready videos out.
+          Vertical cuts, lyric video, Canvas loop, visualizer, teasers. One
+          project, every format, minutes instead of a weekend.
         </p>
         <div className="mx-auto mt-10 max-w-2xl">
           <WaitlistForm />
@@ -64,36 +87,69 @@ export default function Home() {
       </section>
 
       {/* How it works */}
-      <section className="grid gap-6 py-12 sm:grid-cols-3">
-        {steps.map((s) => (
-          <div key={s.n} className="rounded-2xl border border-borderline bg-surface p-6">
-            <p className="font-mono text-sm text-coral">{s.n}</p>
-            <h3 className="mt-2 text-lg font-semibold">{s.title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-muted">{s.body}</p>
-          </div>
-        ))}
+      <section className="py-12">
+        <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
+          How it works
+        </h2>
+        <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
+          {steps.map((s) => (
+            <div
+              key={s.n}
+              className="rounded-2xl border border-borderline bg-surface p-6"
+            >
+              <p className="font-mono text-sm text-cyan">{s.n}</p>
+              <h3 className="mt-2 text-lg font-semibold">{s.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted">{s.body}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* What's in the kit */}
       <section className="py-12">
         <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
-          One upload. <span className="text-violet">Ten assets.</span>
+          One upload. <span className="brand-text">The whole campaign.</span>
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-center text-muted">
-          Everything a release needs to look professional on TikTok, Reels,
-          Shorts, and your streaming profiles.
+          Everything a release needs, sized correctly for where it&apos;s going.
         </p>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {kit.map((item) => (
             <div
               key={item.name}
-              className="rounded-xl border border-borderline bg-surface-raised p-4 transition hover:border-violet"
+              className="rounded-xl border border-borderline bg-surface-raised p-4 transition hover:border-cyan"
             >
               <p className="font-semibold">{item.name}</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted">{item.detail}</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                {item.detail}
+              </p>
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Promises */}
+      <section className="py-12">
+        <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
+          What we promise
+        </h2>
+        <p className="mx-auto mt-3 max-w-xl text-center text-muted">
+          Creative tools have trained artists to expect surprises. These are the
+          rules we&apos;re building to.
+        </p>
+        <ul className="mx-auto mt-8 grid max-w-3xl gap-3 sm:grid-cols-2">
+          {promises.map((p) => (
+            <li
+              key={p}
+              className="flex items-start gap-3 rounded-xl border border-borderline bg-surface p-4 text-sm"
+            >
+              <span className="mt-0.5 text-cyan" aria-hidden>
+                ✓
+              </span>
+              <span className="text-muted">{p}</span>
+            </li>
+          ))}
+        </ul>
       </section>
 
       {/* CTA */}
@@ -102,20 +158,20 @@ export default function Home() {
           Releasing soon? Skip the waitlist.
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-muted">
-          Send us one song and we&apos;ll hand-build you a free sample clip from
-          our template library — so you can see your music in motion before we open the doors.
+          Send us one song and we&apos;ll hand-build you a free sample clip — so
+          you can see your music in motion before we open the doors.
         </p>
         <Link
           href="/upload"
-          className="mt-8 inline-block rounded-xl bg-violet-strong px-8 py-3 font-semibold text-white transition hover:bg-violet"
+          className="brand-gradient mt-8 inline-block rounded-xl px-8 py-3 font-semibold text-white transition hover:opacity-90"
         >
           Upload your song
         </Link>
       </section>
 
       <footer className="flex flex-col items-center gap-2 border-t border-borderline py-8 text-center text-xs text-muted">
-        <Logo />
-        <p>The video studio built for music releases. · © 2026 VerseFrame Labs</p>
+        <Logo size={26} />
+        <p>The video studio built for music releases. · © 2026 ChorusFrame Labs</p>
         <p>
           By uploading, you confirm you own the rights to your music and artwork.
         </p>

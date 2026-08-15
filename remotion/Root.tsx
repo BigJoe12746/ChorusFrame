@@ -13,38 +13,56 @@ const defaultProps: SampleClipProps = {
   clipStartSeconds: 0,
   durationSeconds: 15,
   showEndCard: true,
+  endCardUrl: "",
+  useArtworkColors: true,
 };
+
+/**
+ * Validate the clip window against the real song length so an overrun fails the
+ * render loudly instead of producing silent, flatlined video.
+ */
+const calculateMetadata = async ({ props }: { props: SampleClipProps }) => {
+  const src = props.audioSrc.startsWith("http") ? props.audioSrc : staticFile(props.audioSrc);
+  const audioDur = await getAudioDurationInSeconds(src);
+  if (props.clipStartSeconds >= audioDur - 5) {
+    throw new Error(
+      `Clip start ${props.clipStartSeconds}s is beyond the ${audioDur.toFixed(1)}s song (need at least 5s of music after it)`
+    );
+  }
+  const music = Math.min(props.durationSeconds, audioDur - props.clipStartSeconds);
+  return {
+    props: { ...props, durationSeconds: music },
+    durationInFrames: Math.round(
+      (music + (props.showEndCard ? END_CARD_SECONDS : 0)) * FPS
+    ),
+  };
+};
+
+/** Every export format comes from this one composition. */
+export const FORMATS = [
+  { id: "SampleClip", width: 1080, height: 1920, label: "vertical 9:16" },
+  { id: "SampleClipSquare", width: 1080, height: 1080, label: "square 1:1" },
+  { id: "SampleClipWide", width: 1920, height: 1080, label: "wide 16:9" },
+] as const;
 
 export const RemotionRoot: React.FC = () => {
   return (
-    <Composition
-      id="SampleClip"
-      component={SampleClip}
-      width={1080}
-      height={1920}
-      fps={FPS}
-      durationInFrames={Math.round((defaultProps.durationSeconds + END_CARD_SECONDS) * FPS)}
-      defaultProps={defaultProps}
-      calculateMetadata={async ({ props }) => {
-        // Validate the clip window against the real song length so an overrun
-        // fails the render loudly instead of producing silent, flatlined video.
-        const src = props.audioSrc.startsWith("http")
-          ? props.audioSrc
-          : staticFile(props.audioSrc);
-        const audioDur = await getAudioDurationInSeconds(src);
-        if (props.clipStartSeconds >= audioDur - 5) {
-          throw new Error(
-            `Clip start ${props.clipStartSeconds}s is beyond the ${audioDur.toFixed(1)}s song (need at least 5s of music after it)`
-          );
-        }
-        const music = Math.min(props.durationSeconds, audioDur - props.clipStartSeconds);
-        return {
-          props: { ...props, durationSeconds: music },
-          durationInFrames: Math.round(
-            (music + (props.showEndCard ? END_CARD_SECONDS : 0)) * FPS
-          ),
-        };
-      }}
-    />
+    <>
+      {FORMATS.map((f) => (
+        <Composition
+          key={f.id}
+          id={f.id}
+          component={SampleClip}
+          width={f.width}
+          height={f.height}
+          fps={FPS}
+          durationInFrames={Math.round(
+            (defaultProps.durationSeconds + END_CARD_SECONDS) * FPS
+          )}
+          defaultProps={defaultProps}
+          calculateMetadata={calculateMetadata}
+        />
+      ))}
+    </>
   );
 };

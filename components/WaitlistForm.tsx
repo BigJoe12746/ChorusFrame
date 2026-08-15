@@ -33,7 +33,7 @@ export default function WaitlistForm() {
         <p className="text-lg font-semibold">You&apos;re on the list. 🎬</p>
         <p className="mt-2 text-sm text-muted">
           We&apos;ll email you when your spot opens. Want to skip the line?{" "}
-          <a href="/upload" className="text-violet underline underline-offset-4">
+          <a href="/upload" className="text-cyan underline underline-offset-4">
             Send us a song
           </a>{" "}
           and we&apos;ll cut you a free sample clip.
@@ -64,11 +64,11 @@ export default function WaitlistForm() {
       <button
         type="submit"
         disabled={state === "sending"}
-        className="rounded-xl bg-violet-strong px-6 py-3 font-semibold text-white transition hover:bg-violet disabled:opacity-60"
+        className="brand-gradient rounded-xl px-6 py-3 font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
       >
         {state === "sending" ? "Joining…" : "Join the waitlist"}
       </button>
-      {error && <p className="text-sm text-coral sm:self-center">{error}</p>}
+      {error && <p className="text-sm text-danger sm:self-center">{error}</p>}
     </form>
   );
 }

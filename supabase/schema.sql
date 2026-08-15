@@ -1,4 +1,4 @@
--- VerseFrame stage-gate MVP schema
+-- ChorusFrame stage-gate MVP schema
 -- Run this in the Supabase SQL Editor (Dashboard → SQL Editor → New query)
 
 create table if not exists public.waitlist (

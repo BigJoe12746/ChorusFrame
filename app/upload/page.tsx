@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+import Logo from "@/components/Logo";
 
 export default function UploadPage() {
   const formRef = useRef<HTMLFormElement>(null);
@@ -37,8 +38,9 @@ export default function UploadPage() {
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-6">
       <header className="flex items-center justify-between py-6">
-        <Link href="/" className="font-semibold tracking-tight">
-          ← VerseFrame
+        <Link href="/" className="inline-flex items-center gap-2 text-muted transition hover:text-foreground">
+          <span aria-hidden>←</span>
+          <Logo size={26} />
         </Link>
       </header>
 
@@ -127,10 +129,10 @@ export default function UploadPage() {
             <label className="flex items-start gap-3 text-sm text-muted">
               <input type="checkbox" required className="mt-1 accent-[var(--violet-strong)]" />
               I own or control the rights to this music and artwork, and I&apos;m
-              okay with VerseFrame using them to build my sample clip.
+              okay with ChorusFrame using them to build my sample clip.
             </label>
 
-            {error && <p className="text-sm text-coral">{error}</p>}
+            {error && <p className="text-sm text-danger">{error}</p>}
 
             <button
               type="submit"

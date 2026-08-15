@@ -1,5 +1,5 @@
 {
-  "name": "verseframe",
+  "name": "chorusframe",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,7 +9,8 @@
     "lint": "eslint",
     "studio": "remotion studio remotion/index.ts",
     "render:clip": "remotion render remotion/index.ts SampleClip out/clip.mp4",
-    "render:submission": "node scripts/render-submission.mjs"
+    "render:submission": "node scripts/render-submission.mjs",
+    "render:campaign": "node scripts/render-submission.mjs --formats all"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.512",

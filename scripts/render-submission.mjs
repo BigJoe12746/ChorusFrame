@@ -1,12 +1,15 @@
-// Render a sample clip for a Supabase submission.
+// Render sample clips for a Supabase submission — one project, every format.
 //
 // Usage:
-//   node scripts/render-submission.mjs --latest            # newest queued submission
+//   node scripts/render-submission.mjs --latest                 # newest queued submission
 //   node scripts/render-submission.mjs <submission-id>
-//   Options: --start <sec> --duration <sec> --no-end-card --upload --out <file>
-//
-// --upload pushes the MP4 to the public `clips` bucket and sets the row's
-// sample_clip_url + status=clip_ready. Emailing the artist stays manual.
+//   Options:
+//     --formats vertical,square,wide   which cuts to render (default: vertical; "all" = every format)
+//     --start <sec> --duration <sec>   clip window (default: 0, 15)
+//     --no-end-card                    drop the "Made with ChorusFrame" outro
+//     --brand-colors                   use brand accents instead of cover-art colors
+//     --upload                         push to the public `clips` bucket + mark the row clip_ready
+//     --out <file>                     override the output path (single format only)
 //
 // If a run is killed hard (power loss), a row may be left status=in_progress;
 // reset it to 'queued' in the Table Editor.
@@ -18,6 +21,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+// Format name → Remotion composition id (see remotion/Root.tsx)
+const FORMATS = {
+  vertical: { composition: "SampleClip", label: "9:16 vertical (TikTok/Reels/Shorts)" },
+  square: { composition: "SampleClipSquare", label: "1:1 square (feed post)" },
+  wide: { composition: "SampleClipWide", label: "16:9 wide (YouTube)" },
+};
 
 function loadEnv() {
   const envPath = path.join(root, ".env.local");
@@ -42,7 +52,16 @@ function fail(msg) {
 
 // --- args ---
 const argv = process.argv.slice(2);
-const flags = { start: 0, duration: 15, upload: false, endCard: true, out: null, latest: false };
+const flags = {
+  start: 0,
+  duration: 15,
+  upload: false,
+  endCard: true,
+  artworkColors: true,
+  out: null,
+  latest: false,
+  formats: ["vertical"],
+};
 let submissionId = null;
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
@@ -54,10 +73,20 @@ for (let i = 0; i < argv.length; i++) {
   if (a === "--latest") flags.latest = true;
   else if (a === "--upload") flags.upload = true;
   else if (a === "--no-end-card") flags.endCard = false;
+  else if (a === "--brand-colors") flags.artworkColors = false;
   else if (a === "--start") flags.start = Number(takeValue());
   else if (a === "--duration") flags.duration = Number(takeValue());
   else if (a === "--out") flags.out = takeValue();
-  else if (!a.startsWith("--")) submissionId = a;
+  else if (a === "--formats") {
+    const raw = takeValue().toLowerCase();
+    flags.formats =
+      raw === "all"
+        ? Object.keys(FORMATS)
+        : raw.split(",").map((f) => f.trim()).filter(Boolean);
+    const unknown = flags.formats.filter((f) => !FORMATS[f]);
+    if (unknown.length) fail(`Unknown format(s): ${unknown.join(", ")}. Valid: ${Object.keys(FORMATS).join(", ")}, all`);
+    if (!flags.formats.length) fail("--formats needs at least one format");
+  } else if (!a.startsWith("--")) submissionId = a;
   else fail(`Unknown option: ${a}`);
 }
 if (!flags.latest && !submissionId) {
@@ -66,6 +95,9 @@ if (!flags.latest && !submissionId) {
 if (!Number.isFinite(flags.start) || flags.start < 0) fail("--start must be a non-negative number of seconds");
 if (!Number.isFinite(flags.duration) || flags.duration < 5 || flags.duration > 60) {
   fail("--duration must be between 5 and 60 seconds");
+}
+if (flags.out && flags.formats.length > 1) {
+  fail("--out works with a single format; drop it when rendering multiple formats");
 }
 
 const env = loadEnv();
@@ -87,7 +119,8 @@ if (!rows || rows.length === 0) {
   fail(flags.latest ? "No queued submissions found." : `No submission with id ${submissionId}`);
 }
 const sub = rows[0];
-console.log(`▶ Rendering "${sub.song_title}" by ${sub.artist_name || "unknown artist"} (${sub.id})`);
+console.log(`▶ "${sub.song_title}" by ${sub.artist_name || "unknown artist"} (${sub.id})`);
+console.log(`▶ Formats: ${flags.formats.map((f) => FORMATS[f].label).join(", ")}`);
 
 // Claim the row so a concurrent --latest run can't double-render it
 let claimHeld = false;
@@ -138,25 +171,31 @@ try {
     clipStartSeconds: flags.start,
     durationSeconds: flags.duration,
     showEndCard: flags.endCard,
+    endCardUrl: env.NEXT_PUBLIC_SITE_URL || "",
+    useArtworkColors: flags.artworkColors,
   };
 
   const outDir = path.join(root, "out");
   mkdirSync(outDir, { recursive: true });
-  const outFile = flags.out
-    ? path.resolve(flags.out)
-    : path.join(outDir, `${sub.id}-${flags.duration}s.mp4`);
   const propsFile = path.join(outDir, `${sub.id}-props.json`);
   writeFileSync(propsFile, JSON.stringify(props, null, 2));
 
+  const rendered = [];
   try {
-    const cmd = `npx remotion render remotion/index.ts SampleClip "${outFile}" --props="${propsFile}"`;
-    console.log(`▶ ${cmd}`);
-    const res = spawnSync(cmd, { cwd: root, shell: true, stdio: "inherit" });
-    if (res.status !== 0) throw new Error("Remotion render failed (see output above).");
+    for (const format of flags.formats) {
+      const outFile = flags.out
+        ? path.resolve(flags.out)
+        : path.join(outDir, `${sub.id}-${format}-${flags.duration}s.mp4`);
+      const cmd = `npx remotion render remotion/index.ts ${FORMATS[format].composition} "${outFile}" --props="${propsFile}"`;
+      console.log(`\n▶ ${format}: ${cmd}`);
+      const res = spawnSync(cmd, { cwd: root, shell: true, stdio: "inherit" });
+      if (res.status !== 0) throw new Error(`Remotion render failed for ${format} (see output above).`);
+      console.log(`✔ Rendered ${outFile}`);
+      rendered.push({ format, outFile });
+    }
   } finally {
     rmSync(propsFile, { force: true }); // contains signed URLs — don't leave it around
   }
-  console.log(`✔ Rendered ${outFile}`);
 
   // --- optional upload ---
   if (flags.upload) {
@@ -172,22 +211,34 @@ try {
         );
       }
     }
-    // Stable key so re-renders replace the old clip instead of orphaning it
-    const clipPath = `${sub.id}/sample.mp4`;
-    const { error: upErr } = await supabase.storage
-      .from("clips")
-      .upload(clipPath, readFileSync(outFile), { contentType: "video/mp4", upsert: true, cacheControl: "60" });
-    if (upErr) throw new Error(`Uploading clip failed: ${upErr.message}`);
 
-    const { data: pub } = supabase.storage.from("clips").getPublicUrl(clipPath);
-    const freshUrl = `${pub.publicUrl}?v=${Date.now()}`; // bust CDN cache on re-renders
+    const urls = [];
+    for (const { format, outFile } of rendered) {
+      // Stable key per format so re-renders replace the old clip instead of orphaning it
+      const clipPath = `${sub.id}/sample-${format}.mp4`;
+      const { error: upErr } = await supabase.storage
+        .from("clips")
+        .upload(clipPath, readFileSync(outFile), {
+          contentType: "video/mp4",
+          upsert: true,
+          cacheControl: "60",
+        });
+      if (upErr) throw new Error(`Uploading ${format} clip failed: ${upErr.message}`);
+      const { data: pub } = supabase.storage.from("clips").getPublicUrl(clipPath);
+      urls.push({ format, url: `${pub.publicUrl}?v=${Date.now()}` }); // bust CDN cache on re-renders
+    }
+
+    // The row holds one URL: the vertical cut if we made one, else the first.
+    const primary = urls.find((u) => u.format === "vertical") ?? urls[0];
     const { error: updErr } = await supabase
       .from("submissions")
-      .update({ sample_clip_url: freshUrl, status: "clip_ready" })
+      .update({ sample_clip_url: primary.url, status: "clip_ready" })
       .eq("id", sub.id);
     if (updErr) throw new Error(`Updating submission row failed: ${updErr.message}`);
     claimHeld = false; // row is now clip_ready; nothing to release
-    console.log(`✔ Uploaded: ${freshUrl}`);
+
+    console.log("");
+    for (const { format, url: u } of urls) console.log(`✔ ${format}: ${u}`);
     console.log(`✔ Submission marked clip_ready — email the artist, then set status to delivered.`);
   } else {
     await releaseClaim(); // local render only: put the row back in the queue

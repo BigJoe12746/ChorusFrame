@@ -1,16 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  /* VerseFrame brand: dark, cinematic, energetic */
+  /* ChorusFrame brand: dark, cinematic, electric */
   --background: #080b16; /* midnight navy, near-black */
   --surface: #0e1326;
   --surface-raised: #151b33;
   --border: #232b4a;
   --foreground: #eef0f8;
   --muted: #8b93b5;
+  --cyan: #22dcf5; /* electric cyan — signal, energy */
+  --blue: #2b8cff; /* mid-gradient */
   --violet: #8b5cf6; /* electric violet — product actions */
   --violet-strong: #7c3aed;
-  --coral: #ff6b5e; /* restrained coral — music moments */
+  --danger: #ff6b6b; /* error states only — never a brand accent */
 }
 
 @theme inline {
@@ -20,9 +22,11 @@
   --color-borderline: var(--border);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-cyan: var(--cyan);
+  --color-blue: var(--blue);
   --color-violet: var(--violet);
   --color-violet-strong: var(--violet-strong);
-  --color-coral: var(--coral);
+  --color-danger: var(--danger);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -36,4 +40,26 @@ body {
 ::selection {
   background: var(--violet-strong);
   color: #fff;
+}
+
+/* Brand gradient, cyan → blue → violet (matches the logo wordmark) */
+.brand-gradient {
+  background-image: linear-gradient(
+    100deg,
+    var(--cyan) 0%,
+    var(--blue) 45%,
+    var(--violet-strong) 100%
+  );
+}
+
+.brand-text {
+  background-image: linear-gradient(
+    100deg,
+    var(--cyan) 0%,
+    var(--blue) 45%,
+    var(--violet-strong) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }

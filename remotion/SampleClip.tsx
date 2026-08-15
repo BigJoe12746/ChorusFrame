@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   AbsoluteFill,
   Audio,
   Img,
+  continueRender,
+  delayRender,
   interpolate,
   spring,
   staticFile,
@@ -10,6 +12,8 @@ import {
   useVideoConfig,
 } from "remotion";
 import { useAudioData, visualizeAudio } from "@remotion/media-utils";
+import { getLayout } from "./layout";
+import { BRAND_PALETTE, extractPalette, type Palette } from "./palette";
 
 export type SampleClipProps = {
   audioSrc: string;
@@ -23,32 +27,85 @@ export type SampleClipProps = {
   /** Musical length of the clip (excluding the end card), in seconds. */
   durationSeconds: number;
   showEndCard: boolean;
+  /** Shown under the end-card wordmark. Empty until a domain is live. */
+  endCardUrl: string;
+  /** Theme accents from the cover art instead of brand colors. */
+  useArtworkColors: boolean;
 };
 
 export const FPS = 30;
 export const END_CARD_SECONDS = 2.6;
 
 const NAVY = "#080b16";
-const VIOLET = "#8b5cf6";
-const VIOLET_STRONG = "#7c3aed";
-const CORAL = "#ff6b5e";
 const FONT = 'Inter, "Segoe UI", system-ui, -apple-system, sans-serif';
 
-const resolveSrc = (src: string) =>
-  src.startsWith("http") ? src : staticFile(src);
+const resolveSrc = (src: string) => (src.startsWith("http") ? src : staticFile(src));
 
-function Logo({ size }: { size: number }) {
+/**
+ * Reads accent colors out of the cover art. Holds the render until the image
+ * has been sampled, then falls back to brand colors if anything goes wrong
+ * (missing artwork, cross-origin block, greyscale cover).
+ */
+function useArtworkPalette(src: string | null, enabled: boolean): Palette {
+  const [palette, setPalette] = useState<Palette>(BRAND_PALETTE);
+  const [handle] = useState(() => delayRender("Reading artwork colors"));
+  const settled = useRef(false);
+
+  useEffect(() => {
+    const finish = (next?: Palette | null) => {
+      if (settled.current) return;
+      settled.current = true;
+      if (next) setPalette(next);
+      continueRender(handle);
+    };
+
+    if (!src || !enabled) {
+      finish();
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => finish(extractPalette(img));
+    img.onerror = () => finish();
+    img.src = src;
+    return () => finish();
+  }, [src, enabled, handle]);
+
+  return palette;
+}
+
+function LogoMark({ size, id, accent }: { size: number; id: string; accent: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 26 26" fill="none">
-      <rect x="1.5" y="1.5" width="23" height="23" rx="5" stroke={VIOLET} strokeWidth="2" />
-      <path d="M10 8.5L17.5 13L10 17.5V8.5Z" fill={CORAL} />
-      <path d="M5 13c1.2-2.2 2.2 2.2 3.4 0" stroke={VIOLET} strokeWidth="1.4" strokeLinecap="round" fill="none" />
+    <svg width={size} height={(size * 48) / 64} viewBox="0 0 64 48" fill="none">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={accent} />
+          <stop offset="100%" stopColor="#2b8cff" />
+        </linearGradient>
+      </defs>
+      <rect x="3.5" y="3.5" width="57" height="41" rx="12" stroke={`url(#${id})`} strokeWidth="6" />
+      <path
+        d="M13 24h4.5l3-9.5 4 18.5 3.5-13 2.5 8 3-4H51"
+        stroke={`url(#${id})`}
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M29.5 17L43 24l-13.5 7V17Z" fill="#7c3aed" />
     </svg>
   );
 }
 
 /** Fallback art when no artwork was uploaded: gradient monogram card. */
-function MonogramArt({ title }: { title: string }) {
+function MonogramArt({
+  title,
+  palette,
+  size,
+}: {
+  title: string;
+  palette: Palette;
+  size: number;
+}) {
   const letter = (title.trim()[0] || "♪").toUpperCase();
   return (
     <div
@@ -58,17 +115,35 @@ function MonogramArt({ title }: { title: string }) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: `radial-gradient(circle at 30% 25%, ${VIOLET_STRONG}, ${NAVY} 75%)`,
+        background: `radial-gradient(circle at 30% 25%, ${palette.secondary}, ${NAVY} 75%)`,
       }}
     >
-      <span style={{ fontFamily: FONT, fontWeight: 800, fontSize: 380, color: "rgba(255,255,255,0.92)" }}>
+      <span
+        style={{
+          fontFamily: FONT,
+          fontWeight: 800,
+          fontSize: size * 0.52,
+          lineHeight: 1,
+          color: "rgba(255,255,255,0.92)",
+        }}
+      >
         {letter}
       </span>
     </div>
   );
 }
 
-function EndCard({ startFrame }: { startFrame: number }) {
+function EndCard({
+  startFrame,
+  unit,
+  palette,
+  url,
+}: {
+  startFrame: number;
+  unit: number;
+  palette: Palette;
+  url: string;
+}) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const local = frame - startFrame;
@@ -86,19 +161,28 @@ function EndCard({ startFrame }: { startFrame: number }) {
         alignItems: "center",
         justifyContent: "center",
         flexDirection: "column",
-        gap: 36,
+        gap: unit * 0.033,
       }}
     >
       <div style={{ transform: `scale(${0.8 + 0.2 * pop})` }}>
-        <Logo size={140} />
+        <LogoMark size={unit * 0.19} id="endcard-mark" accent={palette.primary} />
       </div>
       <div style={{ fontFamily: FONT, textAlign: "center" }}>
-        <div style={{ color: "#eef0f8", fontSize: 54, fontWeight: 700 }}>
-          Made with VerseFrame
+        <div style={{ color: "#eef0f8", fontSize: unit * 0.05, fontWeight: 700 }}>
+          Made with ChorusFrame
         </div>
-        <div style={{ color: CORAL, fontSize: 34, marginTop: 14, fontWeight: 500 }}>
-          verseframe.vercel.app
-        </div>
+        {url ? (
+          <div
+            style={{
+              color: palette.primary,
+              fontSize: unit * 0.031,
+              marginTop: unit * 0.013,
+              fontWeight: 500,
+            }}
+          >
+            {url}
+          </div>
+        ) : null}
       </div>
     </AbsoluteFill>
   );
@@ -113,11 +197,16 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   clipStartSeconds,
   durationSeconds,
   showEndCard,
+  endCardUrl,
+  useArtworkColors,
 }) => {
   const frame = useCurrentFrame();
-  const { fps, width } = useVideoConfig();
+  const { fps, width, height } = useVideoConfig();
   const src = resolveSrc(audioSrc);
   const audioData = useAudioData(src);
+  const art = artworkSrc ? resolveSrc(artworkSrc) : null;
+  const palette = useArtworkPalette(art, useArtworkColors);
+  const L = getLayout(width, height);
 
   const musicFrames = Math.round(durationSeconds * fps);
   const totalFrames = musicFrames + (showEndCard ? Math.round(END_CARD_SECONDS * fps) : 0);
@@ -130,14 +219,14 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   const maxMediaFrame = Math.max(0, Math.floor(audioData.durationInSeconds * fps) - 1);
   const mediaFrame = Math.min(frame + Math.round(clipStartSeconds * fps), maxMediaFrame);
 
-  // Frequency data drives everything: bass → artwork pulse, full range → bars
+  // Frequency data drives everything: bass → artwork pulse, mid → bars
   const freq = visualizeAudio({ audioData, frame: mediaFrame, fps, numberOfSamples: 64 });
   const bass = (freq[0] + freq[1] + freq[2] + freq[3] + freq[4]) / 5;
   const pulse = 1 + Math.min(bass * 1.4, 1) * 0.05;
 
   // Intro entrance
   const intro = spring({ frame, fps, config: { damping: 200 }, durationInFrames: 24 });
-  const headerY = interpolate(intro, [0, 1], [-60, 0]);
+  const headerShift = interpolate(intro, [0, 1], [-L.unit * 0.056, 0]);
 
   // Lyrics: re-break long source lines on word boundaries (paragraph-pasted
   // lyrics arrive as one giant "line"), then distribute across the music window.
@@ -162,18 +251,27 @@ export const SampleClip: React.FC<SampleClipProps> = ({
     .filter(Boolean)
     .flatMap(wrapLine)
     .slice(0, maxLines);
+
   const lyricsStart = 1.0 * fps;
   const lyricsEnd = musicFrames - 0.8 * fps;
   const perLine = lines.length > 0 ? (lyricsEnd - lyricsStart) / lines.length : 0;
   const rawIndex = perLine > 0 ? Math.floor((frame - lyricsStart) / perLine) : -1;
-  const lineIndex = frame >= lyricsStart && frame < lyricsEnd ? Math.min(Math.max(rawIndex, 0), lines.length - 1) : -1;
+  const lineIndex =
+    frame >= lyricsStart && frame < lyricsEnd
+      ? Math.min(Math.max(rawIndex, 0), lines.length - 1)
+      : -1;
   const lineFrame = lineIndex >= 0 ? frame - (lyricsStart + lineIndex * perLine) : 0;
   const lineIn = spring({ frame: lineFrame, fps, config: { damping: 16, mass: 0.6 } });
-  const lineOut = perLine > 0 ? interpolate(lineFrame, [perLine - 8, perLine], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 1;
+  const lineOut =
+    perLine > 0
+      ? interpolate(lineFrame, [perLine - 8, perLine], [1, 0], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+        })
+      : 1;
 
-  // Waveform: 32 bars from the low/mid spectrum, where the music actually lives
-  const bars = freq.slice(2, 34);
-  const barWidth = Math.floor((width - 240) / bars.length);
+  const bars = freq.slice(2, 2 + L.bars.count);
+  const barWidth = L.bars.width / bars.length;
 
   const progress = Math.min(frame / musicFrames, 1);
   // Fade the song out at the END of the musical window, not the end card —
@@ -184,9 +282,7 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   });
   // Short ramp-in when slicing mid-song, so the cut doesn't click
   const fadeIn =
-    clipStartSeconds > 0
-      ? interpolate(frame, [0, 12], [0, 1], { extrapolateRight: "clamp" })
-      : 1;
+    clipStartSeconds > 0 ? interpolate(frame, [0, 12], [0, 1], { extrapolateRight: "clamp" }) : 1;
 
   const artSway = Math.sin(frame / 55) * 1.1;
   const bgDrift = frame * 0.12;
@@ -202,24 +298,33 @@ export const SampleClip: React.FC<SampleClipProps> = ({
 
       {/* Blurred artwork backdrop */}
       <AbsoluteFill style={{ overflow: "hidden" }}>
-        {artworkSrc ? (
+        {art ? (
           <Img
-            src={resolveSrc(artworkSrc)}
+            src={art}
             style={{
               width: "100%",
               height: "100%",
               objectFit: "cover",
-              transform: `scale(2.3) rotate(${bgDrift * 0.05}deg) translateY(${Math.sin(frame / 90) * 14}px)`,
+              transform: `scale(2.3) rotate(${bgDrift * 0.05}deg) translateY(${
+                Math.sin(frame / 90) * 14
+              }px)`,
               filter: "blur(70px) saturate(1.35) brightness(0.5)",
             }}
           />
         ) : (
           <AbsoluteFill
-            style={{ background: `radial-gradient(circle at 50% 30%, #1c1440, ${NAVY} 80%)` }}
+            style={{
+              background: `radial-gradient(circle at 50% 30%, ${palette.secondary}33, ${NAVY} 80%)`,
+            }}
           />
         )}
       </AbsoluteFill>
-      <AbsoluteFill style={{ background: "radial-gradient(ellipse at center, rgba(8,11,22,0) 45%, rgba(8,11,22,0.75) 100%)" }} />
+      <AbsoluteFill
+        style={{
+          background:
+            "radial-gradient(ellipse at center, rgba(8,11,22,0) 45%, rgba(8,11,22,0.75) 100%)",
+        }}
+      />
 
       {/* Progress bar */}
       <div
@@ -227,9 +332,9 @@ export const SampleClip: React.FC<SampleClipProps> = ({
           position: "absolute",
           top: 0,
           left: 0,
-          height: 8,
+          height: L.progressHeight,
           width: `${progress * 100}%`,
-          background: `linear-gradient(90deg, ${VIOLET_STRONG}, ${CORAL})`,
+          background: `linear-gradient(90deg, ${palette.secondary}, ${palette.primary})`,
         }}
       />
 
@@ -237,19 +342,19 @@ export const SampleClip: React.FC<SampleClipProps> = ({
       <div
         style={{
           position: "absolute",
-          top: 150,
-          width: "100%",
-          textAlign: "center",
-          transform: `translateY(${headerY}px)`,
+          top: L.header.top,
+          left: L.header.left,
+          width: L.header.width,
+          textAlign: L.header.align,
+          transform: `translateY(${headerShift}px)`,
           opacity: intro,
-          padding: "0 90px",
         }}
       >
         {artistName ? (
           <div
             style={{
-              color: CORAL,
-              fontSize: 34,
+              color: palette.primary,
+              fontSize: L.header.artistSize,
               fontWeight: 600,
               letterSpacing: "0.28em",
               textTransform: "uppercase",
@@ -264,9 +369,14 @@ export const SampleClip: React.FC<SampleClipProps> = ({
         <div
           style={{
             color: "#eef0f8",
-            fontSize: songTitle.length > 40 ? 44 : songTitle.length > 22 ? 56 : 72,
+            fontSize:
+              songTitle.length > 40
+                ? L.header.titleSize * 0.61
+                : songTitle.length > 22
+                  ? L.header.titleSize * 0.78
+                  : L.header.titleSize,
             fontWeight: 800,
-            marginTop: 18,
+            marginTop: L.unit * 0.017,
             lineHeight: 1.1,
             display: "-webkit-box",
             WebkitLineClamp: 2,
@@ -282,20 +392,22 @@ export const SampleClip: React.FC<SampleClipProps> = ({
       <div
         style={{
           position: "absolute",
-          top: 480,
-          left: "50%",
-          width: 720,
-          height: 720,
-          transform: `translateX(-50%) scale(${(0.82 + 0.18 * intro) * pulse}) rotate(${artSway}deg)`,
-          borderRadius: 36,
+          top: L.art.top,
+          left: L.art.left,
+          width: L.art.size,
+          height: L.art.size,
+          transform: `scale(${(0.82 + 0.18 * intro) * pulse}) rotate(${artSway}deg)`,
+          borderRadius: L.art.radius,
           overflow: "hidden",
-          boxShadow: `0 60px 140px rgba(0,0,0,0.6), 0 0 ${60 + bass * 160}px rgba(139,92,246,${0.25 + Math.min(bass, 0.5) * 0.5})`,
+          boxShadow: `0 ${L.unit * 0.055}px ${L.unit * 0.13}px rgba(0,0,0,0.6), 0 0 ${
+            L.unit * 0.055 + bass * L.unit * 0.15
+          }px ${palette.secondary}${bass > 0.3 ? "88" : "44"}`,
         }}
       >
-        {artworkSrc ? (
-          <Img src={resolveSrc(artworkSrc)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        {art ? (
+          <Img src={art} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
-          <MonogramArt title={songTitle} />
+          <MonogramArt title={songTitle} palette={palette} size={L.art.size} />
         )}
       </div>
 
@@ -304,20 +416,20 @@ export const SampleClip: React.FC<SampleClipProps> = ({
         <div
           style={{
             position: "absolute",
-            top: 1310,
-            width: "100%",
-            padding: "0 110px",
-            textAlign: "center",
+            top: L.lyric.top,
+            left: L.lyric.left,
+            width: L.lyric.width,
+            textAlign: L.lyric.align,
             opacity: Math.min(lineIn, lineOut),
-            transform: `translateY(${(1 - lineIn) * 46}px)`,
-            maxHeight: 210,
+            transform: `translateY(${(1 - lineIn) * L.unit * 0.043}px)`,
+            maxHeight: L.lyric.maxHeight,
             overflow: "hidden",
           }}
         >
           <span
             style={{
               color: "#ffffff",
-              fontSize: lines[lineIndex].length > 54 ? 44 : 56,
+              fontSize: lines[lineIndex].length > 54 ? L.lyric.size * 0.79 : L.lyric.size,
               fontWeight: 700,
               lineHeight: 1.25,
               textShadow: "0 4px 30px rgba(0,0,0,0.65)",
@@ -332,28 +444,29 @@ export const SampleClip: React.FC<SampleClipProps> = ({
       <div
         style={{
           position: "absolute",
-          bottom: 190,
-          left: 120,
-          right: 120,
-          height: 200,
+          top: L.bars.top,
+          left: L.bars.left,
+          width: L.bars.width,
+          height: L.bars.height,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: 6,
         }}
       >
         {bars.map((v, i) => {
+          const h = L.bars.height * 0.06 + Math.min(1, Math.pow(v * 4.5, 0.75)) * L.bars.height * 0.86;
           const t = i / (bars.length - 1);
-          // tilt compensates the natural high-frequency falloff of music spectra
-          const h = 12 + Math.min(1, Math.pow(v * 4.5 * (0.8 + t * 2.2), 0.75)) * 172;
           return (
             <div
               key={i}
               style={{
-                width: barWidth - 6,
+                width: barWidth * 0.62,
+                marginRight: barWidth * 0.38,
                 height: h,
-                borderRadius: 6,
-                background: `linear-gradient(180deg, ${t < 0.5 ? VIOLET : CORAL}, ${VIOLET_STRONG})`,
+                borderRadius: barWidth * 0.31,
+                background: `linear-gradient(180deg, ${
+                  t < 0.5 ? palette.primary : palette.secondary
+                }, ${palette.secondary})`,
                 opacity: 0.9,
               }}
             />
@@ -365,20 +478,25 @@ export const SampleClip: React.FC<SampleClipProps> = ({
       <div
         style={{
           position: "absolute",
-          bottom: 90,
-          width: "100%",
+          top: L.watermark.top,
+          left: L.watermark.left,
+          width: L.watermark.width,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          gap: 14,
+          gap: L.unit * 0.013,
           opacity: 0.75,
         }}
       >
-        <Logo size={40} />
-        <span style={{ color: "#8b93b5", fontSize: 28, fontWeight: 500 }}>VerseFrame</span>
+        <LogoMark size={L.unit * 0.05} id="watermark-mark" accent={palette.primary} />
+        <span style={{ color: "#8b93b5", fontSize: L.watermark.size, fontWeight: 600 }}>
+          ChorusFrame
+        </span>
       </div>
 
-      {showEndCard && frame >= musicFrames ? <EndCard startFrame={musicFrames} /> : null}
+      {showEndCard && frame >= musicFrames ? (
+        <EndCard startFrame={musicFrames} unit={L.unit} palette={palette} url={endCardUrl} />
+      ) : null}
     </AbsoluteFill>
   );
 };
