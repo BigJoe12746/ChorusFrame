@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import NavAuth from "@/components/NavAuth";
 import WaitlistForm from "@/components/WaitlistForm";
 
 const kit = [
@@ -56,12 +57,7 @@ export default function Home() {
       {/* Nav */}
       <header className="flex items-center justify-between py-6">
         <Logo />
-        <Link
-          href="/upload"
-          className="rounded-lg border border-borderline px-4 py-2 text-sm text-muted transition hover:border-cyan hover:text-foreground"
-        >
-          Get a free sample clip
-        </Link>
+        <NavAuth />
       </header>
 
       {/* Hero */}

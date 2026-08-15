@@ -1,0 +1,192 @@
+import Link from "next/link";
+import Logo from "@/components/Logo";
+import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase";
+
+export const dynamic = "force-dynamic";
+
+type Submission = {
+  id: string;
+  song_title: string;
+  artist_name: string | null;
+  status: string;
+  created_at: string;
+  artwork_path: string | null;
+  sample_clip_url: string | null;
+};
+
+const STATUS: Record<string, { label: string; cls: string }> = {
+  queued: { label: "In the queue", cls: "border-borderline text-muted" },
+  in_progress: { label: "Rendering", cls: "border-blue text-blue" },
+  clip_ready: { label: "Clips ready", cls: "border-cyan text-cyan" },
+  delivered: { label: "Delivered", cls: "border-cyan text-cyan" },
+};
+
+const FORMAT_LABELS: Record<string, string> = {
+  "sample-vertical.mp4": "9:16 vertical",
+  "sample-square.mp4": "1:1 square",
+  "sample-wide.mp4": "16:9 wide",
+  "sample.mp4": "Clip",
+};
+
+export default async function DashboardPage() {
+  const supabase = await getSupabaseServer();
+  if (!supabase) {
+    return (
+      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-20 text-center">
+        <p className="text-muted">Sign-in isn&apos;t configured on this deployment.</p>
+      </main>
+    );
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // RLS scopes this to the signed-in artist's own rows
+  const { data, error } = await supabase
+    .from("submissions")
+    .select("id, song_title, artist_name, status, created_at, artwork_path, sample_clip_url")
+    .order("created_at", { ascending: false });
+  const submissions = (data ?? []) as Submission[];
+
+  // Artwork lives in a private bucket, and finished clips may exist in several
+  // formats — resolve both with the service-role client.
+  const admin = getSupabaseAdmin();
+  const artThumbs = new Map<string, string>();
+  const clipFiles = new Map<string, { name: string; url: string }[]>();
+
+  if (admin) {
+    await Promise.all(
+      submissions.map(async (s) => {
+        if (s.artwork_path) {
+          const { data: signed } = await admin.storage
+            .from("submissions")
+            .createSignedUrl(s.artwork_path, 3600);
+          if (signed) artThumbs.set(s.id, signed.signedUrl);
+        }
+        const { data: files } = await admin.storage.from("clips").list(s.id);
+        if (files?.length) {
+          clipFiles.set(
+            s.id,
+            files
+              .filter((f) => f.name.endsWith(".mp4"))
+              .map((f) => ({
+                name: f.name,
+                url: admin.storage.from("clips").getPublicUrl(`${s.id}/${f.name}`).data.publicUrl,
+              }))
+          );
+        }
+      })
+    );
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-3xl flex-1 px-6">
+      <header className="flex items-center justify-between py-6">
+        <Link href="/">
+          <Logo size={26} />
+        </Link>
+        <div className="flex items-center gap-4 text-sm">
+          <Link href="/upload" className="text-muted transition hover:text-foreground">
+            New upload
+          </Link>
+          <form action="/auth/signout" method="post">
+            <button type="submit" className="text-muted transition hover:text-foreground">
+              Sign out
+            </button>
+          </form>
+        </div>
+      </header>
+
+      <section className="py-8">
+        <h1 className="text-3xl font-bold tracking-tight">Your songs</h1>
+        <p className="mt-2 text-sm text-muted">
+          Signed in as {user?.email}
+        </p>
+
+        {error ? (
+          <p className="mt-8 rounded-xl border border-borderline bg-surface p-4 text-sm text-danger">
+            Could not load your uploads: {error.message}
+          </p>
+        ) : null}
+
+        {submissions.length === 0 ? (
+          <div className="mt-8 rounded-2xl border border-borderline bg-surface p-10 text-center">
+            <p className="text-4xl">🎵</p>
+            <h2 className="mt-4 text-lg font-semibold">Nothing here yet</h2>
+            <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
+              Send us a song and we&apos;ll build your first clip. It shows up
+              here when it&apos;s ready.
+            </p>
+            <Link
+              href="/upload"
+              className="brand-gradient mt-6 inline-block rounded-xl px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+            >
+              Upload a song
+            </Link>
+          </div>
+        ) : (
+          <ul className="mt-8 flex flex-col gap-4">
+            {submissions.map((s) => {
+              const badge = STATUS[s.status] ?? {
+                label: s.status,
+                cls: "border-borderline text-muted",
+              };
+              const clips = clipFiles.get(s.id) ?? [];
+              const thumb = artThumbs.get(s.id);
+              return (
+                <li
+                  key={s.id}
+                  className="flex flex-col gap-4 rounded-2xl border border-borderline bg-surface p-5 sm:flex-row sm:items-center"
+                >
+                  <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-borderline bg-surface-raised">
+                    {thumb ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={thumb} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xl text-muted">
+                        ♪
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold">{s.song_title}</p>
+                    <p className="mt-0.5 text-xs text-muted">
+                      {new Date(s.created_at).toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </p>
+                    {clips.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {clips.map((c) => (
+                          <a
+                            key={c.name}
+                            href={c.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-lg border border-borderline px-2.5 py-1 text-xs text-muted transition hover:border-cyan hover:text-foreground"
+                          >
+                            {FORMAT_LABELS[c.name] ?? c.name} ↗
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <span
+                    className={`shrink-0 self-start rounded-full border px-3 py-1 text-xs sm:self-center ${badge.cls}`}
+                  >
+                    {badge.label}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </main>
+  );
+}

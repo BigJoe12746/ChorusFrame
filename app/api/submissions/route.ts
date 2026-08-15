@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase";
+import { getCurrentUser, getSupabaseAdmin } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 
@@ -78,6 +78,10 @@ export async function POST(req: Request) {
     }
   }
 
+  // Attribute the upload when the artist is signed in; anonymous uploads
+  // (the free-sample flow) keep user_id null and stay service-role-only.
+  const user = await getCurrentUser();
+
   const { error: dbErr } = await supabase.from("submissions").insert({
     id,
     email,
@@ -87,6 +91,7 @@ export async function POST(req: Request) {
     song_path: songPath,
     artwork_path: artworkPath,
     status: "queued",
+    user_id: user?.id ?? null,
   });
 
   if (dbErr) {

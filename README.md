@@ -37,6 +37,29 @@ succeed, but nothing is persisted (a warning is logged server-side).
    Environment Variables
 4. Deploy
 
+## Artist accounts (Supabase Auth)
+
+Passwordless email links — no password handling anywhere in the codebase.
+
+One-time setup, after `schema.sql`:
+
+1. SQL Editor → run `supabase/002_auth.sql` (adds `submissions.user_id`,
+   a `profiles` table with a signup trigger, and RLS read policies)
+2. Project Settings → **API Keys** → copy the **publishable** key into
+   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+3. Authentication → **URL Configuration** → add redirect URLs:
+   `http://localhost:3000/**` and your production URL + `/**`
+
+Until the publishable key is set, sign-in is disabled with a clear
+message and the rest of the site works normally.
+
+Routes: `/login` (magic link) → `/auth/callback` (code exchange) →
+`/dashboard` (the artist's own uploads and finished clips).
+`middleware.ts` refreshes the session and gates `/dashboard`.
+
+Uploads made while signed in are attributed to the account; anonymous
+free-sample uploads keep `user_id` null and stay service-role-only.
+
 ## Reviewing submissions
 
 Stage-gate is intentionally manual: check the `submissions` table in
