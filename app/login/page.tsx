@@ -5,10 +5,23 @@ import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
 import { authConfigured, getSupabaseBrowser } from "@/lib/supabase-browser";
+import { resolveNext } from "@/lib/safe-next";
+
+const CALLBACK_ERRORS: Record<string, string> = {
+  expired: "That sign-in link has expired or was already used. Here's a fresh one.",
+  "missing-code": "That link was incomplete. Request a new one below.",
+  "not-configured": "Sign-in isn't switched on for this deployment yet.",
+};
 
 function LoginForm() {
   const params = useSearchParams();
-  const next = params.get("next") || "/dashboard";
+  const nextParam = params.get("next");
+  // hasOwn, not a bare lookup: `?error=__proto__` would otherwise resolve to
+  // Object.prototype and crash the render when React tries to display it
+  const rawError = params.get("error") ?? "";
+  const callbackError = Object.hasOwn(CALLBACK_ERRORS, rawError)
+    ? CALLBACK_ERRORS[rawError]
+    : undefined;
   const [email, setEmail] = useState("");
   const [artistName, setArtistName] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -20,6 +33,8 @@ function LoginForm() {
     setError("");
     try {
       const supabase = getSupabaseBrowser();
+      // Sanitize here too, so a hostile `next` never even reaches the email
+      const next = resolveNext(nextParam, window.location.origin);
       const { error: authErr } = await supabase.auth.signInWithOtp({
         email: email.trim().toLowerCase(),
         options: {
@@ -76,6 +91,11 @@ function LoginForm() {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4">
+      {callbackError ? (
+        <p className="rounded-xl border border-borderline bg-surface p-3 text-sm text-muted">
+          {callbackError}
+        </p>
+      ) : null}
       <div>
         <label className="mb-1.5 block text-sm font-medium">Email</label>
         <input

@@ -36,7 +36,12 @@ export async function middleware(request: NextRequest) {
     const redirect = request.nextUrl.clone();
     redirect.pathname = "/login";
     redirect.searchParams.set("next", request.nextUrl.pathname);
-    return NextResponse.redirect(redirect);
+    const res = NextResponse.redirect(redirect);
+    // Carry over any cookies Supabase queued during the refresh attempt —
+    // otherwise a revoked session's cookie-clearing is thrown away here and
+    // the dead cookie keeps triggering failed refreshes on every request.
+    for (const cookie of response.cookies.getAll()) res.cookies.set(cookie);
+    return res;
   }
 
   return response;

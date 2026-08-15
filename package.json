@@ -10,7 +10,8 @@
     "studio": "remotion studio remotion/index.ts",
     "render:clip": "remotion render remotion/index.ts SampleClip out/clip.mp4",
     "render:submission": "node scripts/render-submission.mjs",
-    "render:campaign": "node scripts/render-submission.mjs --formats all"
+    "render:campaign": "node scripts/render-submission.mjs --formats all",
+    "test:redirect": "node --experimental-strip-types scripts/test-safe-next.mjs"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.512",

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServer } from "@/lib/supabase";
+import { resolveNext } from "@/lib/safe-next";
 
 export const runtime = "nodejs";
 
@@ -7,9 +8,9 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") ?? "/dashboard";
-  // Only allow same-site redirects — never bounce to an attacker-supplied host
-  const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+  // Only allow same-origin redirects — never bounce a freshly signed-in user
+  // to an attacker-supplied host
+  const safeNext = resolveNext(url.searchParams.get("next"), url.origin);
 
   if (!code) {
     return NextResponse.redirect(new URL("/login?error=missing-code", url.origin));
