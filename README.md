@@ -35,9 +35,36 @@ succeed, but nothing is persisted (a warning is logged server-side).
 ## Reviewing submissions
 
 Stage-gate is intentionally manual: check the `submissions` table in
-the Supabase dashboard (Table Editor), download files from the
-`submissions` storage bucket, build the sample clip, email it back, and
-set the row's `status` to `delivered`. Instrument later — validate first.
+the Supabase dashboard (Table Editor), render a sample clip (below),
+email it back, and set the row's `status` to `delivered`.
+Instrument later — validate first.
+
+## Rendering sample clips (Remotion)
+
+The `remotion/` folder holds the SampleClip template: a 1080×1920
+audio-reactive visualizer (blurred-artwork backdrop, bass-pulsing cover
+card, timed lyric lines, spectrum bars, VerseFrame end card).
+
+```bash
+npm run studio            # open Remotion Studio to preview/tweak the template
+npm run render:clip       # render the built-in demo to out/clip.mp4
+```
+
+Render a real submission straight from Supabase:
+
+```bash
+npm run render:submission -- --latest
+```
+
+- `--latest` picks the newest `queued` submission; or pass a submission id
+- `--start 34 --duration 30` chooses the clip window (defaults: 0, 15s)
+- `--no-end-card` drops the "Made with VerseFrame" outro
+- `--upload` pushes the MP4 to the public `clips` bucket and sets the
+  row to `status=clip_ready` + `sample_clip_url`
+
+Status lifecycle: `queued` → `in_progress` (claimed by a render run;
+reverts to `queued` if the render fails or isn't uploaded) → `clip_ready`
+(clip uploaded) → `delivered` (you emailed the artist — set manually).
 
 ## What's intentionally NOT here
 

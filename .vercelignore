@@ -1,0 +1,6 @@
+# Render pipeline runs locally, not on Vercel — keep deploys lean
+remotion
+scripts
+remotion.config.ts
+public/demo
+out

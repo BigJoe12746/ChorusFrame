@@ -6,13 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "studio": "remotion studio remotion/index.ts",
+    "render:clip": "remotion render remotion/index.ts SampleClip out/clip.mp4",
+    "render:submission": "node scripts/render-submission.mjs"
   },
   "dependencies": {
+    "@remotion/cli": "^4.0.512",
+    "@remotion/media-utils": "^4.0.512",
     "@supabase/supabase-js": "^2.112.3",
     "next": "16.3.1",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "remotion": "^4.0.512"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

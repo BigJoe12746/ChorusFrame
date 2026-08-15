@@ -17,7 +17,7 @@ create table if not exists public.submissions (
   lyrics text,
   song_path text not null,
   artwork_path text,
-  status text not null default 'queued', -- queued | in_progress | delivered
+  status text not null default 'queued', -- queued | in_progress | clip_ready | delivered
   sample_clip_url text,
   created_at timestamptz not null default now()
 );
