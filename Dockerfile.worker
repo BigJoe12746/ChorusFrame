@@ -1,0 +1,49 @@
+# ChorusFrame render worker.
+#
+# Only the render pipeline ships in this image — the Next.js app is deployed
+# separately to Vercel. The worker talks straight to Supabase, so it needs no
+# inbound networking and exposes no ports.
+
+FROM node:22-bookworm-slim
+
+# Shared libraries Chrome Headless Shell needs to start. Remotion renders in
+# a real browser, so these are required even though nothing is displayed.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates \
+      fonts-liberation \
+      libasound2 \
+      libatk-bridge2.0-0 \
+      libatk1.0-0 \
+      libcairo2 \
+      libcups2 \
+      libdbus-1-3 \
+      libgbm1 \
+      libnss3 \
+      libpango-1.0-0 \
+      libxcomposite1 \
+      libxdamage1 \
+      libxfixes3 \
+      libxkbcommon0 \
+      libxrandr2 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+# Just the pieces the worker actually runs.
+# tsconfig.json is required: the Remotion CLI refuses to start without one.
+COPY remotion.config.ts tsconfig.json ./
+COPY remotion ./remotion
+COPY scripts ./scripts
+COPY public ./public
+
+# Download the browser at build time so the first render isn't slowed by it
+RUN node node_modules/@remotion/cli/remotion-cli.js browser ensure
+
+ENV NODE_ENV=production
+
+# No .env.local in the image — configuration comes from Railway variables:
+#   NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, NEXT_PUBLIC_SITE_URL
+CMD ["node", "scripts/render-worker.mjs"]

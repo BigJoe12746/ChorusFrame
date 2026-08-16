@@ -1,0 +1,14 @@
+node_modules
+.next
+out
+.git
+.vercel
+.env*
+app
+components
+lib
+supabase
+*.md
+next.config.ts
+postcss.config.mjs
+eslint.config.mjs

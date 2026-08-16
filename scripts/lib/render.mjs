@@ -21,21 +21,24 @@ export const FORMATS = {
 export const MIN_DURATION = 5;
 export const MAX_DURATION = 60;
 
+/**
+ * Config from .env.local when present, overlaid with real environment
+ * variables. A deployed worker has no .env.local — the host injects the
+ * config — so a missing file is normal, not an error.
+ */
 export function loadEnv() {
   const envPath = path.join(ROOT, ".env.local");
-  let text;
+  const env = {};
+  let text = null;
   try {
     text = readFileSync(envPath, "utf8");
   } catch {
-    throw new Error(`.env.local not found at ${envPath}`);
+    // No local env file: rely entirely on the process environment.
   }
-  const env = {};
-  for (const line of text.split(/\r?\n/)) {
+  for (const line of (text ?? "").split(/\r?\n/)) {
     const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
     if (m && !line.trim().startsWith("#")) env[m[1]] = m[2].replace(/^["']|["']$/g, "");
   }
-  // Real environment variables win, so the worker can run on a host that
-  // injects config instead of shipping a .env.local
   return { ...env, ...process.env };
 }
 

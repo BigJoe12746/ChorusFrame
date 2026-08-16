@@ -72,6 +72,27 @@ npm run worker        # poll for jobs forever  (Ctrl-C releases the current job)
 npm run worker:once   # drain the queue and exit
 ```
 
+**In production the worker runs on Railway** (project `chorusframe-worker`,
+service `worker`), built from `Dockerfile.worker` — a Node image with Chrome's
+shared libraries and the headless shell baked in at build time. It needs no
+inbound networking and exposes no ports; it only talks out to Supabase.
+
+```bash
+npx @railway/cli up --service worker --ci      # deploy
+npx @railway/cli logs --service worker          # tail it
+```
+
+Railway variables required: `NEXT_PUBLIC_SUPABASE_URL`,
+`SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SITE_URL`. There is no `.env.local`
+in the image — `loadEnv()` falls back to the process environment.
+
+Two things the image genuinely needs and will fail without: `tsconfig.json`
+(the Remotion CLI refuses to start without one) and the Chrome shared
+libraries installed via apt.
+
+Running a local worker at the same time as the Railway one is fine — they
+claim different jobs.
+
 Run several workers if you want more throughput — `claim_render_job()` uses
 `FOR UPDATE SKIP LOCKED`, so they take different jobs instead of colliding.
 The worker heartbeats while rendering; a job whose worker dies is requeued
