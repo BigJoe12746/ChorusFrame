@@ -10,6 +10,7 @@ const defaultProps: SampleClipProps = {
   artistName: "Demo Artist",
   lyrics:
     "City lights are calling out my name\nFoot down, midnight, chasing flame\nNever slowing down, never the same\nWe run, we run, we run",
+  lyricTiming: [],
   clipStartSeconds: 0,
   durationSeconds: 15,
   showEndCard: true,

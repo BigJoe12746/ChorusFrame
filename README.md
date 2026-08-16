@@ -115,6 +115,36 @@ including failures, purely to stop a deliberate failure loop from burning
 compute. Both are enforced inside `enqueue_render_job()` in the same
 transaction as the insert, so concurrent requests can't slip past them.
 
+## Lyric timing
+
+"Paste your real lyrics — timing is our job" is a promise on the landing
+page, so lines are placed where they are actually sung rather than spread
+evenly across the clip.
+
+How it works: a transcriber returns what it *heard* with word-level
+timestamps, and `scripts/lib/align.mjs` aligns those words to the artist's
+official lyrics (Needleman-Wunsch with fuzzy word matching). We never show
+the transcript — only its timings. That survives the ways transcription
+actually fails: a misheard word still matches, a dropped word is
+interpolated between its neighbours, and a whole missed line lands between
+the lines around it.
+
+```bash
+npm run test:align   # 38 assertions, including misheard/dropped/missing-line cases
+```
+
+Set `OPENAI_API_KEY` (Whisper) or `DEEPGRAM_API_KEY` on the **worker** to turn
+it on. Without one, timing falls back to a syllable-weighted spread — long
+lines hold the screen longer than short ones, which is the main thing even
+distribution gets wrong — and is labelled `estimated`.
+
+Real timing is cached on `submissions.lyrics_timing` (migration
+`supabase/004_lyric_timing.sql`) so re-rendering another window or format
+doesn't pay for transcription twice. Estimates are deliberately **not**
+cached, so every song upgrades itself the moment a key is configured — no
+backfill needed. A transcription failure never fails a render; it falls back
+to an estimate, because an estimated clip beats no clip.
+
 ## Reviewing submissions
 
 Stage-gate is intentionally manual: check the `submissions` table in

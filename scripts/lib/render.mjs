@@ -8,6 +8,8 @@ import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { estimateTimings, splitLines, timingsForWindow } from "./align.mjs";
+import { ensureLyricTiming } from "./timing.mjs";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -144,6 +146,7 @@ export async function renderFormats({
   endCard = true,
   artworkColors = true,
   endCardUrl = "",
+  env = {},
   outDir = path.join(ROOT, "out"),
   outFile: singleOut = null,
   log = console.log,
@@ -153,12 +156,36 @@ export async function renderFormats({
 
   const { audioSrc, artworkSrc } = await signInputs(supabase, sub);
 
+  // Lyric timing: real alignment when a transcriber is configured (cached on
+  // the song), otherwise a syllable-weighted spread across this clip window.
+  let lyricTiming = [];
+  let timingSource = "none";
+  if (sub.lyrics?.trim()) {
+    const { timings, source } = await ensureLyricTiming({
+      supabase,
+      sub,
+      audioUrl: audioSrc,
+      env,
+      log,
+    });
+    timingSource = source;
+    const windowed =
+      source === "estimated" ? [] : timingsForWindow(timings, start, duration);
+    lyricTiming = windowed.length
+      ? windowed
+      : // No real timing, or none of it lands in this window: spread the lines
+        // across the clip so it still reads as a lyric video.
+        estimateTimings(splitLines(sub.lyrics), 0, duration);
+    log(`lyric timing: ${lyricTiming.length} lines (${timingSource})`);
+  }
+
   const props = {
     audioSrc,
     artworkSrc,
     songTitle: sub.song_title,
     artistName: sub.artist_name || "",
     lyrics: sub.lyrics || "",
+    lyricTiming,
     clipStartSeconds: start,
     durationSeconds: duration,
     showEndCard: endCard,

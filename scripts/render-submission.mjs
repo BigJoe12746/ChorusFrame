@@ -132,6 +132,7 @@ try {
     endCard: flags.endCard,
     artworkColors: flags.artworkColors,
     endCardUrl: env.NEXT_PUBLIC_SITE_URL || "",
+    env,
     outFile: flags.out,
   });
 

@@ -121,6 +121,7 @@ async function runJob(job) {
       start: Number(job.clip_start_seconds),
       duration: Number(job.duration_seconds),
       endCardUrl: env.NEXT_PUBLIC_SITE_URL || "",
+      env,
       log: (m) => log(`   ${m}`),
     });
     artifacts.push(...rendered.map((r) => r.outFile));

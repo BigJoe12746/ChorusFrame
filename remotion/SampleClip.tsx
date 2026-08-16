@@ -22,6 +22,11 @@ export type SampleClipProps = {
   artistName: string;
   /** Raw lyrics; lines separated by newlines. Empty string = no lyrics shown. */
   lyrics: string;
+  /**
+   * Timed lines, in seconds from the start of THIS clip. When present they
+   * drive the lyric display; when empty the lines are spread across the clip.
+   */
+  lyricTiming: { text: string; start: number; end: number }[];
   /** Where in the song the clip window begins, in seconds. */
   clipStartSeconds: number;
   /** Musical length of the clip (excluding the end card), in seconds. */
@@ -194,6 +199,7 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   songTitle,
   artistName,
   lyrics,
+  lyricTiming,
   clipStartSeconds,
   durationSeconds,
   showEndCard,
@@ -245,26 +251,48 @@ export const SampleClip: React.FC<SampleClipProps> = ({
     return out;
   };
   const maxLines = Math.min(10, Math.max(1, Math.floor((musicFrames - 54) / 26)));
-  const lines = lyrics
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .flatMap(wrapLine)
-    .slice(0, maxLines);
 
-  const lyricsStart = 1.0 * fps;
-  const lyricsEnd = musicFrames - 0.8 * fps;
-  const perLine = lines.length > 0 ? (lyricsEnd - lyricsStart) / lines.length : 0;
-  const rawIndex = perLine > 0 ? Math.floor((frame - lyricsStart) / perLine) : -1;
-  const lineIndex =
-    frame >= lyricsStart && frame < lyricsEnd
-      ? Math.min(Math.max(rawIndex, 0), lines.length - 1)
-      : -1;
-  const lineFrame = lineIndex >= 0 ? frame - (lyricsStart + lineIndex * perLine) : 0;
+  // Timed lines win when we have them: each line appears when it is actually
+  // sung. Without timing, fall back to spreading the lines across the clip.
+  const timed: { text: string; startF: number; endF: number }[] = lyricTiming?.length
+    ? lyricTiming
+        .flatMap((l) => {
+          const parts = wrapLine(l.text);
+          const span = (l.end - l.start) / Math.max(1, parts.length);
+          return parts.map((text, i) => ({
+            text,
+            startF: (l.start + span * i) * fps,
+            endF: (l.start + span * (i + 1)) * fps,
+          }));
+        })
+        .slice(0, 24)
+    : (() => {
+        const lines = lyrics
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean)
+          .flatMap(wrapLine)
+          .slice(0, maxLines);
+        const startF = 1.0 * fps;
+        const endF = musicFrames - 0.8 * fps;
+        const per = lines.length ? (endF - startF) / lines.length : 0;
+        return lines.map((text, i) => ({
+          text,
+          startF: startF + per * i,
+          endF: startF + per * (i + 1),
+        }));
+      })();
+
+  const active = timed.find((l) => frame >= l.startF && frame < l.endF) ?? null;
+  const lineFrame = active ? frame - active.startF : 0;
+  const lineSpan = active ? active.endF - active.startF : 0;
   const lineIn = spring({ frame: lineFrame, fps, config: { damping: 16, mass: 0.6 } });
+  // Fade over the tail of the line, but never start before it has finished
+  // springing in — short lines would otherwise only ever flash.
+  const fadeFrames = Math.min(8, Math.max(2, lineSpan * 0.25));
   const lineOut =
-    perLine > 0
-      ? interpolate(lineFrame, [perLine - 8, perLine], [1, 0], {
+    lineSpan > 0
+      ? interpolate(lineFrame, [lineSpan - fadeFrames, lineSpan], [1, 0], {
           extrapolateLeft: "clamp",
           extrapolateRight: "clamp",
         })
@@ -412,7 +440,7 @@ export const SampleClip: React.FC<SampleClipProps> = ({
       </div>
 
       {/* Active lyric line */}
-      {lineIndex >= 0 ? (
+      {active ? (
         <div
           style={{
             position: "absolute",
@@ -429,13 +457,13 @@ export const SampleClip: React.FC<SampleClipProps> = ({
           <span
             style={{
               color: "#ffffff",
-              fontSize: lines[lineIndex].length > 54 ? L.lyric.size * 0.79 : L.lyric.size,
+              fontSize: active.text.length > 54 ? L.lyric.size * 0.79 : L.lyric.size,
               fontWeight: 700,
               lineHeight: 1.25,
               textShadow: "0 4px 30px rgba(0,0,0,0.65)",
             }}
           >
-            {lines[lineIndex]}
+            {active.text}
           </span>
         </div>
       ) : null}
