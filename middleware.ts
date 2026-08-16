@@ -12,6 +12,25 @@ const configured = Boolean(url && publishableKey && !publishableKey.includes("PA
 export async function middleware(request: NextRequest) {
   if (!configured) return NextResponse.next();
 
+  // A sign-in code that landed somewhere other than the callback.
+  //
+  // Supabase falls back to the project's Site URL whenever the requested
+  // redirect isn't allow-listed, which drops the artist on "/" with a bare
+  // ?code= and no handler — the link looks broken. Stale links carry their
+  // old destination forever, so this keeps working regardless of how the
+  // dashboard is configured today.
+  const { pathname, searchParams } = request.nextUrl;
+  const strayCode = searchParams.get("code") ?? searchParams.get("token_hash");
+  if (strayCode && !pathname.startsWith("/auth/")) {
+    const callback = request.nextUrl.clone();
+    callback.pathname = "/auth/callback";
+    // Preserve the original path as the destination when it was a real page
+    if (pathname !== "/" && !callback.searchParams.get("next")) {
+      callback.searchParams.set("next", pathname);
+    }
+    return NextResponse.redirect(callback);
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(url, publishableKey, {
