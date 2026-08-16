@@ -2,6 +2,7 @@ import React from "react";
 import { Composition, staticFile } from "remotion";
 import { getAudioDurationInSeconds } from "@remotion/media-utils";
 import { SampleClip, FPS, END_CARD_SECONDS, type SampleClipProps } from "./SampleClip";
+import { DEFAULT_VIBE } from "./vibes";
 
 const defaultProps: SampleClipProps = {
   audioSrc: "demo/demo-song.wav",
@@ -16,6 +17,7 @@ const defaultProps: SampleClipProps = {
   showEndCard: true,
   endCardUrl: "",
   useArtworkColors: true,
+  vibe: DEFAULT_VIBE,
 };
 
 /**

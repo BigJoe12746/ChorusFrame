@@ -13,6 +13,7 @@ type Submission = {
   created_at: string;
   artwork_path: string | null;
   sample_clip_url: string | null;
+  vibe: string | null;
 };
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -46,7 +47,7 @@ export default async function DashboardPage() {
   // RLS scopes this to the signed-in artist's own rows
   const { data, error } = await supabase
     .from("submissions")
-    .select("id, song_title, artist_name, status, created_at, artwork_path, sample_clip_url")
+    .select("id, song_title, artist_name, status, created_at, artwork_path, sample_clip_url, vibe")
     .order("created_at", { ascending: false });
   const submissions = (data ?? []) as Submission[];
 
@@ -190,6 +191,7 @@ export default async function DashboardPage() {
                       <RenderControls
                         submissionId={s.id}
                         initialJob={latestJob.get(s.id) ?? null}
+                        initialVibe={s.vibe}
                       />
                     </div>
                   </div>

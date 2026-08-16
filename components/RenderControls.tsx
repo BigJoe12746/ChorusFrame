@@ -21,14 +21,28 @@ const FORMAT_LABELS: Record<string, string> = {
 
 const ACTIVE = ["queued", "rendering"];
 
+/** Mirrors remotion/vibes.ts. Swatches are indicative, not the render itself. */
+const VIBES = [
+  { id: "hyperpop", label: "Hyperpop", blurb: "Candy, caps, hard pump", from: "#ff4fd8", to: "#22dcf5" },
+  { id: "anime", label: "Dark anime", blurb: "Deep black, blood red", from: "#ff2d46", to: "#1a0308" },
+  { id: "dreamy", label: "Dreamy", blurb: "Pastel glow, lowercase", from: "#c9b8ff", to: "#ffc2e2" },
+  { id: "cinematic", label: "Cinematic", blurb: "Letterboxed, wide serif", from: "#e8d5b0", to: "#2e6f86" },
+  { id: "reggae", label: "Reggae", blurb: "Gold and green, bouncy", from: "#ffc400", to: "#1f9d55" },
+  { id: "minimal", label: "Minimal", blurb: "Mono, thin, still", from: "#f5f5f5", to: "#555" },
+];
+
 export default function RenderControls({
   submissionId,
   initialJob,
+  initialVibe,
 }: {
   submissionId: string;
   initialJob: RenderJob | null;
+  initialVibe: string | null;
 }) {
   const [job, setJob] = useState<RenderJob | null>(initialJob);
+  const [vibe, setVibe] = useState(initialVibe || "hyperpop");
+  const [picking, setPicking] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
 
@@ -76,6 +90,7 @@ export default function RenderControls({
           submissionId,
           formats: ["vertical", "square", "wide"],
           durationSeconds: 15,
+          vibe,
         }),
       });
       const data = await res.json();
@@ -91,10 +106,11 @@ export default function RenderControls({
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start the render");
+      setPicking(false);
     } finally {
       setStarting(false);
     }
-  }, [submissionId]);
+  }, [submissionId, vibe]);
 
   if (active && job) {
     return (
@@ -134,17 +150,59 @@ export default function RenderControls({
         </div>
       ) : null}
       {error ? <p className="text-xs text-danger">{error}</p> : null}
-      <button
-        onClick={start}
-        disabled={starting}
-        className="self-start rounded-lg border border-borderline px-3 py-1.5 text-xs font-medium text-muted transition hover:border-cyan hover:text-foreground disabled:opacity-60"
-      >
-        {starting
-          ? "Starting…"
-          : job?.status === "done" || job?.status === "failed"
-            ? "Render again"
+
+      {picking ? (
+        <div className="rounded-xl border border-borderline bg-surface-raised p-3">
+          <p className="mb-2 text-xs font-medium">Pick a vibe</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {VIBES.map((v) => (
+              <button
+                key={v.id}
+                onClick={() => setVibe(v.id)}
+                className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition ${
+                  vibe === v.id
+                    ? "border-cyan bg-surface"
+                    : "border-borderline hover:border-muted"
+                }`}
+              >
+                <span
+                  aria-hidden
+                  className="h-6 w-6 shrink-0 rounded-md"
+                  style={{ background: `linear-gradient(135deg, ${v.from}, ${v.to})` }}
+                />
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-medium">{v.label}</span>
+                  <span className="block truncate text-[10px] text-muted">{v.blurb}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={start}
+              disabled={starting}
+              className="brand-gradient rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+            >
+              {starting ? "Starting…" : "Render this vibe"}
+            </button>
+            <button
+              onClick={() => setPicking(false)}
+              className="rounded-lg px-2 py-1.5 text-xs text-muted transition hover:text-foreground"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setPicking(true)}
+          className="self-start rounded-lg border border-borderline px-3 py-1.5 text-xs font-medium text-muted transition hover:border-cyan hover:text-foreground"
+        >
+          {job?.status === "done" || job?.status === "failed"
+            ? "Render another vibe"
             : "Make my clips"}
-      </button>
+        </button>
+      )}
     </div>
   );
 }

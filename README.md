@@ -115,6 +115,29 @@ including failures, purely to stop a deliberate failure loop from burning
 compute. Both are enforced inside `enqueue_render_job()` in the same
 transaction as the insert, so concurrent requests can't slip past them.
 
+## Vibes
+
+Six visual directions in `remotion/vibes.ts`: `hyperpop`, `anime`, `dreamy`,
+`cinematic`, `reggae`, `minimal`. A vibe is not a colour swap — it changes
+typography (family, weight, case, tracking), motion speed, bass-pulse depth,
+the *shape* of the visualizer (bars / dots / trace / none), artwork treatment
+(corner radius, ring, glow), backdrop blur and saturation, vignette,
+letterbox, and film grain.
+
+A vibe declares whether its palette is `artwork` (themed from the cover) or
+`fixed` (keeps its own identity whatever the cover looks like) — that's the
+point of picking "dark anime" over "dreamy".
+
+Artists choose on the dashboard before rendering; the choice is remembered on
+the song and carried through the queue on the job, so a render always uses
+what was picked at the time. An unknown id falls back to the default rather
+than failing the render.
+
+Add one by adding an entry to `VIBES` and to `VALID_VIBES` in
+`app/api/render/route.ts` (kept in step deliberately, so the API rejects ids
+the renderer doesn't know). Font stacks stay on families present both locally
+and in the worker image (`fonts-liberation`).
+
 ## Lyric timing
 
 "Paste your real lyrics — timing is our job" is a promise on the landing

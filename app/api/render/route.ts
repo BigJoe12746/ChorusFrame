@@ -4,6 +4,8 @@ import { getCurrentUser, getSupabaseAdmin } from "@/lib/supabase";
 export const runtime = "nodejs";
 
 const VALID_FORMATS = ["vertical", "square", "wide"] as const;
+/** Keep in step with remotion/vibes.ts — an unknown id renders the default. */
+const VALID_VIBES = ["hyperpop", "anime", "dreamy", "cinematic", "reggae", "minimal"] as const;
 const MIN_DURATION = 5;
 const MAX_DURATION = 60;
 /** No song we accept is longer than this, so a start beyond it can only fail. */
@@ -64,6 +66,11 @@ export async function POST(req: Request) {
     );
   }
 
+  const vibe = typeof body.vibe === "string" ? body.vibe : null;
+  if (vibe && !VALID_VIBES.includes(vibe as (typeof VALID_VIBES)[number])) {
+    return NextResponse.json({ error: "Unknown vibe" }, { status: 400 });
+  }
+
   // Ownership, per-song dedupe, quota, and the insert all happen inside one
   // transaction. Checking in the route and inserting afterwards let several
   // concurrent requests each read "under the limit" and each insert.
@@ -75,6 +82,7 @@ export async function POST(req: Request) {
     p_duration: duration,
     p_daily_limit: DAILY_LIMIT,
     p_abuse_limit: ABUSE_LIMIT,
+    p_vibe: vibe,
   });
 
   if (error) {

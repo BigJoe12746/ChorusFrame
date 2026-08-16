@@ -157,6 +157,7 @@ export async function renderFormats({
   endCard = true,
   artworkColors = true,
   endCardUrl = "",
+  vibe = null,
   env = {},
   outDir = path.join(ROOT, "out"),
   outFile: singleOut = null,
@@ -207,6 +208,9 @@ export async function renderFormats({
     showEndCard: endCard,
     endCardUrl,
     useArtworkColors: artworkColors,
+    // The composition falls back to its default for an unknown id, so a bad
+    // value can never fail a render.
+    vibe: vibe || sub.vibe || "",
   };
 
   mkdirSync(outDir, { recursive: true });

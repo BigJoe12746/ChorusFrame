@@ -14,6 +14,7 @@ import {
 import { useAudioData, visualizeAudio } from "@remotion/media-utils";
 import { getLayout } from "./layout";
 import { BRAND_PALETTE, extractPalette, type Palette } from "./palette";
+import { DEFAULT_VIBE, getVibe } from "./vibes";
 
 export type SampleClipProps = {
   audioSrc: string;
@@ -36,6 +37,8 @@ export type SampleClipProps = {
   endCardUrl: string;
   /** Theme accents from the cover art instead of brand colors. */
   useArtworkColors: boolean;
+  /** Visual direction — see remotion/vibes.ts. */
+  vibe: string;
 };
 
 export const FPS = 30;
@@ -205,13 +208,21 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   showEndCard,
   endCardUrl,
   useArtworkColors,
+  vibe,
 }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
   const src = resolveSrc(audioSrc);
   const audioData = useAudioData(src);
+  const V = getVibe(vibe);
   const art = artworkSrc ? resolveSrc(artworkSrc) : null;
-  const palette = useArtworkPalette(art, useArtworkColors);
+  // A vibe with a fixed palette keeps its own colours whatever the cover looks
+  // like — that identity is the point of choosing it.
+  const artPalette = useArtworkPalette(art, useArtworkColors && V.palette.mode === "artwork");
+  const palette: Palette =
+    V.palette.mode === "fixed" || !artPalette.fromArtwork
+      ? { primary: V.palette.primary, secondary: V.palette.secondary, fromArtwork: false }
+      : artPalette;
   const L = getLayout(width, height);
 
   const musicFrames = Math.round(durationSeconds * fps);
@@ -228,10 +239,15 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   // Frequency data drives everything: bass → artwork pulse, mid → bars
   const freq = visualizeAudio({ audioData, frame: mediaFrame, fps, numberOfSamples: 64 });
   const bass = (freq[0] + freq[1] + freq[2] + freq[3] + freq[4]) / 5;
-  const pulse = 1 + Math.min(bass * 1.4, 1) * 0.05;
+  const pulse = 1 + Math.min(bass * 1.4, 1) * V.art.pulse;
 
-  // Intro entrance
-  const intro = spring({ frame, fps, config: { damping: 200 }, durationInFrames: 24 });
+  // Intro entrance — a vibe can make it snap or drift
+  const intro = spring({
+    frame,
+    fps,
+    config: { damping: 200 },
+    durationInFrames: Math.round(24 * V.motion),
+  });
   const headerShift = interpolate(intro, [0, 1], [-L.unit * 0.056, 0]);
 
   // Lyrics: re-break long source lines on word boundaries (paragraph-pasted
@@ -327,11 +343,17 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   const fadeIn =
     clipStartSeconds > 0 ? interpolate(frame, [0, 12], [0, 1], { extrapolateRight: "clamp" }) : 1;
 
-  const artSway = Math.sin(frame / 55) * 1.1;
+  const artSway = Math.sin(frame / 55) * V.art.sway;
   const bgDrift = frame * 0.12;
 
+  // Letterbox eats the bottom of the frame, so the whole lower cluster
+  // (waveform + watermark) moves up together rather than one piece sliding
+  // into the other.
+  const letterboxHeight = height * 0.055;
+  const bottomLift = V.letterbox ? letterboxHeight : 0;
+
   return (
-    <AbsoluteFill style={{ backgroundColor: NAVY, fontFamily: FONT }}>
+    <AbsoluteFill style={{ backgroundColor: V.background, fontFamily: V.fonts.title }}>
       <Audio
         src={src}
         startFrom={Math.round(clipStartSeconds * fps)}
@@ -348,32 +370,31 @@ export const SampleClip: React.FC<SampleClipProps> = ({
               width: "100%",
               height: "100%",
               objectFit: "cover",
-              transform: `scale(2.3) rotate(${bgDrift * 0.05}deg) translateY(${
+              transform: `scale(${V.backdrop.scale}) rotate(${bgDrift * 0.05}deg) translateY(${
                 Math.sin(frame / 90) * 14
               }px)`,
-              filter: "blur(70px) saturate(1.35) brightness(0.5)",
+              filter: `blur(${V.backdrop.blur}px) saturate(${V.backdrop.saturate}) brightness(${V.backdrop.brightness})`,
             }}
           />
         ) : (
           <AbsoluteFill
             style={{
-              background: `radial-gradient(circle at 50% 30%, ${palette.secondary}33, ${NAVY} 80%)`,
+              background: `radial-gradient(circle at 50% 30%, ${palette.secondary}33, ${V.background} 80%)`,
             }}
           />
         )}
       </AbsoluteFill>
       <AbsoluteFill
         style={{
-          background:
-            "radial-gradient(ellipse at center, rgba(8,11,22,0) 45%, rgba(8,11,22,0.75) 100%)",
+          background: `radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,${V.vignette}) 100%)`,
         }}
       />
 
-      {/* Progress bar */}
+      {/* Progress bar — sits below the letterbox bar rather than under it */}
       <div
         style={{
           position: "absolute",
-          top: 0,
+          top: bottomLift,
           left: 0,
           height: L.progressHeight,
           width: `${progress * 100}%`,
@@ -398,8 +419,8 @@ export const SampleClip: React.FC<SampleClipProps> = ({
             style={{
               color: palette.primary,
               fontSize: L.header.artistSize,
-              fontWeight: 600,
-              letterSpacing: "0.28em",
+              fontWeight: V.artistLabel.weight,
+              letterSpacing: V.artistLabel.letterSpacing,
               textTransform: "uppercase",
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -418,7 +439,10 @@ export const SampleClip: React.FC<SampleClipProps> = ({
                 : songTitle.length > 22
                   ? L.header.titleSize * 0.78
                   : L.header.titleSize,
-            fontWeight: 800,
+            fontWeight: V.title.weight,
+            fontStyle: V.title.italic ? "italic" : "normal",
+            letterSpacing: V.title.letterSpacing,
+            textTransform: V.title.transform,
             marginTop: L.unit * 0.017,
             lineHeight: 1.1,
             display: "-webkit-box",
@@ -440,10 +464,11 @@ export const SampleClip: React.FC<SampleClipProps> = ({
           width: L.art.size,
           height: L.art.size,
           transform: `scale(${(0.82 + 0.18 * intro) * pulse}) rotate(${artSway}deg)`,
-          borderRadius: L.art.radius,
+          borderRadius: L.art.size * V.art.radiusScale,
           overflow: "hidden",
+          border: V.art.ring ? `${Math.max(2, L.unit * 0.004)}px solid ${palette.primary}` : undefined,
           boxShadow: `0 ${L.unit * 0.055}px ${L.unit * 0.13}px rgba(0,0,0,0.6), 0 0 ${
-            L.unit * 0.055 + bass * L.unit * 0.15
+            (L.unit * 0.055 + bass * L.unit * 0.15) * V.art.glow
           }px ${palette.secondary}${bass > 0.3 ? "88" : "44"}`,
         }}
       >
@@ -472,10 +497,16 @@ export const SampleClip: React.FC<SampleClipProps> = ({
           <span
             style={{
               color: "#ffffff",
-              fontSize: active.text.length > 54 ? L.lyric.size * 0.79 : L.lyric.size,
-              fontWeight: 700,
+              fontFamily: V.fonts.lyric,
+              fontSize:
+                (active.text.length > 54 ? L.lyric.size * 0.79 : L.lyric.size) *
+                V.lyric.sizeScale,
+              fontWeight: V.lyric.weight,
+              fontStyle: V.lyric.italic ? "italic" : "normal",
+              letterSpacing: V.lyric.letterSpacing,
+              textTransform: V.lyric.transform,
               lineHeight: 1.25,
-              textShadow: "0 4px 30px rgba(0,0,0,0.65)",
+              textShadow: V.lyric.shadow,
             }}
           >
             {active.text}
@@ -483,45 +514,88 @@ export const SampleClip: React.FC<SampleClipProps> = ({
         </div>
       ) : null}
 
-      {/* Waveform bars */}
-      <div
-        style={{
-          position: "absolute",
-          top: L.bars.top,
-          left: L.bars.left,
-          width: L.bars.width,
-          height: L.bars.height,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {bars.map((v, i) => {
-          const h = L.bars.height * 0.06 + Math.min(1, Math.pow(v * 4.5, 0.75)) * L.bars.height * 0.86;
-          const t = i / (bars.length - 1);
-          return (
-            <div
-              key={i}
-              style={{
-                width: barWidth * 0.62,
-                marginRight: barWidth * 0.38,
-                height: h,
-                borderRadius: barWidth * 0.31,
-                background: `linear-gradient(180deg, ${
-                  t < 0.5 ? palette.primary : palette.secondary
-                }, ${palette.secondary})`,
-                opacity: 0.9,
-              }}
-            />
-          );
-        })}
-      </div>
+      {/* Audio visualizer — its shape is part of the vibe, not just its colour */}
+      {V.bars.style !== "none" ? (
+        <div
+          style={{
+            position: "absolute",
+            top: L.bars.top - bottomLift,
+            left: L.bars.left,
+            width: L.bars.width,
+            height: L.bars.height,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: V.bars.opacity,
+          }}
+        >
+          {bars.map((v, i) => {
+            const level = Math.min(1, Math.pow(v * 4.5, 0.75));
+            const t = i / Math.max(1, bars.length - 1);
+            const color = t < 0.5 ? palette.primary : palette.secondary;
+            const w = barWidth * V.bars.thickness;
 
-      {/* Watermark */}
+            if (V.bars.style === "dots") {
+              // Circles that swell with the level and drift off the centre line
+              const d = w * (0.5 + level * 0.9);
+              return (
+                <div
+                  key={i}
+                  style={{
+                    width: w,
+                    height: L.bars.height,
+                    marginRight: barWidth - w,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transform: `translateY(${-level * L.bars.height * 0.22}px)`,
+                  }}
+                >
+                  <div style={{ width: d, height: d, borderRadius: "50%", background: color }} />
+                </div>
+              );
+            }
+
+            if (V.bars.style === "line") {
+              // A thin symmetric trace — reads as an instrument readout
+              const h = Math.max(2, level * L.bars.height * 0.82);
+              return (
+                <div
+                  key={i}
+                  style={{
+                    width: w,
+                    marginRight: barWidth - w,
+                    height: h,
+                    background: color,
+                    borderRadius: 0,
+                  }}
+                />
+              );
+            }
+
+            // "bars" — chunky columns anchored to the baseline
+            const h = L.bars.height * 0.06 + level * L.bars.height * 0.86;
+            return (
+              <div
+                key={i}
+                style={{
+                  width: w,
+                  marginRight: barWidth - w,
+                  height: h,
+                  borderRadius: w * V.bars.radiusScale,
+                  background: `linear-gradient(180deg, ${color}, ${palette.secondary})`,
+                }}
+              />
+            );
+          })}
+        </div>
+      ) : null}
+
+      {/* Watermark — lifted clear of the letterbox bar when there is one */}
       <div
         style={{
           position: "absolute",
-          top: L.watermark.top,
+          top: L.watermark.top - bottomLift,
           left: L.watermark.left,
           width: L.watermark.width,
           display: "flex",
@@ -536,6 +610,46 @@ export const SampleClip: React.FC<SampleClipProps> = ({
           ChorusFrame
         </span>
       </div>
+
+      {/* Film grain — a static tile, so it costs nothing per frame */}
+      {V.grain > 0 ? (
+        <AbsoluteFill
+          style={{
+            opacity: V.grain,
+            pointerEvents: "none",
+            backgroundImage:
+              "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='0.55'/></svg>\")",
+            backgroundRepeat: "repeat",
+            mixBlendMode: "overlay",
+          }}
+        />
+      ) : null}
+
+      {/* Letterbox bars, drawn last so nothing sits on top of them */}
+      {V.letterbox ? (
+        <>
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: letterboxHeight,
+              background: "#000",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              width: "100%",
+              height: letterboxHeight,
+              background: "#000",
+            }}
+          />
+        </>
+      ) : null}
 
       {showEndCard && frame >= musicFrames ? (
         <EndCard startFrame={musicFrames} unit={L.unit} palette={palette} url={endCardUrl} />
