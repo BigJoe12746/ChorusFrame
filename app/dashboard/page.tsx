@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import RenderControls, { type RenderJob } from "@/components/RenderControls";
+import SetPassword from "@/components/SetPassword";
 import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -124,9 +125,15 @@ export default async function DashboardPage() {
 
       <section className="py-8">
         <h1 className="text-3xl font-bold tracking-tight">Your songs</h1>
-        <p className="mt-2 text-sm text-muted">
-          Signed in as {user?.email}
-        </p>
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <p className="text-sm text-muted">Signed in as {user?.email}</p>
+          <SetPassword
+            hasPassword={Boolean(
+              (user?.identities ?? []).some((i) => i.provider === "email") &&
+                user?.user_metadata?.has_password
+            )}
+          />
+        </div>
 
         {error ? (
           <p className="mt-8 rounded-xl border border-borderline bg-surface p-4 text-sm text-danger">

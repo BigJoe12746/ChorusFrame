@@ -53,9 +53,9 @@ export default function NavAuth() {
           {authConfigured ? (
             <Link
               href="/login"
-              className="rounded-lg border border-borderline px-4 py-2 text-muted transition hover:border-cyan hover:text-foreground"
+              className="rounded-lg border border-borderline px-4 py-2 font-medium text-foreground transition hover:border-cyan"
             >
-              Sign in
+              Log in
             </Link>
           ) : null}
         </>
