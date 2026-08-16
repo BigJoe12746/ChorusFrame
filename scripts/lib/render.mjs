@@ -3,8 +3,9 @@
 // how clips are produced can't drift between the two entry points.
 
 import { createClient } from "@supabase/supabase-js";
-import { readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -74,6 +75,33 @@ export function validateFormats(formats) {
  * would starve it for the whole render — which made every long render look
  * abandoned and get reclaimed and re-rendered by a second worker.
  */
+/**
+ * Locate the Remotion CLI's JS entry so it can be run with this Node binary.
+ * The package doesn't expose the bin through its "exports" map, so resolve the
+ * package directory first and fall back to a plain node_modules lookup.
+ */
+function resolveRemotionCli() {
+  const req = createRequire(import.meta.url);
+  const candidates = [];
+  for (const spec of ["@remotion/cli/package.json", "@remotion/cli"]) {
+    try {
+      const resolved = req.resolve(spec);
+      const dir = spec.endsWith("package.json")
+        ? path.dirname(resolved)
+        : path.resolve(path.dirname(resolved), "..");
+      candidates.push(path.join(dir, "remotion-cli.js"));
+    } catch {
+      // try the next strategy
+    }
+  }
+  candidates.push(path.join(ROOT, "node_modules", "@remotion", "cli", "remotion-cli.js"));
+  const found = candidates.find((c) => existsSync(c));
+  if (!found) {
+    throw new Error(`could not locate the Remotion CLI (looked in: ${candidates.join(", ")})`);
+  }
+  return found;
+}
+
 function run(command, args, opts) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { ...opts, stdio: "inherit", shell: false });
@@ -142,9 +170,11 @@ export async function renderFormats({
   const propsFile = path.join(outDir, `${sub.id}-${runId}-props.json`);
   writeFileSync(propsFile, JSON.stringify(props, null, 2));
 
-  // npx is a .cmd shim on Windows; shell:false means args are passed through
-  // verbatim, so nothing in a song title can reach a command line.
-  const npx = process.platform === "win32" ? "npx.cmd" : "npx";
+  // Invoke the Remotion CLI's JS entry point with this same Node binary rather
+  // than going through npx. npx is a .cmd shim on Windows, and Node refuses to
+  // spawn .cmd files without a shell (EINVAL), while using a shell would put
+  // paths on a command line. This avoids both.
+  const cli = resolveRemotionCli();
 
   const rendered = [];
   try {
@@ -155,9 +185,9 @@ export async function renderFormats({
           : path.join(outDir, `${sub.id}-${runId}-${format}.mp4`);
       log(`▶ ${format}: rendering…`);
       await run(
-        npx,
+        process.execPath,
         [
-          "remotion",
+          cli,
           "render",
           "remotion/index.ts",
           FORMATS[format].composition,
