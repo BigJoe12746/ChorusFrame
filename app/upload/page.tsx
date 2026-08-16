@@ -199,7 +199,15 @@ export default function UploadPage() {
               />
               <span>
                 I own or control the rights to this music and artwork, and I&apos;m okay
-                with ChorusFrame using them to build my sample clip.
+                with ChorusFrame using them to build my clips. I agree to the{" "}
+                <Link href="/legal/terms" className="text-cyan underline underline-offset-4">
+                  Terms
+                </Link>{" "}
+                and{" "}
+                <Link href="/legal/privacy" className="text-cyan underline underline-offset-4">
+                  Privacy policy
+                </Link>
+                .
               </span>
             </label>
 

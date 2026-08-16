@@ -187,12 +187,21 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="flex flex-col items-center gap-2 border-t border-borderline py-8 text-center text-xs text-muted">
+      <footer className="flex flex-col items-center gap-3 border-t border-borderline py-8 text-center text-xs text-muted">
         <Logo size={26} />
-        <p>The video studio built for music releases. · © 2026 ChorusFrame Labs</p>
-        <p>
-          By uploading, you confirm you own the rights to your music and artwork.
-        </p>
+        <p>The video studio built for music releases. · © 2026 ChorusFrame</p>
+        <nav className="flex flex-wrap justify-center gap-4">
+          <Link href="/legal/terms" className="transition hover:text-foreground">
+            Terms
+          </Link>
+          <Link href="/legal/privacy" className="transition hover:text-foreground">
+            Privacy
+          </Link>
+          <Link href="/legal/copyright" className="transition hover:text-foreground">
+            Copyright
+          </Link>
+        </nav>
+        <p>By uploading, you confirm you own the rights to your music and artwork.</p>
       </footer>
     </main>
   );
