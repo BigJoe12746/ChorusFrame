@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MAX_START } from "@/lib/clip-limits";
+import { analyzeAudio, type Analysis } from "@/lib/audio-analysis";
 
 const BUCKETS = 600;
 
@@ -37,6 +38,9 @@ export default function HookPicker({
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [dragging, setDragging] = useState(false);
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  /** Only auto-jump to the suggestion once, so it never fights the artist. */
+  const suggested = useRef(false);
 
   // Decode once per song and reduce to a fixed number of peaks
   useEffect(() => {
@@ -71,6 +75,15 @@ export default function HookPicker({
         const max = Math.max(...out, 0.0001);
         setPeaks(out.map((p) => p / max));
         setAudioDuration(audio.duration);
+
+        // Same samples, second use: find the loudest sustained stretch and
+        // open there. The old default of 0:00 was the intro of most tracks.
+        const a = analyzeAudio(data, audio.sampleRate, duration, MAX_START);
+        setAnalysis(a);
+        if (!suggested.current && a.bestStart > 0) {
+          suggested.current = true;
+          onChange(a.bestStart);
+        }
         setState("ready");
       } catch {
         if (live) setState("failed");
@@ -82,6 +95,11 @@ export default function HookPicker({
     return () => {
       live = false;
     };
+    // Intentionally keyed on the URL alone. Adding `duration` or `onChange`
+    // would re-run the decode — a second download of the whole song — every
+    // time the artist changed clip length. The suggestion is computed once
+    // from the length in effect at decode time, which is what we want.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioUrl]);
 
   // Draw the waveform whenever the peaks or the chosen window change.
@@ -194,8 +212,13 @@ export default function HookPicker({
 
   return (
     <div>
-      <div className="mb-1.5 flex items-baseline justify-between text-xs">
-        <span className="font-medium">Pick your hook</span>
+      <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-2 text-xs">
+        <span className="font-medium">
+          Pick your hook
+          {analysis?.tempo ? (
+            <span className="ml-1.5 font-normal text-muted">≈{analysis.tempo} BPM</span>
+          ) : null}
+        </span>
         <span className="text-muted">
           {mmss(start)} – {mmss(effectiveEnd)} of {mmss(audioDuration)}
           {shortened ? (
@@ -235,9 +258,19 @@ export default function HookPicker({
         className="mt-2 w-full accent-[var(--cyan)]"
       />
 
+      {analysis && Math.abs(analysis.bestStart - start) > 0.6 ? (
+        <button
+          type="button"
+          onClick={() => onChange(Math.min(maxStart, analysis.bestStart))}
+          className="mt-2 rounded-lg border border-borderline px-2.5 py-1 text-[11px] text-muted transition hover:border-cyan hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+        >
+          ✨ Jump to the strongest part ({mmss(analysis.bestStart)})
+        </button>
+      ) : null}
+
       <p className="mt-1 text-[11px] text-muted">
-        Drag on the waveform, or use the slider. Aim at the loudest part — that&apos;s
-        usually the chorus.
+        Drag on the waveform, or use the slider. We start you at the loudest
+        sustained stretch — usually the chorus.
         {cappedByLimit ? (
           <span className="ml-1 text-cyan">
             Clips can start up to {mmss(MAX_START)}.
