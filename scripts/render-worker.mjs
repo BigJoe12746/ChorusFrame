@@ -20,6 +20,7 @@
 import os from "node:os";
 import { rmSync } from "node:fs";
 import { loadEnv, makeClient, renderFormats, uploadClips } from "./lib/render.mjs";
+import { notifyClipsReady } from "./lib/notify.mjs";
 
 const argv = process.argv.slice(2);
 const ONCE = argv.includes("--once");
@@ -147,6 +148,16 @@ async function runJob(job) {
         .eq("id", sub.id)
         .neq("status", "delivered");
       log(`✔ job ${job.id} done — ${urls.map((u) => u.format).join(", ")}`);
+
+      // Self-serve only works if the artist doesn't have to watch a spinner.
+      // notifyClipsReady never throws: the clips exist either way.
+      await notifyClipsReady({
+        env,
+        to: sub.email,
+        songTitle: sub.song_title,
+        clips: urls,
+        log: (m) => log(`   ${m}`),
+      });
     }
     lease = null;
   } catch (e) {

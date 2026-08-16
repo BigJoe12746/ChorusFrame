@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import NavAuth from "@/components/NavAuth";
-import WaitlistForm from "@/components/WaitlistForm";
 
 const kit = [
   { name: "TikTok / Reels", detail: "9:16 vertical, caption-safe zones" },
@@ -74,10 +73,25 @@ export default function Home() {
           Vertical cuts, lyric video, Canvas loop, visualizer, teasers. One
           project, every format, minutes instead of a weekend.
         </p>
-        <div className="mx-auto mt-10 max-w-2xl">
-          <WaitlistForm />
-          <p className="mt-3 text-xs text-muted">
-            Free while in beta · First 1,000 artists lock founding-year pricing
+        <div className="mx-auto mt-10 flex max-w-2xl flex-col items-center gap-4">
+          <Link
+            href="/login"
+            className="brand-gradient rounded-xl px-8 py-3.5 text-base font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+          >
+            Start free — upload a song
+          </Link>
+          <p className="text-sm text-muted">
+            Rather we made your first one?{" "}
+            <Link
+              href="/upload"
+              className="text-cyan underline underline-offset-4 transition hover:text-foreground"
+            >
+              Send us a song
+            </Link>{" "}
+            and we&apos;ll build it by hand.
+          </p>
+          <p className="text-xs text-muted">
+            Free while in beta · No card, no waiting list
           </p>
         </div>
       </section>
@@ -151,18 +165,26 @@ export default function Home() {
       {/* CTA */}
       <section className="my-16 rounded-3xl border border-borderline bg-gradient-to-br from-surface to-surface-raised p-10 text-center">
         <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
-          Releasing soon? Skip the waitlist.
+          Releasing soon? Start now.
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-muted">
-          Send us one song and we&apos;ll hand-build you a free sample clip — so
-          you can see your music in motion before we open the doors.
+          Make an account, upload the track, pick a vibe, and your clips render
+          while you carry on with the rest of the release.
         </p>
-        <Link
-          href="/upload"
-          className="brand-gradient mt-8 inline-block rounded-xl px-8 py-3 font-semibold text-white transition hover:opacity-90"
-        >
-          Upload your song
-        </Link>
+        <div className="mt-8 flex flex-col items-center gap-3">
+          <Link
+            href="/login"
+            className="brand-gradient inline-block rounded-xl px-8 py-3 font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+          >
+            Start free
+          </Link>
+          <Link
+            href="/upload"
+            className="text-sm text-muted underline underline-offset-4 transition hover:text-foreground"
+          >
+            Or have us hand-build your first clip
+          </Link>
+        </div>
       </section>
 
       <footer className="flex flex-col items-center gap-2 border-t border-borderline py-8 text-center text-xs text-muted">

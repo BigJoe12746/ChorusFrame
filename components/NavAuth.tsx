@@ -44,17 +44,20 @@ export default function NavAuth() {
         </Link>
       ) : (
         <>
+          <Link
+            href="/upload"
+            className="px-2 py-2 text-muted transition hover:text-foreground"
+          >
+            Free sample clip
+          </Link>
           {authConfigured ? (
-            <Link href="/login" className="px-2 py-2 text-muted transition hover:text-foreground">
+            <Link
+              href="/login"
+              className="rounded-lg border border-borderline px-4 py-2 text-muted transition hover:border-cyan hover:text-foreground"
+            >
               Sign in
             </Link>
           ) : null}
-          <Link
-            href="/upload"
-            className="rounded-lg border border-borderline px-4 py-2 text-muted transition hover:border-cyan hover:text-foreground"
-          >
-            Get a free sample clip
-          </Link>
         </>
       )}
     </div>

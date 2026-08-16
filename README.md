@@ -138,6 +138,15 @@ Add one by adding an entry to `VIBES` and to `VALID_VIBES` in
 the renderer doesn't know). Font stacks stay on families present both locally
 and in the worker image (`fonts-liberation`).
 
+## Telling the artist their clips are done
+
+`scripts/lib/notify.mjs` emails the artist when a render finishes — self-serve
+isn't self-serve if they have to watch the dashboard. Set `RESEND_API_KEY` or
+`POSTMARK_TOKEN` on the **worker** (plus `NOTIFY_FROM` once you have a verified
+sender). With neither, the worker logs what it would have sent.
+
+Sending never fails a job: the clips exist whether or not the email lands.
+
 ## Lyric timing
 
 "Paste your real lyrics — timing is our job" is a promise on the landing
