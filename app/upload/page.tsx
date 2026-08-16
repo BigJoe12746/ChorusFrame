@@ -36,37 +36,99 @@ export default function UploadPage() {
     };
   }, []);
 
-  function submit(e: React.FormEvent) {
+  /** PUT straight to storage, reporting progress as it goes. */
+  function putFile(signedUrl: string, file: File, onProgress: (pct: number) => void) {
+    return new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", signedUrl);
+      xhr.setRequestHeader("content-type", file.type || "application/octet-stream");
+      xhr.upload.addEventListener("progress", (ev) => {
+        if (ev.lengthComputable) onProgress(ev.loaded / ev.total);
+      });
+      xhr.addEventListener("load", () =>
+        xhr.status >= 200 && xhr.status < 300
+          ? resolve()
+          : reject(new Error(`upload failed (${xhr.status})`))
+      );
+      xhr.addEventListener("error", () => reject(new Error("network")));
+      xhr.addEventListener("abort", () => reject(new Error("aborted")));
+      xhr.send(file);
+    });
+  }
+
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!formRef.current) return;
+    const form = formRef.current;
+    if (!form) return;
+
+    const data = new FormData(form);
+    const song = data.get("song");
+    const artwork = data.get("artwork");
+    if (!(song instanceof File) || song.size === 0) {
+      setError("Attach your song first.");
+      setState("error");
+      return;
+    }
+
     setState("sending");
     setError("");
     setProgress(0);
 
-    // XHR rather than fetch: a 50 MB upload with no progress feels broken
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/submissions");
-    xhr.upload.addEventListener("progress", (ev) => {
-      if (ev.lengthComputable) setProgress(Math.round((ev.loaded / ev.total) * 100));
-    });
-    xhr.addEventListener("load", () => {
-      let data: { error?: string } = {};
-      try {
-        data = JSON.parse(xhr.responseText);
-      } catch {
-        // fall through to the status check
+    try {
+      // 1. Ask for somewhere to put the files. The audio must NOT go through
+      //    our API: Vercel rejects request bodies over ~4.5MB, which is
+      //    smaller than most songs.
+      const urlRes = await fetch("/api/submissions/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          songName: song.name,
+          artworkName: artwork instanceof File && artwork.size > 0 ? artwork.name : undefined,
+        }),
+      });
+      const slots = await urlRes.json();
+      if (!urlRes.ok) throw new Error(slots.error || "Could not start the upload");
+
+      // 2. Straight to storage. The song is the bulk of the bytes, so it owns
+      //    most of the progress bar.
+      const hasArt = artwork instanceof File && artwork.size > 0 && slots.artwork;
+      await putFile(slots.song.signedUrl, song, (f) =>
+        setProgress(Math.round(f * (hasArt ? 90 : 98)))
+      );
+      if (hasArt) {
+        await putFile(slots.artwork.signedUrl, artwork as File, (f) =>
+          setProgress(90 + Math.round(f * 8))
+        );
       }
-      if (xhr.status >= 200 && xhr.status < 300) setState("done");
-      else {
-        setError(data.error || "Something went wrong. Try again.");
-        setState("error");
-      }
-    });
-    xhr.addEventListener("error", () => {
-      setError("The upload was interrupted. Check your connection and try again.");
+      setProgress(99);
+
+      // 3. Record it, now that the files are demonstrably there.
+      const finishRes = await fetch("/api/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: slots.id,
+          email: String(data.get("email") ?? ""),
+          artistName: String(data.get("artistName") ?? ""),
+          songTitle: String(data.get("songTitle") ?? ""),
+          lyrics: String(data.get("lyrics") ?? ""),
+          songPath: slots.song.path,
+          artworkPath: hasArt ? slots.artwork.path : null,
+        }),
+      });
+      const finished = await finishRes.json();
+      if (!finishRes.ok) throw new Error(finished.error || "Something went wrong. Try again.");
+
+      setProgress(100);
+      setState("done");
+    } catch (err) {
+      setError(
+        err instanceof Error && err.message !== "network"
+          ? err.message
+          : "The upload was interrupted. Check your connection and try again."
+      );
       setState("error");
-    });
-    xhr.send(new FormData(formRef.current));
+    }
   }
 
   const inputCls =

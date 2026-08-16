@@ -5,76 +5,80 @@ export const runtime = "nodejs";
 
 const MAX_AUDIO_BYTES = 50 * 1024 * 1024; // 50 MB
 const MAX_ART_BYTES = 10 * 1024 * 1024; // 10 MB
-const AUDIO_TYPES = ["audio/mpeg", "audio/wav", "audio/x-wav", "audio/mp3"];
-const ART_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function safeName(name: string) {
-  return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80);
-}
-
+/**
+ * Record a submission whose files are already in storage.
+ *
+ * The audio never passes through here — it goes browser-to-storage via a
+ * signed URL from /api/submissions/upload-url, because Vercel caps request
+ * bodies at ~4.5MB and a normal MP3 is larger than that.
+ *
+ * Sizes are enforced against what actually landed rather than what the browser
+ * claimed, since a signed upload URL is a direct line to storage.
+ */
 export async function POST(req: Request) {
-  const form = await req.formData().catch(() => null);
-  if (!form) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    console.warn("[submissions] Supabase not configured — demo mode");
+    return NextResponse.json({ ok: true, demo: true });
   }
 
-  const email = String(form.get("email") ?? "").trim().toLowerCase();
-  const artistName = String(form.get("artistName") ?? "").trim();
-  const songTitle = String(form.get("songTitle") ?? "").trim();
-  const lyrics = String(form.get("lyrics") ?? "").trim();
-  const song = form.get("song");
-  const artwork = form.get("artwork");
+  const body = await req.json().catch(() => null);
+  if (!body) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 
+  const id = String(body.id ?? "");
+  const email = String(body.email ?? "").trim().toLowerCase();
+  const artistName = String(body.artistName ?? "").trim();
+  const songTitle = String(body.songTitle ?? "").trim().slice(0, 200);
+  const lyrics = String(body.lyrics ?? "").trim().slice(0, 20000);
+  const songPath = String(body.songPath ?? "");
+  const artworkPath = body.artworkPath ? String(body.artworkPath) : null;
+
+  if (!UUID.test(id)) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Enter a valid email" }, { status: 400 });
   }
   if (!songTitle) {
     return NextResponse.json({ error: "Enter a song title" }, { status: 400 });
   }
-  if (!(song instanceof File) || song.size === 0) {
-    return NextResponse.json({ error: "Attach your song (WAV or MP3)" }, { status: 400 });
+  // Paths must sit under the id this request was issued, so a caller can't
+  // attach someone else's uploaded audio to their own submission.
+  if (!songPath.startsWith(`${id}/`) || (artworkPath && !artworkPath.startsWith(`${id}/`))) {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  if (song.size > MAX_AUDIO_BYTES) {
+
+  // Confirm the files really arrived, and are the size they should be
+  const { data: files, error: listErr } = await supabase.storage
+    .from("submissions")
+    .list(id);
+  if (listErr) {
+    console.error("[submissions] list failed:", listErr);
+    return NextResponse.json({ error: "Could not verify the upload" }, { status: 500 });
+  }
+  const byName = new Map((files ?? []).map((f) => [f.name, f]));
+  const songFile = byName.get(songPath.slice(id.length + 1));
+  if (!songFile) {
+    return NextResponse.json({ error: "The song didn't finish uploading" }, { status: 400 });
+  }
+  const songSize = (songFile.metadata as { size?: number } | null)?.size ?? 0;
+  if (songSize === 0) {
+    return NextResponse.json({ error: "That song file is empty" }, { status: 400 });
+  }
+  if (songSize > MAX_AUDIO_BYTES) {
+    await supabase.storage.from("submissions").remove([songPath]);
     return NextResponse.json({ error: "Song file must be under 50 MB" }, { status: 400 });
   }
-  if (song.type && !AUDIO_TYPES.includes(song.type)) {
-    return NextResponse.json({ error: "Song must be a WAV or MP3 file" }, { status: 400 });
-  }
-  if (artwork instanceof File && artwork.size > 0) {
-    if (artwork.size > MAX_ART_BYTES) {
-      return NextResponse.json({ error: "Artwork must be under 10 MB" }, { status: 400 });
-    }
-    if (artwork.type && !ART_TYPES.includes(artwork.type)) {
-      return NextResponse.json({ error: "Artwork must be JPG, PNG, or WebP" }, { status: 400 });
-    }
-  }
 
-  const supabase = getSupabaseAdmin();
-  if (!supabase) {
-    console.warn("[submissions] Supabase not configured — demo mode, not persisted:", email, songTitle);
-    return NextResponse.json({ ok: true, demo: true });
-  }
-
-  const id = crypto.randomUUID();
-  const songPath = `${id}/${safeName(song.name || "song.mp3")}`;
-
-  const { error: songErr } = await supabase.storage
-    .from("submissions")
-    .upload(songPath, song, { contentType: song.type || "audio/mpeg" });
-  if (songErr) {
-    console.error("[submissions] song upload failed:", songErr);
-    return NextResponse.json({ error: "Upload failed. Try again." }, { status: 500 });
-  }
-
-  let artworkPath: string | null = null;
-  if (artwork instanceof File && artwork.size > 0) {
-    artworkPath = `${id}/${safeName(artwork.name || "artwork.jpg")}`;
-    const { error: artErr } = await supabase.storage
-      .from("submissions")
-      .upload(artworkPath, artwork, { contentType: artwork.type || "image/jpeg" });
-    if (artErr) {
-      console.error("[submissions] artwork upload failed:", artErr);
-      artworkPath = null; // artwork is optional — keep going
+  let art = artworkPath;
+  if (art) {
+    const artFile = byName.get(art.slice(id.length + 1));
+    const artSize = (artFile?.metadata as { size?: number } | null)?.size ?? 0;
+    if (!artFile || artSize === 0 || artSize > MAX_ART_BYTES) {
+      if (artFile) await supabase.storage.from("submissions").remove([art]);
+      art = null; // artwork is optional — keep the submission
     }
   }
 
@@ -89,7 +93,7 @@ export async function POST(req: Request) {
     song_title: songTitle,
     lyrics: lyrics || null,
     song_path: songPath,
-    artwork_path: artworkPath,
+    artwork_path: art,
     status: "queued",
     user_id: user?.id ?? null,
   });
