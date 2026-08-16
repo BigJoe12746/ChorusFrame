@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { MAX_START } from "@/lib/clip-limits";
 
 const BUCKETS = 600;
 
@@ -131,7 +132,7 @@ export default function HookPicker({
       const ratio = (clientX - rect.left) / rect.width;
       // Centre the window on the pointer, then keep it inside the song
       const raw = ratio * audioDuration - duration / 2;
-      const max = Math.max(0, audioDuration - duration);
+      const max = Math.min(MAX_START, Math.max(0, audioDuration - duration));
       onChange(Math.min(max, Math.max(0, Math.round(raw * 10) / 10)));
     },
     [audioDuration, duration, onChange]
@@ -149,10 +150,11 @@ export default function HookPicker({
     };
   }, [dragging, setFromClientX]);
 
-  // Keep the window inside the song when the artist changes clip length
+  // Keep the window inside the song — and inside what the API will accept —
+  // when the artist changes clip length
   useEffect(() => {
     if (!audioDuration) return;
-    const max = Math.max(0, audioDuration - duration);
+    const max = Math.min(MAX_START, Math.max(0, audioDuration - duration));
     if (start > max) onChange(max);
   }, [duration, audioDuration, start, onChange]);
 
@@ -179,7 +181,11 @@ export default function HookPicker({
   }
 
   const pct = (v: number) => `${Math.min(100, (v / audioDuration) * 100)}%`;
-  const maxStart = Math.max(0, audioDuration - duration);
+  // The API refuses a start past MAX_START, and a 50MB cap is a byte cap: a
+  // 192kbps MP3 reaches it around 36 minutes. Without this bound the picker
+  // would offer positions that always fail on submit.
+  const maxStart = Math.min(MAX_START, Math.max(0, audioDuration - duration));
+  const cappedByLimit = audioDuration - duration > MAX_START;
   // The song can be shorter than the requested clip; the render clamps to the
   // audio that exists, so the label should say what will actually be produced
   // rather than promising a window past the end of the track.
@@ -232,6 +238,11 @@ export default function HookPicker({
       <p className="mt-1 text-[11px] text-muted">
         Drag on the waveform, or use the slider. Aim at the loudest part — that&apos;s
         usually the chorus.
+        {cappedByLimit ? (
+          <span className="ml-1 text-cyan">
+            Clips can start up to {mmss(MAX_START)}.
+          </span>
+        ) : null}
       </p>
     </div>
   );

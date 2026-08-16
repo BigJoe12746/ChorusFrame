@@ -41,6 +41,12 @@ export default function FileField({
 
   /** Reject oversized or wrong-typed files immediately — not after a long upload. */
   function accepted(f: File) {
+    // A dropped folder arrives as a zero-byte File; so does an empty file.
+    // Both fail server-side with an unhelpful message if let through.
+    if (f.size === 0) {
+      setError("That file is empty — drop the audio file itself, not a folder.");
+      return false;
+    }
     if (f.size > maxBytes) {
       setError(`That file is ${humanSize(f.size)}. The limit is ${humanSize(maxBytes)}.`);
       return false;

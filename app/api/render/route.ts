@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, getSupabaseAdmin } from "@/lib/supabase";
+import { MAX_DURATION, MAX_START, MIN_DURATION } from "@/lib/clip-limits";
 
 export const runtime = "nodejs";
 
 const VALID_FORMATS = ["vertical", "square", "wide"] as const;
 /** Keep in step with remotion/vibes.ts — an unknown id renders the default. */
 const VALID_VIBES = ["hyperpop", "anime", "dreamy", "cinematic", "reggae", "minimal"] as const;
-const MIN_DURATION = 5;
-const MAX_DURATION = 60;
-/** No song we accept is longer than this, so a start beyond it can only fail. */
-const MAX_START = 900;
 
 /**
  * Renders an artist can start per rolling 24h during beta.

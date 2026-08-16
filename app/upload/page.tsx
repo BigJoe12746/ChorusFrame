@@ -25,7 +25,10 @@ export default function UploadPage() {
     getSupabaseBrowser()
       .auth.getUser()
       .then(({ data }) => {
-        if (live && data.user?.email) setEmail(data.user.email);
+        // getUser() is a network round-trip, so this can land after the artist
+        // has already typed. Never overwrite what they entered — they may be
+        // sending the clip to a different address than their login.
+        if (live && data.user?.email) setEmail((cur) => cur || data.user!.email!);
       })
       .catch(() => {});
     return () => {

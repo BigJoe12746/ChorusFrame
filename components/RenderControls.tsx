@@ -50,6 +50,8 @@ export default function RenderControls({
   const [picking, setPicking] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
+  /** Status reads keep failing — say so rather than spinning silently. */
+  const [stale, setStale] = useState(false);
 
   const jobId = job?.id ?? null;
   const status = job?.status ?? null;
@@ -65,16 +67,31 @@ export default function RenderControls({
     if (!active || !jobId || !authConfigured) return;
     let live = true;
     let timer: ReturnType<typeof setTimeout>;
+    let failures = 0;
 
     const tick = async () => {
-      const { data } = await getSupabaseBrowser()
+      const { data, error: readErr } = await getSupabaseBrowser()
         .from("render_jobs")
         .select("id, status, formats, attempts, max_attempts, error, clip_urls")
         .eq("id", jobId)
         .maybeSingle();
       if (!live) return;
-      if (data) setJob(data as RenderJob);
-      if (data && ACTIVE.includes(data.status)) timer = setTimeout(tick, 3000);
+
+      if (data) {
+        failures = 0;
+        setStale(false);
+        setJob(data as RenderJob);
+        if (ACTIVE.includes(data.status)) timer = setTimeout(tick, 3000);
+        return;
+      }
+
+      // A read can fail for reasons that have nothing to do with the render:
+      // the laptop slept, the JWT expired, one request 500'd. Giving up here
+      // would leave the row spinning forever while the worker finished the job.
+      failures += 1;
+      if (readErr) console.warn("[render] status poll failed:", readErr.message);
+      if (failures >= 4) setStale(true);
+      timer = setTimeout(tick, Math.min(30000, 3000 * 2 ** (failures - 1)));
     };
 
     timer = setTimeout(tick, 3000);
@@ -110,6 +127,10 @@ export default function RenderControls({
         error: null,
         clip_urls: null,
       });
+      // Without this the panel is still "open" behind the active-job view and
+      // springs back the moment the render finishes, remounting the picker and
+      // re-downloading the whole song.
+      setPicking(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not start the render");
       setPicking(false);
@@ -120,13 +141,21 @@ export default function RenderControls({
 
   if (active && job) {
     return (
-      <div className="flex items-center gap-2 text-xs text-cyan">
-        <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-cyan" />
-        {job.status === "rendering" ? "Rendering your clips…" : "Queued…"}
-        {job.attempts > 1 ? (
-          <span className="text-muted">
-            (retry {job.attempts} of {job.max_attempts})
-          </span>
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2 text-xs text-cyan">
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-cyan" />
+          {job.status === "rendering" ? "Rendering your clips…" : "Queued…"}
+          {job.attempts > 1 ? (
+            <span className="text-muted">
+              (retry {job.attempts} of {job.max_attempts})
+            </span>
+          ) : null}
+        </div>
+        {stale ? (
+          <p className="text-[11px] text-muted">
+            Can&apos;t reach the status right now — still retrying. Your render
+            carries on regardless; refresh to check.
+          </p>
         ) : null}
       </div>
     );

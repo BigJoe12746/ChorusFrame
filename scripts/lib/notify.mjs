@@ -71,7 +71,9 @@ const escapeHtml = (s) =>
 
 function buildEmail({ songTitle, clips, siteUrl }) {
   const title = escapeHtml(songTitle);
-  const dashboard = `${siteUrl || ""}/dashboard`;
+  // Without a site URL this would be a bare "/dashboard", which is a dead link
+  // in an email client. Drop the button entirely instead.
+  const dashboard = siteUrl ? `${siteUrl.replace(/\/$/, "")}/dashboard` : "";
 
   const rows = clips
     .map(
@@ -100,13 +102,17 @@ function buildEmail({ songTitle, clips, siteUrl }) {
             Grab whichever cuts you need:
           </p>
           <table role="presentation" cellpadding="0" cellspacing="0">${rows}</table>
-          <p style="margin:24px 0 0">
+          ${
+            dashboard
+              ? `<p style="margin:24px 0 0">
             <a href="${escapeHtml(dashboard)}"
                style="display:inline-block;background:${BRAND.cyan};color:#04121a;text-decoration:none;
                       padding:11px 20px;border-radius:10px;font-weight:600;font-size:14px">
               Open your dashboard
             </a>
-          </p>
+          </p>`
+              : ""
+          }
         </td></tr>
         <tr><td style="padding-top:18px;color:${BRAND.muted};font-size:12px;line-height:1.5">
           You're getting this because you rendered a clip on ChorusFrame.
