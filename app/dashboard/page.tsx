@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import RenderControls, { type RenderJob } from "@/components/RenderControls";
 import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -48,6 +49,17 @@ export default async function DashboardPage() {
     .select("id, song_title, artist_name, status, created_at, artwork_path, sample_clip_url")
     .order("created_at", { ascending: false });
   const submissions = (data ?? []) as Submission[];
+
+  // Newest job per song, so each row can show its own render state.
+  // RLS scopes this to the artist's own jobs.
+  const { data: jobRows } = await supabase
+    .from("render_jobs")
+    .select("id, submission_id, status, formats, attempts, max_attempts, error, clip_urls")
+    .order("created_at", { ascending: false });
+  const latestJob = new Map<string, RenderJob>();
+  for (const j of (jobRows ?? []) as (RenderJob & { submission_id: string })[]) {
+    if (!latestJob.has(j.submission_id)) latestJob.set(j.submission_id, j);
+  }
 
   // Artwork lives in a private bucket, and finished clips may exist in several
   // formats — resolve both with the service-role client.
@@ -174,6 +186,12 @@ export default async function DashboardPage() {
                         ))}
                       </div>
                     ) : null}
+                    <div className="mt-3">
+                      <RenderControls
+                        submissionId={s.id}
+                        initialJob={latestJob.get(s.id) ?? null}
+                      />
+                    </div>
                   </div>
 
                   <span

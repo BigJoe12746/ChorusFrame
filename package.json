@@ -11,6 +11,8 @@
     "render:clip": "remotion render remotion/index.ts SampleClip out/clip.mp4",
     "render:submission": "node scripts/render-submission.mjs",
     "render:campaign": "node scripts/render-submission.mjs --formats all",
+    "worker": "node scripts/render-worker.mjs",
+    "worker:once": "node scripts/render-worker.mjs --once",
     "test:redirect": "node --experimental-strip-types scripts/test-safe-next.mjs"
   },
   "dependencies": {
