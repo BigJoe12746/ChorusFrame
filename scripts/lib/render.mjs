@@ -3,7 +3,7 @@
 // how clips are produced can't drift between the two entry points.
 
 import { createClient } from "@supabase/supabase-js";
-import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, statSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -243,6 +243,11 @@ export async function renderFormats({
           FORMATS[format].composition,
           outFile,
           `--props=${propsFile}`,
+          // Remotion defaults to near-lossless H.264, which produced files big
+          // enough for storage to reject a 30s clip outright. CRF 23 is
+          // visually transparent for social video and roughly halves the size,
+          // which also means faster uploads and faster downloads for artists.
+          "--crf=23",
         ],
         { cwd: ROOT }
       );
@@ -274,8 +279,27 @@ export async function ensureClipsBucket(supabase) {
 }
 
 /** Upload rendered files to the public bucket under stable per-format keys. */
+/** Storage rejects anything past this; checked before we spend the upload. */
+export const MAX_CLIP_BYTES = 45 * 1024 * 1024;
+
 export async function uploadClips(supabase, submissionId, rendered, now = Date.now()) {
   await ensureClipsBucket(supabase);
+
+  // Check every file first. Discovering "too large" halfway through means some
+  // formats are published and others aren't, and the retry re-renders all of
+  // them — three times — before the artist is told anything useful.
+  const oversized = rendered
+    .map(({ format, outFile }) => ({ format, size: statSync(outFile).size }))
+    .filter((f) => f.size > MAX_CLIP_BYTES);
+  if (oversized.length) {
+    const detail = oversized
+      .map((f) => `${f.format} is ${(f.size / 1024 / 1024).toFixed(0)}MB`)
+      .join(", ");
+    throw new Error(
+      `clip too large to store (${detail}; limit ${MAX_CLIP_BYTES / 1024 / 1024}MB) — try a shorter clip`
+    );
+  }
+
   const urls = [];
   for (const { format, outFile } of rendered) {
     const clipPath = `${submissionId}/sample-${format}.mp4`;
