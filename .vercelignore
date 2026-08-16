@@ -1,5 +1,8 @@
-# Render pipeline runs locally, not on Vercel — keep deploys lean
-remotion
+# Keep deploys lean.
+#
+# NOTE: `remotion/` must ship. The dashboard imports the composition to render
+# the live preview in the browser, so excluding it breaks the build with
+# "Can't resolve @/remotion/SampleClip". Only the worker-side pieces are cut.
 scripts
 remotion.config.ts
 public/demo
