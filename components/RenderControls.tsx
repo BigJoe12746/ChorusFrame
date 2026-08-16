@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { authConfigured, getSupabaseBrowser } from "@/lib/supabase-browser";
 
 export type RenderJob = {
@@ -31,38 +31,39 @@ export default function RenderControls({
   const [job, setJob] = useState<RenderJob | null>(initialJob);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const active = job ? ACTIVE.includes(job.status) : false;
+  const jobId = job?.id ?? null;
+  const status = job?.status ?? null;
+  const active = status ? ACTIVE.includes(status) : false;
 
   // Poll only while something is in flight. RLS scopes this to the artist's
-  // own jobs, so the browser can read the queue directly.
+  // own jobs, so the browser reads the queue directly.
+  //
+  // Depends on id and status rather than the whole job object: this effect
+  // also *sets* the job, so depending on the object would tear down and
+  // rebuild the timer on every single poll.
   useEffect(() => {
-    if (!active || !authConfigured) return;
+    if (!active || !jobId || !authConfigured) return;
     let live = true;
+    let timer: ReturnType<typeof setTimeout>;
 
     const tick = async () => {
       const { data } = await getSupabaseBrowser()
         .from("render_jobs")
         .select("id, status, formats, attempts, max_attempts, error, clip_urls")
-        .eq("id", job!.id)
+        .eq("id", jobId)
         .maybeSingle();
       if (!live) return;
       if (data) setJob(data as RenderJob);
-      if (live && data && ACTIVE.includes(data.status)) {
-        timer.current = setTimeout(tick, 3000);
-      } else if (live && data?.status === "done") {
-        // Clip links live on the server-rendered row; refresh once to pick them up
-        window.location.reload();
-      }
+      if (data && ACTIVE.includes(data.status)) timer = setTimeout(tick, 3000);
     };
 
-    timer.current = setTimeout(tick, 3000);
+    timer = setTimeout(tick, 3000);
     return () => {
       live = false;
-      if (timer.current) clearTimeout(timer.current);
+      clearTimeout(timer);
     };
-  }, [active, job]);
+  }, [active, jobId]);
 
   const start = useCallback(async () => {
     setStarting(true);
@@ -95,14 +96,15 @@ export default function RenderControls({
     }
   }, [submissionId]);
 
-  if (active) {
-    const label = job!.status === "rendering" ? "Rendering your clips…" : "Queued…";
+  if (active && job) {
     return (
       <div className="flex items-center gap-2 text-xs text-cyan">
         <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-cyan" />
-        {label}
-        {job!.attempts > 1 ? (
-          <span className="text-muted">(retry {job!.attempts} of {job!.max_attempts})</span>
+        {job.status === "rendering" ? "Rendering your clips…" : "Queued…"}
+        {job.attempts > 1 ? (
+          <span className="text-muted">
+            (retry {job.attempts} of {job.max_attempts})
+          </span>
         ) : null}
       </div>
     );

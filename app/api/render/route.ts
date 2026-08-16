@@ -6,14 +6,22 @@ export const runtime = "nodejs";
 const VALID_FORMATS = ["vertical", "square", "wide"] as const;
 const MIN_DURATION = 5;
 const MAX_DURATION = 60;
+/** No song we accept is longer than this, so a start beyond it can only fail. */
+const MAX_START = 900;
 
 /**
  * Renders an artist can start per rolling 24h during beta.
- * Failed jobs are excluded from this count on purpose — "failed renders never
+ *
+ * DAILY_LIMIT counts only jobs that weren't failures: "failed renders never
  * consume credits" is a promise on the marketing page, so a render that
- * doesn't produce a clip must not use up the artist's allowance either.
+ * produced nothing must not use up the artist's allowance.
+ *
+ * ABUSE_LIMIT counts every job including failures. It exists purely so a
+ * caller who deliberately fails renders can't burn compute forever, and it
+ * sits far enough above DAILY_LIMIT that honest use never reaches it.
  */
 const DAILY_LIMIT = 5;
+const ABUSE_LIMIT = 25;
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -31,16 +39,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const formats: string[] = Array.isArray(body.formats) && body.formats.length
-    ? body.formats
-    : ["vertical"];
-  if (formats.some((f) => !VALID_FORMATS.includes(f as (typeof VALID_FORMATS)[number]))) {
+  // Dedupe and cap: a request asking for the same format ten times would
+  // otherwise multiply the work for a single job.
+  const requested: unknown = body.formats;
+  const formats = [
+    ...new Set(Array.isArray(requested) && requested.length ? requested : ["vertical"]),
+  ];
+  if (
+    formats.length > VALID_FORMATS.length ||
+    formats.some((f) => !VALID_FORMATS.includes(f as (typeof VALID_FORMATS)[number]))
+  ) {
     return NextResponse.json({ error: "Unknown format requested" }, { status: 400 });
   }
 
   const start = Number(body.clipStartSeconds ?? 0);
   const duration = Number(body.durationSeconds ?? 15);
-  if (!Number.isFinite(start) || start < 0) {
+  if (!Number.isFinite(start) || start < 0 || start > MAX_START) {
     return NextResponse.json({ error: "Invalid clip start" }, { status: 400 });
   }
   if (!Number.isFinite(duration) || duration < MIN_DURATION || duration > MAX_DURATION) {
@@ -50,67 +64,47 @@ export async function POST(req: Request) {
     );
   }
 
-  // Ownership: the artist may only render their own upload. Checked against the
-  // row's user_id rather than trusting anything in the request body.
-  const { data: sub, error: subErr } = await supabase
-    .from("submissions")
-    .select("id, user_id")
-    .eq("id", body.submissionId)
-    .maybeSingle();
-  if (subErr) {
-    return NextResponse.json({ error: "Could not load that song" }, { status: 500 });
-  }
-  if (!sub || sub.user_id !== user.id) {
-    // Same response whether it's missing or someone else's — don't confirm existence
-    return NextResponse.json({ error: "Song not found" }, { status: 404 });
-  }
+  // Ownership, per-song dedupe, quota, and the insert all happen inside one
+  // transaction. Checking in the route and inserting afterwards let several
+  // concurrent requests each read "under the limit" and each insert.
+  const { data, error } = await supabase.rpc("enqueue_render_job", {
+    p_user: user.id,
+    p_submission: body.submissionId,
+    p_formats: formats,
+    p_start: start,
+    p_duration: duration,
+    p_daily_limit: DAILY_LIMIT,
+    p_abuse_limit: ABUSE_LIMIT,
+  });
 
-  // One active job per song, so double-clicking doesn't queue duplicates
-  const { data: active } = await supabase
-    .from("render_jobs")
-    .select("id")
-    .eq("submission_id", sub.id)
-    .in("status", ["queued", "rendering"])
-    .limit(1);
-  if (active?.length) {
-    return NextResponse.json({ ok: true, id: active[0].id, alreadyQueued: true });
-  }
-
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { count, error: countErr } = await supabase
-    .from("render_jobs")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", user.id)
-    .neq("status", "failed")
-    .gte("created_at", since);
-  if (countErr) {
-    return NextResponse.json({ error: "Could not check your render quota" }, { status: 500 });
-  }
-  if ((count ?? 0) >= DAILY_LIMIT) {
-    return NextResponse.json(
-      {
-        error: `That's ${DAILY_LIMIT} renders in 24 hours — the beta limit. Failed renders don't count toward it.`,
-      },
-      { status: 429 }
-    );
-  }
-
-  const { data: job, error: insErr } = await supabase
-    .from("render_jobs")
-    .insert({
-      submission_id: sub.id,
-      user_id: user.id,
-      formats,
-      clip_start_seconds: start,
-      duration_seconds: duration,
-    })
-    .select("id")
-    .single();
-
-  if (insErr || !job) {
-    console.error("[render] enqueue failed:", insErr);
+  if (error) {
+    console.error("[render] enqueue failed:", error);
     return NextResponse.json({ error: "Could not start the render" }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, id: job.id });
+  const row = Array.isArray(data) ? data[0] : data;
+  switch (row?.outcome) {
+    case "created":
+      return NextResponse.json({ ok: true, id: row.job_id });
+    case "already_queued":
+      return NextResponse.json({ ok: true, id: row.job_id, alreadyQueued: true });
+    case "quota":
+      return NextResponse.json(
+        {
+          error: `That's ${DAILY_LIMIT} renders in 24 hours — the beta limit. Failed renders don't count toward it.`,
+        },
+        { status: 429 }
+      );
+    case "abuse":
+      return NextResponse.json(
+        { error: "Too many render attempts in 24 hours. Try again tomorrow." },
+        { status: 429 }
+      );
+    case "not_found":
+      // Same response whether it's missing or someone else's — don't confirm existence
+      return NextResponse.json({ error: "Song not found" }, { status: 404 });
+    default:
+      console.error("[render] unexpected enqueue outcome:", row);
+      return NextResponse.json({ error: "Could not start the render" }, { status: 500 });
+  }
 }

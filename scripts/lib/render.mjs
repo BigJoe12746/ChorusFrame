@@ -4,7 +4,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -57,12 +57,31 @@ export function validateWindow({ start, duration }) {
 }
 
 export function validateFormats(formats) {
-  const list = formats?.length ? formats : ["vertical"];
-  const unknown = list.filter((f) => !FORMATS[f]);
+  // Dedupe: a stored row could otherwise ask for the same format repeatedly
+  // and multiply the work for a single job.
+  const list = [...new Set(formats?.length ? formats : ["vertical"])];
+  const unknown = list.filter((f) => !Object.hasOwn(FORMATS, f));
   if (unknown.length) {
     throw new Error(`unknown format(s): ${unknown.join(", ")}. Valid: ${Object.keys(FORMATS).join(", ")}`);
   }
   return list;
+}
+
+/**
+ * Run a command to completion WITHOUT blocking the event loop.
+ *
+ * This has to stay async: the worker's heartbeat is a timer, and spawnSync
+ * would starve it for the whole render — which made every long render look
+ * abandoned and get reclaimed and re-rendered by a second worker.
+ */
+function run(command, args, opts) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { ...opts, stdio: "inherit", shell: false });
+    child.on("error", reject);
+    child.on("close", (code) =>
+      code === 0 ? resolve() : reject(new Error(`${command} exited with code ${code}`))
+    );
+  });
 }
 
 /** Signed URLs for the private submissions bucket. */
@@ -117,8 +136,15 @@ export async function renderFormats({
   };
 
   mkdirSync(outDir, { recursive: true });
-  const propsFile = path.join(outDir, `${sub.id}-props.json`);
+  // Unique per run: the manual CLI and a worker can legitimately be running
+  // against the same submission, and they must not share a props file.
+  const runId = `${process.pid}-${Math.round(performance.now())}`;
+  const propsFile = path.join(outDir, `${sub.id}-${runId}-props.json`);
   writeFileSync(propsFile, JSON.stringify(props, null, 2));
+
+  // npx is a .cmd shim on Windows; shell:false means args are passed through
+  // verbatim, so nothing in a song title can reach a command line.
+  const npx = process.platform === "win32" ? "npx.cmd" : "npx";
 
   const rendered = [];
   try {
@@ -126,14 +152,27 @@ export async function renderFormats({
       const outFile =
         singleOut && list.length === 1
           ? path.resolve(singleOut)
-          : path.join(outDir, `${sub.id}-${format}-${duration}s.mp4`);
-      const cmd = `npx remotion render remotion/index.ts ${FORMATS[format].composition} "${outFile}" --props="${propsFile}"`;
+          : path.join(outDir, `${sub.id}-${runId}-${format}.mp4`);
       log(`▶ ${format}: rendering…`);
-      const res = spawnSync(cmd, { cwd: ROOT, shell: true, stdio: "inherit" });
-      if (res.status !== 0) throw new Error(`render failed for ${format}`);
+      await run(
+        npx,
+        [
+          "remotion",
+          "render",
+          "remotion/index.ts",
+          FORMATS[format].composition,
+          outFile,
+          `--props=${propsFile}`,
+        ],
+        { cwd: ROOT }
+      );
       log(`✔ ${format}: ${outFile}`);
       rendered.push({ format, outFile });
     }
+  } catch (e) {
+    // Don't leave half-finished files behind for the caller to clean up
+    for (const r of rendered) rmSync(r.outFile, { force: true });
+    throw e;
   } finally {
     rmSync(propsFile, { force: true }); // holds signed URLs — don't leave it behind
   }

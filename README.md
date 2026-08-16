@@ -60,6 +60,40 @@ Routes: `/login` (magic link) → `/auth/callback` (code exchange) →
 Uploads made while signed in are attributed to the account; anonymous
 free-sample uploads keep `user_id` null and stay service-role-only.
 
+## Self-serve rendering (the queue)
+
+Artists start their own renders from `/dashboard`; a worker process does the
+work. Nothing in the web app knows where the worker runs.
+
+One-time setup: SQL Editor → run `supabase/003_render_queue.sql`.
+
+```bash
+npm run worker        # poll for jobs forever  (Ctrl-C releases the current job)
+npm run worker:once   # drain the queue and exit
+```
+
+Run several workers if you want more throughput — `claim_render_job()` uses
+`FOR UPDATE SKIP LOCKED`, so they take different jobs instead of colliding.
+The worker heartbeats while rendering; a job whose worker dies is requeued
+automatically, up to `max_attempts`.
+
+Which state lives where:
+
+| Table                | Owns                                                 |
+| -------------------- | ---------------------------------------------------- |
+| `render_jobs.status` | the render lifecycle: queued → rendering → done/failed |
+| `submissions.status` | the delivery lifecycle: queued → clip_ready → delivered |
+
+The worker only ever advances a submission to `clip_ready` on success — it
+never demotes one, so a failed re-render can't undo a delivered song.
+
+Quotas (`app/api/render/route.ts`): 5 renders per artist per 24h, counting
+only jobs that weren't failures, because the marketing page promises failed
+renders never cost anything. A separate ceiling of 25 counts every job
+including failures, purely to stop a deliberate failure loop from burning
+compute. Both are enforced inside `enqueue_render_job()` in the same
+transaction as the insert, so concurrent requests can't slip past them.
+
 ## Reviewing submissions
 
 Stage-gate is intentionally manual: check the `submissions` table in
