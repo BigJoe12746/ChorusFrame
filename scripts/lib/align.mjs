@@ -11,6 +11,7 @@
 /** Strip punctuation/case so "Runnin'," and "running" can match. */
 export function normalizeWord(word) {
   return word
+    .normalize("NFC") // an NFD "là" must match an NFC "là" from the transcriber
     .toLowerCase()
     .replace(/['’]/g, "")
     .replace(/[^\p{L}\p{N}]/gu, "");
@@ -87,25 +88,49 @@ export function alignWords(officialWords, transcriptWords) {
     }
   }
 
-  // Traceback
+  // Traceback, walking backwards from (m, n).
+  //
+  // Ties are the normal case in music: a hook sung three times scores
+  // identically wherever you place it, and lyrics usually write a chorus once
+  // while the recording repeats it. How ties break therefore decides which
+  // occurrence the line is timed to — and picking the last one would time the
+  // chorus to the outro, leaving a clip over the real chorus showing nothing.
+  //
+  // Ties must be compared with a tolerance, not ===: two mathematically equal
+  // paths accumulate different rounding, so exact equality breaks ties by
+  // whichever bit pattern happened to win. Consuming trailing transcript words
+  // first biases ties toward the EARLIEST occurrence.
+  const EPS = 1e-9;
   let i = m;
   let j = n;
   while (i > 0 && j > 0) {
     const diag = dp[i - 1][j - 1] + score(i - 1, j - 1);
-    if (dp[i][j] === diag) {
+    const up = dp[i - 1][j] + GAP;
+    const left = dp[i][j - 1] + GAP;
+    const best = Math.max(diag, up, left);
+
+    if (left >= best - EPS) {
+      j--;
+    } else if (up >= best - EPS) {
+      i--;
+    } else {
       if (similarity(officialWords[i - 1], transcriptWords[j - 1]) >= MATCH_FLOOR) {
         mapping[i - 1] = j - 1;
       }
       i--;
       j--;
-    } else if (dp[i][j] === dp[i - 1][j] + GAP) {
-      i--;
-    } else {
-      j--;
     }
   }
   return mapping;
 }
+
+/**
+ * Structural markers artists routinely paste with their lyrics. They aren't
+ * sung, so showing them on screen is wrong — and worse, an unsingable line
+ * still claims a slot and shifts the real first line off its true time.
+ */
+const SECTION_MARKER =
+  /^[[(]\s*(intro|verse|pre-?chorus|chorus|hook|bridge|outro|refrain|solo|break|interlude|instrumental|drop)\b[^\])]*[\])]$/i;
 
 /** Split raw pasted lyrics into display lines, re-wrapping very long ones. */
 export function splitLines(lyrics, maxChars = 90) {
@@ -126,6 +151,7 @@ export function splitLines(lyrics, maxChars = 90) {
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter(Boolean)
+    .filter((l) => !SECTION_MARKER.test(l))
     .flatMap(wrap);
 }
 
@@ -186,11 +212,13 @@ export function alignLyrics(lyrics, words, audioEnd = Infinity) {
 
   // Timestamp every official word: matched words take the transcript's time,
   // unmatched ones are interpolated between their nearest matched neighbours.
-  const times = flat.map((_, k) =>
-    mapping[k] === null
-      ? null
-      : { start: transcript[mapping[k]].start, end: transcript[mapping[k]].end ?? transcript[mapping[k]].start }
-  );
+  // `?? start` would not catch NaN, and providers do omit `end` on the odd
+  // token — one NaN silently removes that line from every clip, forever.
+  const times = flat.map((_, k) => {
+    if (mapping[k] === null) return null;
+    const { start, end } = transcript[mapping[k]];
+    return { start, end: Number.isFinite(end) ? end : start };
+  });
 
   const firstKnown = times.findIndex(Boolean);
   if (firstKnown === -1) {
@@ -223,27 +251,36 @@ export function alignLyrics(lyrics, words, audioEnd = Infinity) {
   }
 
   // Collapse words back into lines
-  const out = lines.map((text) => ({ text, start: null, end: null }));
+  const out = lines.map((text) => ({ text, start: null, end: null, hasWords: false }));
   flat.forEach((f, k) => {
     const line = out[f.lineIndex];
+    line.hasWords = true;
     if (line.start === null || times[k].start < line.start) line.start = times[k].start;
     if (line.end === null || times[k].end > line.end) line.end = times[k].end;
   });
 
-  // Enforce sanity: monotonic, non-zero length, inside the song
+  // Enforce sanity: monotonic, non-zero length, inside the song.
+  // Every comparison must survive NaN, which is why these are written as
+  // positive Number.isFinite checks rather than `<=` tests.
   let prevEnd = 0;
   for (const line of out) {
-    if (line.start === null) line.start = prevEnd;
-    if (line.end === null || line.end <= line.start) line.end = line.start + 1.2;
+    if (!line.hasWords) {
+      // Nothing singable on this line (punctuation, a stray symbol). Give it a
+      // zero-width slot so it cannot push the next real line off its true time.
+      line.start = prevEnd;
+      line.end = prevEnd;
+      continue;
+    }
+    if (!Number.isFinite(line.start)) line.start = prevEnd;
     if (line.start < prevEnd) line.start = prevEnd;
-    if (line.end <= line.start) line.end = line.start + 0.4;
+    if (!Number.isFinite(line.end) || line.end <= line.start) line.end = line.start + 1.2;
     if (Number.isFinite(audioEnd)) {
       line.start = Math.min(line.start, audioEnd);
       line.end = Math.min(line.end, audioEnd);
     }
     prevEnd = line.end;
   }
-  return out;
+  return out.map(({ text, start, end }) => ({ text, start, end }));
 }
 
 /** Keep only the lines that fall inside a clip window, rebased to it. */

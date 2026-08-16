@@ -22,6 +22,17 @@ export const FORMATS = {
 
 export const MIN_DURATION = 5;
 export const MAX_DURATION = 60;
+const FPS = 30;
+
+/**
+ * How many lines a clip of this length can actually show and still be read.
+ * Mirrors the budget the composition applies (~26 frames minimum per line:
+ * enough to spring in, hold, and fade), so the two never disagree.
+ */
+export function readableLines(lines, durationSeconds) {
+  const budget = Math.min(10, Math.max(1, Math.floor((durationSeconds * FPS - 54) / 26)));
+  return lines.slice(0, budget);
+}
 
 /**
  * Config from .env.local when present, overlaid with real environment
@@ -175,7 +186,12 @@ export async function renderFormats({
       ? windowed
       : // No real timing, or none of it lands in this window: spread the lines
         // across the clip so it still reads as a lyric video.
-        estimateTimings(splitLines(sub.lyrics), 0, duration);
+        //
+        // Thin the list FIRST. A full lyric sheet spread over 15 seconds is a
+        // strobe nobody can read, and letting the composition truncate the tail
+        // instead would bunch every line into the opening seconds and leave the
+        // rest of the clip blank.
+        estimateTimings(readableLines(splitLines(sub.lyrics), duration), 0, duration);
     log(`lyric timing: ${lyricTiming.length} lines (${timingSource})`);
   }
 

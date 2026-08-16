@@ -54,6 +54,13 @@ export async function ensureLyricTiming({
 
   const timings = alignLyrics(sub.lyrics, words, audioDuration);
 
+  // Words coming back is not the same as those words being usable. Whisper
+  // emits "♪" over sung passages, and a transcript can also fail to match a
+  // single official word — in both cases alignLyrics falls back internally and
+  // flags its output. Trusting words.length here would cache a fabricated
+  // spread as real "whisper" timing and poison the row permanently.
+  if (timings.some((l) => l.estimated)) source = "estimated";
+
   // Only cache REAL timing. An estimate is derived from the clip window rather
   // than the song, so persisting it would be meaningless — and leaving the
   // column empty means every song upgrades itself the moment a transcription

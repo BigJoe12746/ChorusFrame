@@ -137,6 +137,63 @@ console.log("\nwindowing a clip out of a full song:");
   check("never negative", w.every((l) => l.start >= 0));
 }
 
+console.log("\nrepeated hooks anchor to the FIRST occurrence (regression):");
+{
+  check("single word vs three identical", alignWords(["a"], ["a", "a", "a"])[0] === 0,
+    `got ${alignWords(["a"], ["a", "a", "a"])[0]}`);
+  check("hook surrounded by noise", alignWords(["hook"], ["hook", "x", "hook"])[0] === 0);
+
+  // The real case: a chorus written once in the lyrics, sung twice in the song
+  const lyrics = "City lights are calling\nFoot down chasing flame\nWe ride tonight";
+  const words = [
+    { word: "city", start: 10.5, end: 11.0 },
+    { word: "lights", start: 11.0, end: 11.5 },
+    { word: "are", start: 11.5, end: 11.8 },
+    { word: "calling", start: 11.8, end: 12.4 },
+    { word: "foot", start: 20.5, end: 20.9 },
+    { word: "down", start: 20.9, end: 21.3 },
+    { word: "chasing", start: 21.3, end: 21.9 },
+    { word: "flame", start: 21.9, end: 22.5 },
+    { word: "we", start: 30.5, end: 30.8 },
+    { word: "ride", start: 30.8, end: 31.2 },
+    { word: "tonight", start: 31.2, end: 32.0 },
+    // the same hook again in the outro
+    { word: "we", start: 90.5, end: 90.8 },
+    { word: "ride", start: 90.8, end: 91.2 },
+    { word: "tonight", start: 91.2, end: 92.0 },
+  ];
+  const t = alignLyrics(lyrics, words, 120);
+  check("chorus times to the first time it is sung", near(t[2].start, 30.5),
+    `got ${t[2].start} (90.5 means it latched onto the outro)`);
+  const clip = timingsForWindow(t, 25, 15); // a 15s clip over the real chorus
+  check("a clip over that chorus actually shows it", clip.length > 0,
+    "clip came back empty — the lyric would be missing from the video");
+}
+
+console.log("\nmalformed transcript timings (regression):");
+{
+  const words = [
+    { word: "city", start: 10.0, end: NaN }, // provider omitted the end
+    { word: "lights", start: 10.4, end: 10.9 },
+    { word: "foot", start: 13.0, end: 13.4 },
+  ];
+  const t = alignLyrics("City lights\nFoot down", words, 30);
+  check("no NaN survives", t.every((l) => Number.isFinite(l.start) && Number.isFinite(l.end)),
+    JSON.stringify(t));
+  check("the affected line still appears in a clip",
+    timingsForWindow(t, 0, 30).length === 2,
+    "a NaN silently removed the line from every clip");
+}
+
+console.log("\nsection markers are not lyrics (regression):");
+{
+  const lines = splitLines("[Chorus]\nCity lights are calling\n(Verse 2)\nFoot down");
+  check("markers dropped", lines.length === 2, JSON.stringify(lines));
+  check("real lyrics kept", lines[0] === "City lights are calling" && lines[1] === "Foot down");
+  check("a line that merely starts with a bracket survives",
+    splitLines("[not a marker] still sung").length === 1);
+}
+
 console.log("\nline splitting:");
 {
   const long = "word ".repeat(40).trim();

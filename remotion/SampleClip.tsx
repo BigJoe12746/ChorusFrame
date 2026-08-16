@@ -265,7 +265,13 @@ export const SampleClip: React.FC<SampleClipProps> = ({
             endF: (l.start + span * (i + 1)) * fps,
           }));
         })
-        .slice(0, 24)
+        // calculateMetadata shortens durationSeconds when the clip window runs
+        // past the end of the song, so timings built for the requested length
+        // can point beyond the music. Drop what falls outside and clamp the
+        // line that straddles the boundary rather than truncating the tail.
+        .filter((l) => l.startF < musicFrames)
+        .map((l) => ({ ...l, endF: Math.min(l.endF, musicFrames) }))
+        .filter((l) => l.endF > l.startF)
     : (() => {
         const lines = lyrics
           .split(/\r?\n/)
@@ -286,16 +292,25 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   const active = timed.find((l) => frame >= l.startF && frame < l.endF) ?? null;
   const lineFrame = active ? frame - active.startF : 0;
   const lineSpan = active ? active.endF - active.startF : 0;
-  const lineIn = spring({ frame: lineFrame, fps, config: { damping: 16, mass: 0.6 } });
-  // Fade over the tail of the line, but never start before it has finished
-  // springing in — short lines would otherwise only ever flash.
+  // Entrance and exit have to be sized together, or a short line spends its
+  // whole life ramping in while already fading out and never reads clearly.
+  const settleFrames = Math.min(16, Math.max(4, lineSpan * 0.4));
+  const lineIn = spring({
+    frame: lineFrame,
+    fps,
+    config: { damping: 16, mass: 0.6 },
+    durationInFrames: Math.round(settleFrames),
+  });
   const fadeFrames = Math.min(8, Math.max(2, lineSpan * 0.25));
   const lineOut =
     lineSpan > 0
-      ? interpolate(lineFrame, [lineSpan - fadeFrames, lineSpan], [1, 0], {
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-        })
+      ? interpolate(
+          lineFrame,
+          // Never begin fading before the entrance has landed
+          [Math.max(settleFrames, lineSpan - fadeFrames), lineSpan],
+          [1, 0],
+          { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+        )
       : 1;
 
   const bars = freq.slice(2, 2 + L.bars.count);
