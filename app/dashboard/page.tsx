@@ -32,7 +32,10 @@ const FORMAT_LABELS: Record<string, string> = {
   "sample.mp4": "Clip",
 };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
+  // Set when an artist has just uploaded: open that song's picker for them
+  // rather than leaving them to work out that a button exists.
+  const justUploaded = String((await searchParams)?.new ?? "");
   const supabase = await getSupabaseServer();
   if (!supabase) {
     return (
@@ -211,6 +214,7 @@ export default async function DashboardPage() {
                         initialJob={latestJob.get(s.id) ?? null}
                         initialVibe={s.vibe}
                         audioUrl={audioUrls.get(s.id) ?? null}
+                        autoOpen={s.id === justUploaded}
                       />
                     </div>
                   </div>

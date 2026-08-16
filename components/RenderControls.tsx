@@ -37,17 +37,19 @@ export default function RenderControls({
   initialJob,
   initialVibe,
   audioUrl,
+  autoOpen = false,
 }: {
   submissionId: string;
   initialJob: RenderJob | null;
   initialVibe: string | null;
   audioUrl: string | null;
+  autoOpen?: boolean;
 }) {
   const [job, setJob] = useState<RenderJob | null>(initialJob);
   const [vibe, setVibe] = useState(initialVibe || "hyperpop");
   const [clipStart, setClipStart] = useState(0);
   const [clipLength, setClipLength] = useState(15);
-  const [picking, setPicking] = useState(false);
+  const [picking, setPicking] = useState(autoOpen);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   /** Status reads keep failing — say so rather than spinning silently. */

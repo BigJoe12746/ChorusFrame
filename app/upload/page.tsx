@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import FileField from "@/components/FileField";
 import Logo from "@/components/Logo";
 import { authConfigured, getSupabaseBrowser } from "@/lib/supabase-browser";
@@ -12,11 +13,14 @@ const AUDIO_TYPES = ["audio/mpeg", "audio/wav", "audio/x-wav", "audio/mp3"];
 const ART_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export default function UploadPage() {
+  const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
   const [email, setEmail] = useState("");
+  /** Signed-in artists render for themselves; anonymous ones wait for us. */
+  const [signedIn, setSignedIn] = useState(false);
 
   // Signed-in artists shouldn't have to retype an address we already know
   useEffect(() => {
@@ -28,7 +32,9 @@ export default function UploadPage() {
         // getUser() is a network round-trip, so this can land after the artist
         // has already typed. Never overwrite what they entered — they may be
         // sending the clip to a different address than their login.
-        if (live && data.user?.email) setEmail((cur) => cur || data.user!.email!);
+        if (!live || !data.user) return;
+        setSignedIn(true);
+        if (data.user.email) setEmail((cur) => cur || data.user!.email!);
       })
       .catch(() => {});
     return () => {
@@ -120,6 +126,16 @@ export default function UploadPage() {
       if (!finishRes.ok) throw new Error(finished.error || "Something went wrong. Try again.");
 
       setProgress(100);
+
+      // A signed-in artist can render this themselves in minutes. Leaving them
+      // on a "we'll email you in a few days" screen would be plainly untrue,
+      // and the button they need is on the dashboard — so take them to it with
+      // this song's picker already open.
+      if (signedIn) {
+        router.push(`/dashboard?new=${encodeURIComponent(slots.id)}`);
+        router.refresh();
+        return;
+      }
       setState("done");
     } catch (err) {
       setError(
@@ -150,11 +166,18 @@ export default function UploadPage() {
         <section className="py-24 text-center">
           <p className="text-5xl">🎬</p>
           <h1 className="mt-6 text-3xl font-bold tracking-tight">
-            Got it. Your clip is in the queue.
+            Got it — we&apos;ll build your clip by hand.
           </h1>
           <p className="mx-auto mt-4 max-w-md text-muted">
-            We&apos;ll build a sample clip from your song and email it to you within a
-            few days. Keep an eye on your inbox.
+            We&apos;ll make a sample clip from your song and email it to{" "}
+            <span className="text-foreground">{email}</span> within a few days.
+          </p>
+          <p className="mx-auto mt-3 max-w-md text-sm text-muted">
+            Don&apos;t want to wait?{" "}
+            <Link href="/login" className="text-cyan underline underline-offset-4">
+              Make an account
+            </Link>{" "}
+            and you can render your own clips in minutes.
           </p>
           <Link
             href="/"
