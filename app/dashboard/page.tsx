@@ -12,6 +12,7 @@ type Submission = {
   status: string;
   created_at: string;
   artwork_path: string | null;
+  song_path: string;
   sample_clip_url: string | null;
   vibe: string | null;
 };
@@ -47,7 +48,9 @@ export default async function DashboardPage() {
   // RLS scopes this to the signed-in artist's own rows
   const { data, error } = await supabase
     .from("submissions")
-    .select("id, song_title, artist_name, status, created_at, artwork_path, sample_clip_url, vibe")
+    .select(
+      "id, song_title, artist_name, status, created_at, artwork_path, song_path, sample_clip_url, vibe"
+    )
     .order("created_at", { ascending: false });
   const submissions = (data ?? []) as Submission[];
 
@@ -66,6 +69,7 @@ export default async function DashboardPage() {
   // formats — resolve both with the service-role client.
   const admin = getSupabaseAdmin();
   const artThumbs = new Map<string, string>();
+  const audioUrls = new Map<string, string>();
   const clipFiles = new Map<string, { name: string; url: string }[]>();
 
   if (admin) {
@@ -76,6 +80,13 @@ export default async function DashboardPage() {
             .from("submissions")
             .createSignedUrl(s.artwork_path, 3600);
           if (signed) artThumbs.set(s.id, signed.signedUrl);
+        }
+        // The hook picker decodes this in the browser to draw the waveform
+        if (s.song_path) {
+          const { data: signedAudio } = await admin.storage
+            .from("submissions")
+            .createSignedUrl(s.song_path, 3600);
+          if (signedAudio) audioUrls.set(s.id, signedAudio.signedUrl);
         }
         const { data: files } = await admin.storage.from("clips").list(s.id);
         if (files?.length) {
@@ -192,6 +203,7 @@ export default async function DashboardPage() {
                         submissionId={s.id}
                         initialJob={latestJob.get(s.id) ?? null}
                         initialVibe={s.vibe}
+                        audioUrl={audioUrls.get(s.id) ?? null}
                       />
                     </div>
                   </div>

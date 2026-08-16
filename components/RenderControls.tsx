@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { authConfigured, getSupabaseBrowser } from "@/lib/supabase-browser";
+import HookPicker from "@/components/HookPicker";
 
 export type RenderJob = {
   id: string;
@@ -35,13 +36,17 @@ export default function RenderControls({
   submissionId,
   initialJob,
   initialVibe,
+  audioUrl,
 }: {
   submissionId: string;
   initialJob: RenderJob | null;
   initialVibe: string | null;
+  audioUrl: string | null;
 }) {
   const [job, setJob] = useState<RenderJob | null>(initialJob);
   const [vibe, setVibe] = useState(initialVibe || "hyperpop");
+  const [clipStart, setClipStart] = useState(0);
+  const [clipLength, setClipLength] = useState(15);
   const [picking, setPicking] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
@@ -89,7 +94,8 @@ export default function RenderControls({
         body: JSON.stringify({
           submissionId,
           formats: ["vertical", "square", "wide"],
-          durationSeconds: 15,
+          clipStartSeconds: clipStart,
+          durationSeconds: clipLength,
           vibe,
         }),
       });
@@ -110,7 +116,7 @@ export default function RenderControls({
     } finally {
       setStarting(false);
     }
-  }, [submissionId, vibe]);
+  }, [submissionId, vibe, clipStart, clipLength]);
 
   if (active && job) {
     return (
@@ -152,7 +158,35 @@ export default function RenderControls({
       {error ? <p className="text-xs text-danger">{error}</p> : null}
 
       {picking ? (
-        <div className="rounded-xl border border-borderline bg-surface-raised p-3">
+        <div className="flex flex-col gap-4 rounded-xl border border-borderline bg-surface-raised p-3">
+          <HookPicker
+            audioUrl={audioUrl}
+            start={clipStart}
+            duration={clipLength}
+            onChange={setClipStart}
+          />
+
+          <div>
+            <p className="mb-1.5 text-xs font-medium">Clip length</p>
+            <div className="flex gap-2">
+              {[15, 30, 60].map((secs) => (
+                <button
+                  key={secs}
+                  type="button"
+                  onClick={() => setClipLength(secs)}
+                  className={`rounded-lg border px-3 py-1 text-xs transition ${
+                    clipLength === secs
+                      ? "border-cyan text-foreground"
+                      : "border-borderline text-muted hover:border-muted"
+                  }`}
+                >
+                  {secs}s
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
           <p className="mb-2 text-xs font-medium">Pick a vibe</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {VIBES.map((v) => (
@@ -177,13 +211,15 @@ export default function RenderControls({
               </button>
             ))}
           </div>
-          <div className="mt-3 flex gap-2">
+          </div>
+
+          <div className="flex gap-2">
             <button
               onClick={start}
               disabled={starting}
               className="brand-gradient rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
             >
-              {starting ? "Starting…" : "Render this vibe"}
+              {starting ? "Starting…" : "Start render"}
             </button>
             <button
               onClick={() => setPicking(false)}
