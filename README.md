@@ -1,8 +1,12 @@
-# ChorusFrame — stage-gate MVP
+# ChorusFrame
 
-Landing page + waitlist + free sample-clip upload flow, plus a working
-multi-format render pipeline. Next.js (App Router) + Tailwind + Supabase
-+ Remotion.
+Artists sign in, upload a song, pick a hook and a vibe, and get a set of
+platform-ready videos back. Next.js (App Router) + Tailwind + Supabase +
+Remotion, with a render worker on Railway.
+
+There is no waitlist: the product renders for people now, so there is
+nothing to wait for. The hand-built sample clip (`/upload`) is kept as a
+deliberate secondary path for artists who'd rather we made their first one.
 
 > The folder is still named `verseframe` (the project's earlier name) so
 > the existing Vercel link keeps working. Renaming it means re-linking
@@ -21,9 +25,9 @@ succeed, but nothing is persisted (a warning is logged server-side).
 ## Connect Supabase (one-time, ~5 minutes)
 
 1. Create a free project at https://supabase.com
-2. Dashboard → **SQL Editor** → paste and run `supabase/schema.sql`
-   (creates `waitlist` + `submissions` tables and the private
-   `submissions` storage bucket)
+2. Dashboard → **SQL Editor** → run the migrations in order:
+   `schema.sql`, `002_auth.sql`, `003_render_queue.sql`,
+   `004_lyric_timing.sql`, `005_vibe.sql`
 3. Dashboard → **Project Settings → API** → copy the Project URL and
    the `service_role` key
 4. `cp .env.local.example .env.local` and fill both values in

@@ -1,13 +1,10 @@
 -- ChorusFrame stage-gate MVP schema
 -- Run this in the Supabase SQL Editor (Dashboard → SQL Editor → New query)
 
-create table if not exists public.waitlist (
-  id uuid primary key default gen_random_uuid(),
-  email text not null unique,
-  artist_name text,
-  genre text,
-  created_at timestamptz not null default now()
-);
+-- There was a `waitlist` table here. It was removed once the product could
+-- actually serve people: artists sign up and render for themselves, so there
+-- is nothing to wait for. Existing projects may still have the table; it is
+-- unused and safe to drop.
 
 create table if not exists public.submissions (
   id uuid primary key default gen_random_uuid(),
@@ -22,9 +19,8 @@ create table if not exists public.submissions (
   created_at timestamptz not null default now()
 );
 
--- Lock both tables down: only the service-role key (used by the API routes)
--- can read/write. No anon access needed for the stage-gate app.
-alter table public.waitlist enable row level security;
+-- Locked down: only the service-role key (used by the API routes) can write.
+-- Read policies for signed-in artists are added in 002_auth.sql.
 alter table public.submissions enable row level security;
 
 -- Private storage bucket for uploaded songs/artwork
