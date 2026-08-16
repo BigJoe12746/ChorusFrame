@@ -16,6 +16,7 @@ type Submission = {
   song_path: string;
   sample_clip_url: string | null;
   vibe: string | null;
+  lyrics: string | null;
 };
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -53,7 +54,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const { data, error } = await supabase
     .from("submissions")
     .select(
-      "id, song_title, artist_name, status, created_at, artwork_path, song_path, sample_clip_url, vibe"
+      "id, song_title, artist_name, status, created_at, artwork_path, song_path, sample_clip_url, vibe, lyrics"
     )
     .order("created_at", { ascending: false });
   const submissions = (data ?? []) as Submission[];
@@ -214,6 +215,10 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                         initialJob={latestJob.get(s.id) ?? null}
                         initialVibe={s.vibe}
                         audioUrl={audioUrls.get(s.id) ?? null}
+                        artworkUrl={artThumbs.get(s.id) ?? null}
+                        songTitle={s.song_title}
+                        artistName={s.artist_name ?? ""}
+                        lyrics={s.lyrics ?? ""}
                         autoOpen={s.id === justUploaded}
                       />
                     </div>

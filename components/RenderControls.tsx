@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { authConfigured, getSupabaseBrowser } from "@/lib/supabase-browser";
 import HookPicker from "@/components/HookPicker";
+import ClipPreview from "@/components/ClipPreview";
 
 export type RenderJob = {
   id: string;
@@ -37,12 +38,20 @@ export default function RenderControls({
   initialJob,
   initialVibe,
   audioUrl,
+  artworkUrl,
+  songTitle,
+  artistName,
+  lyrics,
   autoOpen = false,
 }: {
   submissionId: string;
   initialJob: RenderJob | null;
   initialVibe: string | null;
   audioUrl: string | null;
+  artworkUrl: string | null;
+  songTitle: string;
+  artistName: string;
+  lyrics: string;
   autoOpen?: boolean;
 }) {
   const [job, setJob] = useState<RenderJob | null>(initialJob);
@@ -189,7 +198,23 @@ export default function RenderControls({
       {error ? <p className="text-xs text-danger">{error}</p> : null}
 
       {picking ? (
-        <div className="flex flex-col gap-4 rounded-xl border border-borderline bg-surface-raised p-3">
+        <div className="flex flex-col gap-4 rounded-xl border border-borderline bg-surface-raised p-3 sm:flex-row">
+          {/* Preview first on wide screens: the point is to see the change,
+              not to change it and wonder. */}
+          <div className="shrink-0">
+            <ClipPreview
+              audioUrl={audioUrl}
+              artworkUrl={artworkUrl}
+              songTitle={songTitle}
+              artistName={artistName}
+              lyrics={lyrics}
+              clipStart={clipStart}
+              duration={clipLength}
+              vibe={vibe}
+            />
+          </div>
+
+          <div className="flex min-w-0 flex-1 flex-col gap-4">
           <HookPicker
             audioUrl={audioUrl}
             start={clipStart}
@@ -248,6 +273,7 @@ export default function RenderControls({
             <button
               onClick={start}
               disabled={starting}
+              data-render-submit
               className="brand-gradient rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
             >
               {starting ? "Starting…" : "Start render"}
@@ -258,6 +284,7 @@ export default function RenderControls({
             >
               Cancel
             </button>
+          </div>
           </div>
         </div>
       ) : (
