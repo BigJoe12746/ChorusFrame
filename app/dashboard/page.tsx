@@ -3,6 +3,7 @@ import Logo from "@/components/Logo";
 import RenderControls, { type RenderJob } from "@/components/RenderControls";
 import SetPassword from "@/components/SetPassword";
 import BrandKit from "@/components/BrandKit";
+import ShareLink from "@/components/ShareLink";
 import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -218,7 +219,8 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                       })}
                     </p>
                     {clips.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap gap-2">
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <ShareLink submissionId={s.id} />
                         {clips.map((c) => (
                           <a
                             key={c.name}
