@@ -5,6 +5,7 @@ import { authConfigured, getSupabaseBrowser } from "@/lib/supabase-browser";
 import HookPicker from "@/components/HookPicker";
 import ClipPreview from "@/components/ClipPreview";
 import LyricsEditor from "@/components/LyricsEditor";
+import TapToSync from "@/components/TapToSync";
 
 export type RenderJob = {
   id: string;
@@ -219,6 +220,16 @@ export default function RenderControls({
           {/* First, because no lyrics means no lyric video — and that was
               silently the case for a real upload. */}
           <LyricsEditor submissionId={submissionId} initialLyrics={lyrics} />
+
+          {/* Only useful once there are words to time */}
+          {lyrics.trim() ? (
+            <TapToSync
+              submissionId={submissionId}
+              audioUrl={audioUrl}
+              lyrics={lyrics}
+              startAt={clipStart}
+            />
+          ) : null}
 
           <HookPicker
             audioUrl={audioUrl}
