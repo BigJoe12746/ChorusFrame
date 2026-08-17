@@ -15,6 +15,7 @@ import { useAudioData, visualizeAudio } from "@remotion/media-utils";
 import { getLayout } from "./layout";
 import { BRAND_PALETTE, extractPalette, type Palette } from "./palette";
 import { DEFAULT_VIBE, getVibe } from "./vibes";
+import { beatHitAt } from "../lib/audio-analysis";
 
 export type SampleClipProps = {
   audioSrc: string;
@@ -49,6 +50,12 @@ export type SampleClipProps = {
     secondary?: string | null;
     font?: "sans" | "serif" | "mono" | null;
   } | null;
+  /**
+   * Tempo and phase of the song. When present, motion lands ON beats instead
+   * of merely reacting to loudness — the difference between a video with music
+   * under it and a music video.
+   */
+  beatGrid?: { bpm: number; offset: number } | null;
 };
 
 export const FPS = 30;
@@ -220,6 +227,7 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   useArtworkColors,
   vibe,
   brand,
+  beatGrid,
 }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
@@ -264,7 +272,38 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   // Frequency data drives everything: bass → artwork pulse, mid → bars
   const freq = visualizeAudio({ audioData, frame: mediaFrame, fps, numberOfSamples: 64 });
   const bass = (freq[0] + freq[1] + freq[2] + freq[3] + freq[4]) / 5;
-  const pulse = 1 + Math.min(bass * 1.4, 1) * V.art.pulse;
+
+  /*
+   * Beat-locked motion.
+   *
+   * Loudness alone lags: by the time the waveform is loud the hit has already
+   * happened, so the artwork swells slightly late and reads as sluggish. With
+   * a grid we know when the beat IS, and can hit it exactly.
+   *
+   * The shape is a hard attack and a quick decay — a kick, not a sine wave.
+   * Deliberately restrained: beat-driven animation is easy to overdo, and a
+   * clip that throbs on every beat is exhausting rather than musical. The
+   * downbeat of each bar gets a little more, which is what makes it feel
+   * arranged instead of merely periodic.
+   */
+  /*
+   * Beat-locked motion.
+   *
+   * Loudness alone lags: by the time the waveform is loud the hit has already
+   * happened, so the artwork swells slightly late and reads as sluggish. With
+   * a grid we know when the beat IS and can land on it exactly.
+   *
+   * When a grid exists it GOVERNS the motion rather than competing with it.
+   * Taking whichever of beat/loudness is larger sounds safer but does nothing
+   * in practice: on a track whose loudness already peaks near the beat (most
+   * tracks) loudness always wins and the grid changes nothing. A little
+   * loudness stays mixed in so quiet bars don't feel mechanical.
+   */
+  const songSeconds = mediaFrame / fps;
+  const beatHit = beatHitAt(songSeconds, beatGrid);
+  const loudness = Math.min(bass * 1.4, 1);
+  const drive = beatGrid?.bpm ? beatHit * 0.8 + loudness * 0.2 : loudness;
+  const pulse = 1 + drive * V.art.pulse;
 
   // Intro entrance — a vibe can make it snap or drift
   const intro = spring({
@@ -504,8 +543,8 @@ export const SampleClip: React.FC<SampleClipProps> = ({
           overflow: "hidden",
           border: V.art.ring ? `${Math.max(2, L.unit * 0.004)}px solid ${palette.primary}` : undefined,
           boxShadow: `0 ${L.unit * 0.055}px ${L.unit * 0.13}px rgba(0,0,0,0.6), 0 0 ${
-            (L.unit * 0.055 + bass * L.unit * 0.15) * V.art.glow
-          }px ${palette.secondary}${bass > 0.3 ? "88" : "44"}`,
+            (L.unit * 0.055 + drive * L.unit * 0.15) * V.art.glow
+          }px ${palette.secondary}${drive > 0.3 ? "88" : "44"}`,
         }}
       >
         {art ? (

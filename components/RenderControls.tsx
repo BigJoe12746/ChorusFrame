@@ -48,6 +48,7 @@ export default function RenderControls({
   songTitle,
   artistName,
   lyrics,
+  beatGrid,
   autoOpen = false,
 }: {
   submissionId: string;
@@ -58,6 +59,7 @@ export default function RenderControls({
   songTitle: string;
   artistName: string;
   lyrics: string;
+  beatGrid: { bpm: number; offset: number } | null;
   autoOpen?: boolean;
 }) {
   const [job, setJob] = useState<RenderJob | null>(initialJob);
@@ -217,6 +219,7 @@ export default function RenderControls({
               clipStart={clipStart}
               duration={clipLength}
               vibe={vibe}
+              beatGrid={beatGrid}
             />
           </div>
 
@@ -236,6 +239,7 @@ export default function RenderControls({
           ) : null}
 
           <HookPicker
+            submissionId={submissionId}
             audioUrl={audioUrl}
             start={clipStart}
             duration={clipLength}

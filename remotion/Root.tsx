@@ -13,6 +13,7 @@ const defaultProps: SampleClipProps = {
     "City lights are calling out my name\nFoot down, midnight, chasing flame\nNever slowing down, never the same\nWe run, we run, we run",
   lyricTiming: [],
   brand: null,
+  beatGrid: null,
   clipStartSeconds: 0,
   durationSeconds: 15,
   showEndCard: true,

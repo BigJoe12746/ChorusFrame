@@ -22,6 +22,7 @@ export default function ClipPreview({
   clipStart,
   duration,
   vibe,
+  beatGrid,
 }: {
   audioUrl: string | null;
   artworkUrl: string | null;
@@ -31,6 +32,7 @@ export default function ClipPreview({
   clipStart: number;
   duration: number;
   vibe: string;
+  beatGrid: { bpm: number; offset: number } | null;
 }) {
   const inputProps = useMemo(
     () => ({
@@ -49,8 +51,10 @@ export default function ClipPreview({
       endCardUrl: "",
       useArtworkColors: true,
       vibe,
+      brand: null,
+      beatGrid,
     }),
-    [audioUrl, artworkUrl, songTitle, artistName, lyrics, clipStart, duration, vibe]
+    [audioUrl, artworkUrl, songTitle, artistName, lyrics, clipStart, duration, vibe, beatGrid]
   );
 
   if (!audioUrl) {

@@ -22,11 +22,13 @@ function mmss(seconds: number) {
  * to a plain numeric start so the artist can still choose a window.
  */
 export default function HookPicker({
+  submissionId,
   audioUrl,
   start,
   duration,
   onChange,
 }: {
+  submissionId: string;
   audioUrl: string | null;
   start: number;
   duration: number;
@@ -80,6 +82,22 @@ export default function HookPicker({
         // open there. The old default of 0:00 was the intro of most tracks.
         const a = analyzeAudio(data, audio.sampleRate, duration, MAX_START);
         setAnalysis(a);
+
+        // Store the beat grid with the song. The worker has no audio decoder,
+        // so this browser-side detection is the only place it can come from.
+        // Fire-and-forget: failing to save it costs beat-locked motion, not
+        // the render.
+        if (a.beatGrid) {
+          fetch("/api/submissions/analysis", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              submissionId,
+              bpm: a.beatGrid.bpm,
+              beatOffset: a.beatGrid.offset,
+            }),
+          }).catch(() => {});
+        }
         if (!suggested.current && a.bestStart > 0) {
           suggested.current = true;
           onChange(a.bestStart);

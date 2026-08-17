@@ -125,5 +125,82 @@ console.log("\nwindow search is bounded:");
   check("leaves room for the clip", best + 15 <= 2000 * 0.02 + 0.01, `got ${best}`);
 }
 
-console.log(failures === 0 ? "\nPASS — hook detection behaves" : `\nFAIL — ${failures} problem(s)`);
+// ---- beat grid ----
+// Tempo says how often; phase says when. Getting phase wrong makes motion land
+// between beats, which reads as random rather than musical.
+{
+  const { detectBeatGrid, onsetStrength, energyEnvelope } = await import("../lib/audio-analysis.ts");
+  console.log("\nbeat grid:");
+
+  /** Clicks at a known bpm, starting at a known offset. */
+  function clicks(bpm, offsetSec, seconds) {
+    const out = new Float32Array(Math.round(seconds * SR));
+    const period = 60 / bpm;
+    for (let t = offsetSec; t < seconds; t += period) {
+      const i = Math.round(t * SR);
+      for (let j = 0; j < Math.round(0.03 * SR); j++) {
+        if (i + j < out.length) out[i + j] = Math.exp(-j / (SR * 0.006)) * (j % 7 < 4 ? 1 : -1);
+      }
+    }
+    return out;
+  }
+
+  for (const [bpm, offset] of [[120, 0], [120, 0.25], [143, 0.12], [90, 0.4]]) {
+    const grid = detectBeatGrid(onsetStrength(energyEnvelope(clicks(bpm, offset, 24), SR)), 0.02);
+    if (!grid) {
+      check(`${bpm}bpm @${offset}s detected`, false, "returned null");
+      continue;
+    }
+    const period = 60 / bpm;
+    // Phase is circular: being one whole beat out is the same grid
+    const err = Math.min(
+      Math.abs(grid.offset - offset),
+      Math.abs(Math.abs(grid.offset - offset) - period)
+    );
+    check(`${bpm}bpm tempo`, Math.abs(grid.bpm - bpm) <= 2, `got ${grid.bpm}`);
+    check(`${bpm}bpm phase within 60ms`, err < 0.06, `off by ${(err * 1000).toFixed(0)}ms`);
+  }
+
+  const silence = detectBeatGrid(onsetStrength(energyEnvelope(new Float32Array(SR * 10), SR)), 0.02);
+  check("silence yields no grid rather than a made-up one", silence === null, JSON.stringify(silence));
+}
+
+
+// ---- beat hit shape ----
+// This is what actually drives the motion, so it's tested directly: pixel
+// measurements can't separate the pulse from the artwork's slow rotation.
+{
+  const { beatHitAt } = await import("../lib/audio-analysis.ts");
+  console.log("");
+  console.log("beat hit:");
+  const grid = { bpm: 128, offset: 0 };      // a beat every 0.46875s
+  const period = 60 / 128;
+
+  check("peaks exactly on the beat", beatHitAt(0, grid) === 1);
+  check("still strong 25ms after", beatHitAt(0.025, grid) > 0.6, String(beatHitAt(0.025, grid)));
+  check("gone by mid-bar", beatHitAt(period * 0.5, grid) === 0, String(beatHitAt(period * 0.5, grid)));
+  check("fires again on the next beat", beatHitAt(period * 4, grid) === 1);
+
+  const down = beatHitAt(0, grid);
+  const off = beatHitAt(period, grid);
+  check("downbeat hits harder than the offbeat", down > off, `${down} vs ${off}`);
+
+  // Motion must follow the PHASE, not just the tempo
+  const shifted = { bpm: 128, offset: 0.2 };
+  check("respects the offset", beatHitAt(0.2, shifted) === 1 && beatHitAt(0, shifted) < 1);
+
+  check("no grid means no beat motion", beatHitAt(5, null) === 0);
+  check("zero bpm is ignored rather than dividing", beatHitAt(5, { bpm: 0, offset: 0 }) === 0);
+  check("survives a negative time", Number.isFinite(beatHitAt(-3, grid)));
+
+  // The value feeds a scale multiplier, so it must stay in range
+  let outOfRange = 0;
+  for (let t = 0; t < 12; t += 0.017) {
+    const v = beatHitAt(t, grid);
+    if (!(v >= 0 && v <= 1)) outOfRange++;
+  }
+  check("always within 0..1", outOfRange === 0, `${outOfRange} samples outside`);
+}
+
+console.log(failures === 0 ? "\nPASS" : `\nFAIL — ${failures}`);
 process.exit(failures === 0 ? 0 : 1);

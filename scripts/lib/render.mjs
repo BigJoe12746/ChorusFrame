@@ -230,6 +230,12 @@ export async function renderFormats({
     // value can never fail a render.
     vibe: vibe || sub.vibe || "",
     brand,
+    // Detected in the browser and stored on the song; the worker has no
+    // audio decoder of its own.
+    beatGrid:
+      sub.bpm && sub.beat_offset !== null
+        ? { bpm: Number(sub.bpm), offset: Number(sub.beat_offset) }
+        : null,
   };
 
   mkdirSync(outDir, { recursive: true });

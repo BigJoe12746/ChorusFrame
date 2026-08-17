@@ -15,6 +15,8 @@ export type Analysis = {
   frameSeconds: number;
   /** Estimated tempo, or null when nothing convincing was found. */
   tempo: number | null;
+  /** Tempo plus the phase needed to animate on the beat rather than near it. */
+  beatGrid: { bpm: number; offset: number } | null;
   /** Suggested clip start, in seconds. */
   bestStart: number;
 };
@@ -88,6 +90,78 @@ export function estimateTempo(onsets: number[], frameSeconds = HOP_SECONDS): num
   while (bpm < 90) bpm *= 2;
   while (bpm > 180) bpm /= 2;
   return Math.round(bpm);
+}
+
+/**
+ * Where the beats actually fall.
+ *
+ * Tempo alone isn't enough to animate to: 143 BPM tells you how often a beat
+ * happens, not when the first one lands. Without the phase, motion lands
+ * between beats and reads as random.
+ *
+ * Phase is found by trying every offset within one beat period and keeping the
+ * one where the most onset energy piles up on the grid.
+ */
+export function detectBeatGrid(
+  onsets: number[],
+  frameSeconds = HOP_SECONDS,
+  bpm?: number | null
+): { bpm: number; offset: number } | null {
+  const tempo = bpm ?? estimateTempo(onsets, frameSeconds);
+  if (!tempo) return null;
+
+  const periodFrames = 60 / tempo / frameSeconds;
+  if (!Number.isFinite(periodFrames) || periodFrames < 2) return null;
+
+  let bestOffset = 0;
+  let bestScore = -1;
+  const steps = Math.max(1, Math.round(periodFrames));
+  for (let s = 0; s < steps; s++) {
+    const offset = (s / steps) * periodFrames;
+    let score = 0;
+    for (let f = offset; f < onsets.length; f += periodFrames) {
+      // Sample either side of the exact index; a beat rarely lands dead on a
+      // 20ms frame boundary.
+      const i = Math.round(f);
+      score += (onsets[i] ?? 0) + 0.5 * ((onsets[i - 1] ?? 0) + (onsets[i + 1] ?? 0));
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestOffset = offset;
+    }
+  }
+  return {
+    bpm: tempo,
+    offset: Math.round(bestOffset * frameSeconds * 1000) / 1000,
+  };
+}
+
+/**
+ * How hard the visuals should hit at a given moment in the song.
+ *
+ * Returns 1 at the instant of a beat and decays to 0 well before the next one,
+ * so the shape is a kick rather than a sine wave. Downbeats (every fourth
+ * beat) hit harder, which is what makes motion feel arranged instead of merely
+ * periodic.
+ *
+ * Lives here rather than inside the composition so it can be tested without
+ * rendering a frame — pixel measurements can't separate the pulse from the
+ * artwork's slow rotation.
+ */
+export function beatHitAt(
+  songSeconds: number,
+  grid: { bpm: number; offset: number } | null | undefined,
+  { decayFraction = 0.4, offbeatStrength = 0.6 } = {}
+): number {
+  if (!grid?.bpm || grid.bpm <= 0) return 0;
+  const period = 60 / grid.bpm;
+  const since = songSeconds - grid.offset;
+  if (!Number.isFinite(since)) return 0;
+  const phase = ((since % period) + period) % period;
+  const beatIndex = Math.floor(since / period);
+  const isDownbeat = ((beatIndex % 4) + 4) % 4 === 0;
+  const decay = Math.max(0, 1 - phase / (period * decayFraction));
+  return Math.pow(decay, 2.2) * (isDownbeat ? 1 : offbeatStrength);
 }
 
 /**
@@ -172,10 +246,12 @@ export function analyzeAudio(
   const snapped = snapToOnset(onsets, HOP_SECONDS, rough);
   const songSeconds = envelope.length * HOP_SECONDS;
   const limit = Math.max(0, Math.min(maxStart, songSeconds - clipDuration));
+  const tempo = estimateTempo(onsets);
   return {
     envelope,
     frameSeconds: HOP_SECONDS,
-    tempo: estimateTempo(onsets),
+    tempo,
+    beatGrid: detectBeatGrid(onsets, HOP_SECONDS, tempo),
     bestStart: Math.min(limit, snapped),
   };
 }
