@@ -343,6 +343,12 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   const fadeIn =
     clipStartSeconds > 0 ? interpolate(frame, [0, 12], [0, 1], { extrapolateRight: "clamp" }) : 1;
 
+  const artMode = V.art.mode ?? "card";
+  // Centred lyrics belong to templates where the words are the main event
+  // (full-bleed cover, or no cover at all) rather than a caption under a card.
+  const lyricTop =
+    V.lyricPlacement === "center" ? Math.round(height * 0.42) : L.lyric.top;
+
   const artSway = Math.sin(frame / 55) * V.art.sway;
   const bgDrift = frame * 0.12;
 
@@ -361,9 +367,11 @@ export const SampleClip: React.FC<SampleClipProps> = ({
         volume={() => fadeIn * fadeOut}
       />
 
-      {/* Blurred artwork backdrop */}
+      {/* Artwork backdrop. For "full" templates this is the picture itself —
+          barely blurred, near full brightness — rather than a wash behind a
+          card. "none" skips it so type carries the clip. */}
       <AbsoluteFill style={{ overflow: "hidden" }}>
-        {art ? (
+        {art && artMode !== "none" ? (
           <Img
             src={art}
             style={{
@@ -455,7 +463,10 @@ export const SampleClip: React.FC<SampleClipProps> = ({
         </div>
       </div>
 
-      {/* Artwork card, pulsing with the bass */}
+      {/* Artwork card, pulsing with the bass.
+          "full" templates let the backdrop be the picture and "none" templates
+          drop it entirely, so the card only belongs to the framed look. */}
+      {artMode === "card" ? (
       <div
         style={{
           position: "absolute",
@@ -478,13 +489,14 @@ export const SampleClip: React.FC<SampleClipProps> = ({
           <MonogramArt title={songTitle} palette={palette} size={L.art.size} />
         )}
       </div>
+      ) : null}
 
       {/* Active lyric line */}
       {active ? (
         <div
           style={{
             position: "absolute",
-            top: L.lyric.top,
+            top: lyricTop,
             left: L.lyric.left,
             width: L.lyric.width,
             textAlign: L.lyric.align,

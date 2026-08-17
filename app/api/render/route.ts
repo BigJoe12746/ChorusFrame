@@ -6,7 +6,18 @@ export const runtime = "nodejs";
 
 const VALID_FORMATS = ["vertical", "square", "wide"] as const;
 /** Keep in step with remotion/vibes.ts — an unknown id renders the default. */
-const VALID_VIBES = ["hyperpop", "anime", "dreamy", "cinematic", "reggae", "minimal"] as const;
+const VALID_VIBES = [
+  "hyperpop",
+  "anime",
+  "dreamy",
+  "cinematic",
+  "reggae",
+  "minimal",
+  "poster",
+  "typographic",
+  "retro",
+  "neon",
+] as const;
 
 /**
  * Renders an artist can start per rolling 24h during beta.

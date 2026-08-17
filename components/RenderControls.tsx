@@ -33,6 +33,10 @@ const VIBES = [
   { id: "cinematic", label: "Cinematic", blurb: "Letterboxed, wide serif", from: "#e8d5b0", to: "#2e6f86" },
   { id: "reggae", label: "Reggae", blurb: "Gold and green, bouncy", from: "#ffc400", to: "#1f9d55" },
   { id: "minimal", label: "Minimal", blurb: "Mono, thin, still", from: "#f5f5f5", to: "#555" },
+  { id: "poster", label: "Poster", blurb: "Cover fills the screen", from: "#ffffff", to: "#22dcf5" },
+  { id: "typographic", label: "Typographic", blurb: "No cover, huge words", from: "#ffffff", to: "#0b0b12" },
+  { id: "retro", label: "Retro", blurb: "Warm, faded, VHS-ish", from: "#ffb45e", to: "#ff5a3c" },
+  { id: "neon", label: "Neon", blurb: "Black and glow, club", from: "#22dcf5", to: "#a855f7" },
 ];
 
 export default function RenderControls({

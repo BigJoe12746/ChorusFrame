@@ -43,6 +43,14 @@ export type Vibe = {
   /** Strength of the vignette that darkens the frame edges, 0..1. */
   vignette: number;
   art: {
+    /**
+     * Structure, not decoration — this is what makes a template a different
+     * design rather than the same one tinted differently.
+     *   card — framed square, the classic release-post look
+     *   full — artwork fills the frame, lyrics sit over it
+     *   none — no artwork; typography carries the whole clip
+     */
+    mode?: "card" | "full" | "none";
     radiusScale: number;
     /** How hard the artwork pumps with the bass. */
     pulse: number;
@@ -51,6 +59,8 @@ export type Vibe = {
     glow: number;
     ring?: boolean;
   };
+  /** Where the words live: under the artwork, or centred as the main event. */
+  lyricPlacement?: "under" | "center";
   bars: { style: BarStyle; opacity: number; thickness: number; radiusScale: number };
   /** Black bars top and bottom, film style. */
   letterbox: boolean;
@@ -210,6 +220,113 @@ export const VIBES: Record<string, Vibe> = {
     letterbox: false,
     grain: 0.03,
     motion: 1.8,
+  },
+
+  // ---- Full-bleed artwork: the cover IS the video ----
+  poster: {
+    id: "poster",
+    label: "Poster",
+    blurb: "Cover fills the screen, words on top",
+    fonts: { title: SANS, lyric: SANS },
+    title: { weight: 800, transform: "uppercase", letterSpacing: "0.02em" },
+    artistLabel: { letterSpacing: "0.32em", weight: 600 },
+    lyric: {
+      weight: 800,
+      transform: "none",
+      letterSpacing: "-0.01em",
+      shadow: "0 4px 34px rgba(0,0,0,0.9), 0 2px 8px rgba(0,0,0,0.8)",
+      sizeScale: 1.12,
+    },
+    palette: { mode: "artwork", primary: "#ffffff", secondary: "#22dcf5" },
+    background: "#000000",
+    // Barely blurred and near full brightness: this IS the picture, not a wash
+    backdrop: { blur: 0, brightness: 0.72, saturate: 1.15, scale: 1.06 },
+    vignette: 0.85,
+    art: { mode: "full", radiusScale: 0, pulse: 0.02, sway: 0.15, glow: 0 },
+    bars: { style: "line", opacity: 0.65, thickness: 0.4, radiusScale: 0 },
+    letterbox: false,
+    grain: 0.03,
+    motion: 1.2,
+    lyricPlacement: "center",
+  },
+
+  // ---- No artwork at all: type carries it ----
+  typographic: {
+    id: "typographic",
+    label: "Typographic",
+    blurb: "No cover — just huge words",
+    fonts: { title: SANS, lyric: SANS },
+    title: { weight: 900, transform: "uppercase", letterSpacing: "-0.03em" },
+    artistLabel: { letterSpacing: "0.4em", weight: 700 },
+    lyric: {
+      weight: 900,
+      transform: "uppercase",
+      letterSpacing: "-0.02em",
+      shadow: "none",
+      sizeScale: 1.35,
+    },
+    palette: { mode: "artwork", primary: "#ffffff", secondary: "#22dcf5" },
+    background: "#0b0b12",
+    backdrop: { blur: 130, brightness: 0.5, saturate: 2.2, scale: 2.8 },
+    vignette: 0.35,
+    art: { mode: "none", radiusScale: 0, pulse: 0, sway: 0, glow: 0 },
+    bars: { style: "bars", opacity: 0.9, thickness: 0.55, radiusScale: 0 },
+    letterbox: false,
+    grain: 0,
+    motion: 0.7,
+    lyricPlacement: "center",
+  },
+
+  // ---- Warm, faded, analogue ----
+  retro: {
+    id: "retro",
+    label: "Retro",
+    blurb: "Warm, faded, VHS-ish",
+    fonts: { title: SERIF, lyric: SANS },
+    title: { weight: 700, transform: "uppercase", letterSpacing: "0.08em" },
+    artistLabel: { letterSpacing: "0.36em", weight: 600 },
+    lyric: {
+      weight: 700,
+      transform: "uppercase",
+      letterSpacing: "0.03em",
+      shadow: "2px 2px 0 rgba(255,90,60,0.55), -2px -2px 0 rgba(60,180,255,0.4)",
+      sizeScale: 0.94,
+    },
+    palette: { mode: "fixed", primary: "#ffb45e", secondary: "#ff5a3c" },
+    background: "#140d0a",
+    backdrop: { blur: 45, brightness: 0.55, saturate: 0.75, scale: 2.2 },
+    vignette: 0.75,
+    art: { mode: "card", radiusScale: 0.01, pulse: 0.05, sway: 0.5, glow: 0.6 },
+    bars: { style: "bars", opacity: 0.7, thickness: 0.85, radiusScale: 0 },
+    letterbox: false,
+    grain: 0.11,
+    motion: 1.1,
+  },
+
+  // ---- Club: black, glow, hard pulse ----
+  neon: {
+    id: "neon",
+    label: "Neon",
+    blurb: "Black and glow, club energy",
+    fonts: { title: SANS, lyric: SANS },
+    title: { weight: 800, transform: "uppercase", letterSpacing: "0.12em" },
+    artistLabel: { letterSpacing: "0.44em", weight: 600 },
+    lyric: {
+      weight: 800,
+      transform: "uppercase",
+      letterSpacing: "0.04em",
+      shadow: "0 0 18px rgba(34,220,245,0.9), 0 0 46px rgba(124,58,237,0.7)",
+      sizeScale: 1.0,
+    },
+    palette: { mode: "fixed", primary: "#22dcf5", secondary: "#a855f7" },
+    background: "#03040a",
+    backdrop: { blur: 95, brightness: 0.4, saturate: 1.9, scale: 2.5 },
+    vignette: 0.9,
+    art: { mode: "card", radiusScale: 0.5, pulse: 0.1, sway: 0.8, glow: 2.2, ring: true },
+    bars: { style: "dots", opacity: 1, thickness: 0.6, radiusScale: 0.5 },
+    letterbox: false,
+    grain: 0,
+    motion: 0.8,
   },
 };
 
