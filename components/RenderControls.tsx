@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { authConfigured, getSupabaseBrowser } from "@/lib/supabase-browser";
 import HookPicker from "@/components/HookPicker";
 import ClipPreview from "@/components/ClipPreview";
+import LyricsEditor from "@/components/LyricsEditor";
 
 export type RenderJob = {
   id: string;
@@ -215,6 +216,10 @@ export default function RenderControls({
           </div>
 
           <div className="flex min-w-0 flex-1 flex-col gap-4">
+          {/* First, because no lyrics means no lyric video — and that was
+              silently the case for a real upload. */}
+          <LyricsEditor submissionId={submissionId} initialLyrics={lyrics} />
+
           <HookPicker
             audioUrl={audioUrl}
             start={clipStart}

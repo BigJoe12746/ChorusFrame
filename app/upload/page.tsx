@@ -19,6 +19,7 @@ export default function UploadPage() {
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
   const [email, setEmail] = useState("");
+  const [lyrics, setLyrics] = useState("");
   /** Signed-in artists render for themselves; anonymous ones wait for us. */
   const [signedIn, setSignedIn] = useState(false);
 
@@ -267,16 +268,27 @@ export default function UploadPage() {
               <label htmlFor="lyrics" className="mb-1.5 block text-sm font-medium">
                 Lyrics{" "}
                 <span className="font-normal text-muted">
-                  (optional — paste the section you want on screen)
+                  — paste the part you want on screen, usually the chorus
                 </span>
               </label>
               <textarea
                 id="lyrics"
                 name="lyrics"
                 rows={5}
-                placeholder="Paste your hook or chorus…"
+                value={lyrics}
+                onChange={(e) => setLyrics(e.target.value)}
+                placeholder={"Late checkout, I'm still here\nSay my name, make it clear"}
                 className={inputCls}
               />
+              {/* Skipping this silently produces a visualizer instead of a
+                  lyric video, which is not what anyone comes here for. */}
+              {!lyrics.trim() ? (
+                <p className="mt-1.5 text-xs text-muted">
+                  Leave this empty and you&apos;ll get a{" "}
+                  <span className="text-foreground">visualizer</span> — cover art and
+                  waveform, no words. You can add lyrics later from your dashboard.
+                </p>
+              ) : null}
             </div>
 
             <label className="flex items-start gap-3 text-sm text-muted">
