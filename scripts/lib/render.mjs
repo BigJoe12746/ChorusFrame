@@ -168,6 +168,24 @@ export async function renderFormats({
 
   const { audioSrc, artworkSrc } = await signInputs(supabase, sub);
 
+  // The artist's saved identity, so their fifth release looks like their first
+  let brand = null;
+  if (sub.user_id) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("brand_primary, brand_secondary, brand_font")
+      .eq("id", sub.user_id)
+      .maybeSingle();
+    if (profile?.brand_primary || profile?.brand_secondary || profile?.brand_font) {
+      brand = {
+        primary: profile.brand_primary,
+        secondary: profile.brand_secondary,
+        font: profile.brand_font,
+      };
+      log(`brand kit: ${brand.primary ?? "—"} / ${brand.secondary ?? "—"} / ${brand.font ?? "—"}`);
+    }
+  }
+
   // Lyric timing: real alignment when a transcriber is configured (cached on
   // the song), otherwise a syllable-weighted spread across this clip window.
   let lyricTiming = [];
@@ -211,6 +229,7 @@ export async function renderFormats({
     // The composition falls back to its default for an unknown id, so a bad
     // value can never fail a render.
     vibe: vibe || sub.vibe || "",
+    brand,
   };
 
   mkdirSync(outDir, { recursive: true });

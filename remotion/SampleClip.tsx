@@ -39,6 +39,16 @@ export type SampleClipProps = {
   useArtworkColors: boolean;
   /** Visual direction — see remotion/vibes.ts. */
   vibe: string;
+  /**
+   * The artist's saved identity. Outranks both the vibe palette and cover-art
+   * extraction, because a brand kit is a deliberate choice and those two are
+   * defaults.
+   */
+  brand?: {
+    primary?: string | null;
+    secondary?: string | null;
+    font?: "sans" | "serif" | "mono" | null;
+  } | null;
 };
 
 export const FPS = 30;
@@ -209,6 +219,7 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   endCardUrl,
   useArtworkColors,
   vibe,
+  brand,
 }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
@@ -219,10 +230,24 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   // A vibe with a fixed palette keeps its own colours whatever the cover looks
   // like — that identity is the point of choosing it.
   const artPalette = useArtworkPalette(art, useArtworkColors && V.palette.mode === "artwork");
-  const palette: Palette =
+  const vibePalette: Palette =
     V.palette.mode === "fixed" || !artPalette.fromArtwork
       ? { primary: V.palette.primary, secondary: V.palette.secondary, fromArtwork: false }
       : artPalette;
+  // Brand kit wins: it's a deliberate choice, the other two are defaults.
+  const palette: Palette = {
+    primary: brand?.primary || vibePalette.primary,
+    secondary: brand?.secondary || vibePalette.secondary,
+    fromArtwork: vibePalette.fromArtwork && !brand?.primary,
+  };
+  const BRAND_FONTS = {
+    sans: 'Inter, "Segoe UI", "Liberation Sans", Arial, system-ui, sans-serif',
+    serif: 'Georgia, "Liberation Serif", "Times New Roman", serif',
+    mono: '"Liberation Mono", "Courier New", ui-monospace, monospace',
+  } as const;
+  const brandFont = brand?.font ? BRAND_FONTS[brand.font] : null;
+  const titleFont = brandFont ?? V.fonts.title;
+  const lyricFont = brandFont ?? V.fonts.lyric;
   const L = getLayout(width, height);
 
   const musicFrames = Math.round(durationSeconds * fps);
@@ -359,7 +384,7 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   const bottomLift = V.letterbox ? letterboxHeight : 0;
 
   return (
-    <AbsoluteFill style={{ backgroundColor: V.background, fontFamily: V.fonts.title }}>
+    <AbsoluteFill style={{ backgroundColor: V.background, fontFamily: titleFont }}>
       <Audio
         src={src}
         startFrom={Math.round(clipStartSeconds * fps)}
@@ -509,7 +534,7 @@ export const SampleClip: React.FC<SampleClipProps> = ({
           <span
             style={{
               color: "#ffffff",
-              fontFamily: V.fonts.lyric,
+              fontFamily: lyricFont,
               fontSize:
                 (active.text.length > 54 ? L.lyric.size * 0.79 : L.lyric.size) *
                 V.lyric.sizeScale,

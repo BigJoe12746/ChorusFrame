@@ -2,6 +2,7 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 import RenderControls, { type RenderJob } from "@/components/RenderControls";
 import SetPassword from "@/components/SetPassword";
+import BrandKit from "@/components/BrandKit";
 import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +71,14 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
     if (!latestJob.has(j.submission_id)) latestJob.set(j.submission_id, j);
   }
 
+  // The artist's saved brand kit. RLS scopes this to their own row, and a
+  // missing profile (or an unrun migration) simply means no kit.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("brand_primary, brand_secondary, brand_font")
+    .eq("id", user?.id ?? "")
+    .maybeSingle();
+
   // Artwork lives in a private bucket, and finished clips may exist in several
   // formats — resolve both with the service-role client.
   const admin = getSupabaseAdmin();
@@ -136,6 +145,17 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
               (user?.identities ?? []).some((i) => i.provider === "email") &&
                 user?.user_metadata?.has_password
             )}
+          />
+        </div>
+
+        {/* A kit belongs to the artist, not to a song, so it lives up here */}
+        <div className="mt-4">
+          <BrandKit
+            initial={{
+              primary: profile?.brand_primary ?? null,
+              secondary: profile?.brand_secondary ?? null,
+              font: profile?.brand_font ?? null,
+            }}
           />
         </div>
 
