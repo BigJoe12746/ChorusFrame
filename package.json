@@ -15,7 +15,8 @@
     "worker:once": "node scripts/render-worker.mjs --once",
     "test:redirect": "node --experimental-strip-types scripts/test-safe-next.mjs",
     "test:align": "node scripts/test-align.mjs",
-    "test:audio": "node --experimental-strip-types scripts/test-audio-analysis.mjs"
+    "test:audio": "node --experimental-strip-types scripts/test-audio-analysis.mjs",
+    "test:plans": "node --experimental-strip-types scripts/test-plans.mjs"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.512",

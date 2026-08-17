@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, getSupabaseAdmin } from "@/lib/supabase";
 import { MAX_DURATION, MAX_START, MIN_DURATION } from "@/lib/clip-limits";
+import { checkEntitlement } from "@/lib/plans";
 
 export const runtime = "nodejs";
 
@@ -20,18 +21,16 @@ const VALID_VIBES = [
 ] as const;
 
 /**
- * Renders an artist can start per rolling 24h during beta.
+ * What an artist may render comes from their plan (lib/plans.ts), counted per
+ * calendar month, with failures excluded — "failed renders never consume
+ * credits" is a promise on the marketing page.
  *
- * DAILY_LIMIT counts only jobs that weren't failures: "failed renders never
- * consume credits" is a promise on the marketing page, so a render that
- * produced nothing must not use up the artist's allowance.
- *
- * ABUSE_LIMIT counts every job including failures. It exists purely so a
- * caller who deliberately fails renders can't burn compute forever, and it
- * sits far enough above DAILY_LIMIT that honest use never reaches it.
+ * ABUSE_LIMIT is separate and counts EVERY job including failures. It exists
+ * only so a caller who deliberately fails renders can't burn compute forever,
+ * and sits far above any plan's monthly allowance so honest use never meets
+ * it. Keeping the two apart is what lets the promise stay true.
  */
-const DAILY_LIMIT = 5;
-const ABUSE_LIMIT = 25;
+const ABUSE_LIMIT_PER_DAY = 40;
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -79,17 +78,43 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unknown vibe" }, { status: 400 });
   }
 
-  // Ownership, per-song dedupe, quota, and the insert all happen inside one
-  // transaction. Checking in the route and inserting afterwards let several
-  // concurrent requests each read "under the limit" and each insert.
+  // What this artist's plan allows. Checked before the enqueue so the refusal
+  // names the actual reason — clip too long, format not included, allowance
+  // spent — rather than a generic "quota".
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("plan")
+    .eq("id", user.id)
+    .maybeSingle();
+  const { data: usedRaw } = await supabase.rpc("exports_used_this_month", { p_user: user.id });
+  const usedThisMonth = Number(usedRaw ?? 0);
+
+  const entitlement = checkEntitlement({
+    planId: profile?.plan,
+    usedThisMonth,
+    clipSeconds: duration,
+    formats,
+  });
+  if (!entitlement.allowed) {
+    return NextResponse.json(
+      { error: entitlement.reason, plan: entitlement.plan.id, upgrade: true },
+      { status: 402 }
+    );
+  }
+
+  // Ownership, per-song dedupe, the abuse ceiling and the insert all happen
+  // inside one transaction. Checking in the route and inserting afterwards let
+  // several concurrent requests each read "under the limit" and each insert.
   const { data, error } = await supabase.rpc("enqueue_render_job", {
     p_user: user.id,
     p_submission: body.submissionId,
     p_formats: formats,
     p_start: start,
     p_duration: duration,
-    p_daily_limit: DAILY_LIMIT,
-    p_abuse_limit: ABUSE_LIMIT,
+    // The plan allowance was just checked above; pass it through so the
+    // transaction re-checks it atomically rather than trusting our read.
+    p_daily_limit: entitlement.remaining,
+    p_abuse_limit: ABUSE_LIMIT_PER_DAY,
     p_vibe: vibe,
   });
 
@@ -105,15 +130,19 @@ export async function POST(req: Request) {
     case "already_queued":
       return NextResponse.json({ ok: true, id: row.job_id, alreadyQueued: true });
     case "quota":
+      // The transaction re-checked and disagreed with our read — a concurrent
+      // render used the last of the allowance between the two.
       return NextResponse.json(
         {
-          error: `That's ${DAILY_LIMIT} renders in 24 hours — the beta limit. Failed renders don't count toward it.`,
+          error: `You've used all ${entitlement.plan.exportsPerMonth} exports this month. Renders that failed don't count.`,
+          plan: entitlement.plan.id,
+          upgrade: true,
         },
-        { status: 429 }
+        { status: 402 }
       );
     case "abuse":
       return NextResponse.json(
-        { error: "Too many render attempts in 24 hours. Try again tomorrow." },
+        { error: "Too many render attempts today. Try again tomorrow." },
         { status: 429 }
       );
     case "not_found":
