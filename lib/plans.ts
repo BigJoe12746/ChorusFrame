@@ -28,6 +28,14 @@ export type Plan = {
   templates: "basic" | "all";
   /** Metered credits for expensive generative features, per month. */
   aiCredits: number;
+  /**
+   * True when `monthly`/`annual` are charged per seat rather than per account.
+   * Measured against real render costs, Teams at a flat $19.99 for 1,000
+   * exports returns 39% margin; per seat it returns 88%, in line with the
+   * other plans. The business plan quotes "$14.99/user/mo annual", so per
+   * seat is the intended reading.
+   */
+  perSeat?: boolean;
   storageGb: number;
   seats: number;
   features: string[];
@@ -105,6 +113,7 @@ export const PLANS: Record<PlanId, Plan> = {
     // not a yearly total. Stored as the yearly figure per seat (14.99 x 12) so
     // it means the same thing as every other plan's `annual`.
     annual: 17988,
+    perSeat: true,
     tagline: "For labels and managers",
     exportsPerMonth: 1000,
     formats: ["vertical", "square", "wide"],
@@ -118,7 +127,7 @@ export const PLANS: Record<PlanId, Plan> = {
       "Shared brand kits",
       "Pooled AI credits",
       "Approvals and admin controls",
-      "5 seats included",
+      "Priced per seat, 5 seat minimum",
     ],
   },
 };

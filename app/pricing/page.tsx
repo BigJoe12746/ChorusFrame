@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import PricingCompare from "@/components/PricingCompare";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import NavAuth from "@/components/NavAuth";
@@ -106,6 +107,8 @@ export default function PricingPage() {
           standard annual rate, and we&apos;ll tell you before it does.
         </p>
       </section>
+
+      <PricingCompare />
 
       {/* The promises, restated where they cost us something */}
       <section className="pb-16">
