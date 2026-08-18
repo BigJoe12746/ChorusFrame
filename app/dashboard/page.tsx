@@ -4,6 +4,7 @@ import RenderControls, { type RenderJob } from "@/components/RenderControls";
 import SetPassword from "@/components/SetPassword";
 import BrandKit from "@/components/BrandKit";
 import ShareLink from "@/components/ShareLink";
+import DeleteSong from "@/components/DeleteSong";
 import { getPlan } from "@/lib/plans";
 import type { TimedLine } from "@/components/LyricTimingEditor";
 import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase";
@@ -283,11 +284,18 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                     </div>
                   </div>
 
-                  <span
-                    className={`shrink-0 self-start rounded-full border px-3 py-1 text-xs sm:self-center ${badge.cls}`}
-                  >
-                    {badge.label}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-2 self-start sm:self-center">
+                    <span
+                      className={`rounded-full border px-3 py-1 text-xs ${badge.cls}`}
+                    >
+                      {badge.label}
+                    </span>
+                    <DeleteSong
+                      submissionId={s.id}
+                      songTitle={s.song_title}
+                      clipCount={clips.length}
+                    />
+                  </div>
                 </li>
               );
             })}
