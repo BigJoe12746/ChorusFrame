@@ -11,7 +11,7 @@ const ROWS: { label: string; general: string; us: string; better: boolean }[] = 
   {
     label: "Typical price",
     general: "$15–25 a month",
-    us: "$9.99 a month",
+    us: "$10 a month",
     better: true,
   },
   {

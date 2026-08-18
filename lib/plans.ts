@@ -1,15 +1,18 @@
 // Plans and entitlements — the single source of truth for what a plan allows.
 //
-// Prices and limits come from the business plan. Everything that decides what
-// an artist can do reads from here, so a limit can never drift between the
-// pricing page, the API that enforces it, and the dashboard that reports it.
+// Two plans, deliberately. The business plan sketched four (Free, Creator,
+// Creator AI, Teams), but three of them sold things that do not exist yet:
+// 4K, AI credits, translation, approvals. Advertising those before they are
+// built is how a product ends up owing its customers features. Everything
+// listed here is something the product does today; tiers come back when the
+// features behind them are real.
 //
-// Two rules from the plan are structural rather than cosmetic, and the code
-// has to honour them because they are printed on the marketing page:
+// Two rules from the plan are structural rather than cosmetic, because they
+// are printed on the marketing page:
 //   "You will always know what an export costs"
 //   "Failed renders never consume credits"
 
-export type PlanId = "free" | "creator" | "creator_ai" | "teams";
+export type PlanId = "free" | "pro";
 
 export type Plan = {
   id: PlanId;
@@ -24,20 +27,13 @@ export type Plan = {
   /** Formats available per render. */
   formats: ("vertical" | "square" | "wide")[];
   maxClipSeconds: number;
-  /** Template ids, or "all". */
-  templates: "basic" | "all";
-  /** Metered credits for expensive generative features, per month. */
-  aiCredits: number;
-  /**
-   * True when `monthly`/`annual` are charged per seat rather than per account.
-   * Measured against real render costs, Teams at a flat $19.99 for 1,000
-   * exports returns 39% margin; per seat it returns 88%, in line with the
-   * other plans. The business plan quotes "$14.99/user/mo annual", so per
-   * seat is the intended reading.
-   */
-  perSeat?: boolean;
+  /** How many of the ten visual directions are available. */
+  templates: number;
+  /** Saved colours and type applied to every render. */
+  brandKit: boolean;
+  /** Whether the ChorusFrame end card is appended. */
+  endCard: boolean;
   storageGb: number;
-  seats: number;
   features: string[];
 };
 
@@ -47,99 +43,58 @@ export const PLANS: Record<PlanId, Plan> = {
     name: "Free",
     monthly: 0,
     annual: 0,
-    tagline: "Try it on a real release",
-    exportsPerMonth: 10,
+    tagline: "Enough to put a real release out",
+    exportsPerMonth: 5,
+    // Every format stays on Free on purpose: "one upload, every format" is the
+    // whole pitch, and gating it would undercut the thing worth trying.
     formats: ["vertical", "square", "wide"],
-    maxClipSeconds: 30,
-    templates: "basic",
-    aiCredits: 0,
+    maxClipSeconds: 15,
+    templates: 3,
+    brandKit: false,
+    endCard: true,
     storageGb: 2,
-    seats: 1,
     features: [
-      "10 exports a month",
-      "1080p, every aspect ratio",
-      "Basic templates",
-      "Tap-to-sync lyric timing",
+      "5 exports a month",
+      "9:16, 1:1 and 16:9 from one upload",
+      "Clips up to 15 seconds",
+      "3 templates",
+      "Hook detection and tap-to-sync lyrics",
       "ChorusFrame end card",
     ],
   },
-  creator: {
-    id: "creator",
-    name: "Creator",
-    monthly: 999,
-    annual: 7999,
+  pro: {
+    id: "pro",
+    name: "Pro",
+    monthly: 1000,
+    // ~17% off, the usual shape for an annual plan
+    annual: 9900,
     tagline: "For artists releasing regularly",
     exportsPerMonth: 100,
     formats: ["vertical", "square", "wide"],
     maxClipSeconds: 60,
-    templates: "all",
-    aiCredits: 0,
+    templates: 10,
+    brandKit: true,
+    endCard: false,
     storageGb: 100,
-    seats: 1,
     features: [
       "100 exports a month",
-      "Every template",
       "Clips up to 60 seconds",
+      "All 10 templates",
+      "Your brand kit on every render",
       "No end card",
       "100GB of storage",
-    ],
-  },
-  creator_ai: {
-    id: "creator_ai",
-    name: "Creator AI",
-    monthly: 1699,
-    annual: 13999,
-    tagline: "For high-frequency creators",
-    exportsPerMonth: 300,
-    formats: ["vertical", "square", "wide"],
-    maxClipSeconds: 60,
-    templates: "all",
-    aiCredits: 500,
-    storageGb: 250,
-    seats: 1,
-    features: [
-      "300 exports a month",
-      "Everything in Creator",
-      "Automatic lyric alignment",
-      "500 AI credits a month",
-      "Batch exports",
-    ],
-  },
-  teams: {
-    id: "teams",
-    name: "Teams",
-    monthly: 1999,
-    // The plan quotes Teams as "$14.99/user/mo annual" — a monthly-equivalent,
-    // not a yearly total. Stored as the yearly figure per seat (14.99 x 12) so
-    // it means the same thing as every other plan's `annual`.
-    annual: 17988,
-    perSeat: true,
-    tagline: "For labels and managers",
-    exportsPerMonth: 1000,
-    formats: ["vertical", "square", "wide"],
-    maxClipSeconds: 60,
-    templates: "all",
-    aiCredits: 1000,
-    storageGb: 1000,
-    seats: 5,
-    features: [
-      "1,000 exports a month",
-      "Shared brand kits",
-      "Pooled AI credits",
-      "Approvals and admin controls",
-      "Priced per seat, 5 seat minimum",
     ],
   },
 };
 
 /**
- * Founding-year offer: the plan promises the first 1,000 paying customers an
- * annual Creator plan at $59.99, renewing at the standard rate with notice.
+ * Founding-year offer: the business plan promises the first 1,000 paying
+ * customers a discounted first year, renewing at the standard rate with notice.
  */
 export const FOUNDING = {
   priceCents: 5999,
   seats: 1000,
-  planId: "creator" as PlanId,
+  planId: "pro" as PlanId,
 };
 
 export const DEFAULT_PLAN: PlanId = "free";
@@ -180,7 +135,7 @@ export function checkEntitlement({
     return {
       ...base,
       allowed: false,
-      reason: `${plan.name} covers clips up to ${plan.maxClipSeconds} seconds. Upgrade for longer cuts.`,
+      reason: `${plan.name} covers clips up to ${plan.maxClipSeconds} seconds. Pro goes to ${PLANS.pro.maxClipSeconds}.`,
     };
   }
   const unavailable = formats.filter((f) => !plan.formats.includes(f as Plan["formats"][number]));

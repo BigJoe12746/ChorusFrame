@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     "Free while in beta. Simple plans for artists, with no surprises about what an export costs.",
 };
 
-const ORDER = ["free", "creator", "creator_ai", "teams"] as const;
+const ORDER = ["free", "pro"] as const;
 
 export default function PricingPage() {
   return (
@@ -34,10 +34,10 @@ export default function PricingPage() {
         </p>
       </section>
 
-      <section className="grid gap-4 pb-8 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-4 pb-8 mx-auto max-w-3xl sm:grid-cols-2">
         {ORDER.map((id) => {
           const p = PLANS[id];
-          const featured = id === "creator";
+          const featured = id === "pro";
           return (
             <div
               key={id}
@@ -58,16 +58,12 @@ export default function PricingPage() {
               <p className="mt-4">
                 <span className="text-3xl font-bold">{money(p.monthly)}</span>
                 {p.monthly > 0 ? (
-                  <span className="text-sm text-muted">
-                    /mo{id === "teams" ? " per seat" : ""}
-                  </span>
+                  <span className="text-sm text-muted">/mo</span>
                 ) : null}
               </p>
               {p.annual > 0 ? (
                 <p className="mt-1 text-xs text-muted">
-                  or {money(p.annual)}/year
-                  {id === "teams" ? " per seat" : ""} —{" "}
-                  {money(Math.round(p.annual / 12))}/mo
+                  or {money(p.annual)}/year — {money(Math.round(p.annual / 12))}/mo
                 </p>
               ) : null}
 

@@ -4,6 +4,7 @@ import RenderControls, { type RenderJob } from "@/components/RenderControls";
 import SetPassword from "@/components/SetPassword";
 import BrandKit from "@/components/BrandKit";
 import ShareLink from "@/components/ShareLink";
+import { getPlan } from "@/lib/plans";
 import type { TimedLine } from "@/components/LyricTimingEditor";
 import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase";
 
@@ -104,12 +105,16 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   // missing profile (or an unrun migration) simply means no kit.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("brand_primary, brand_secondary, brand_font")
+    .select("plan, brand_primary, brand_secondary, brand_font")
     .eq("id", user?.id ?? "")
     .maybeSingle();
 
   // Artwork lives in a private bucket, and finished clips may exist in several
   // formats — resolve both with the service-role client.
+  // What this artist may actually ask for, so the controls cannot offer a
+  // choice the API will reject.
+  const plan = getPlan(profile?.plan);
+
   const admin = getSupabaseAdmin();
   const artThumbs = new Map<string, string>();
   const audioUrls = new Map<string, string>();
@@ -271,6 +276,8 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                         lyrics={s.lyrics ?? ""}
                         beatGrid={beatGrids.get(s.id) ?? null}
                         savedTimings={savedTimings.get(s.id) ?? []}
+                        maxClipSeconds={plan.maxClipSeconds}
+                        planName={plan.name}
                         autoOpen={s.id === justUploaded}
                       />
                     </div>

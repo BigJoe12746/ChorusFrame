@@ -1,61 +1,55 @@
-// Entitlement rules, checked against the business plan's pricing.
-//   npm run test:plans
+// Tests for plans and entitlements.  npm run test:plans
 //
-// The prices are asserted literally because a typo here is a wrong number on a
-// public pricing page, and the "failed renders are free" rule is asserted
-// because it is a promise the marketing page makes.
+// These guard the two promises printed on the marketing page — that an artist
+// always knows what an export costs, and that a failed render never costs one
+// — plus the limits the API enforces.
 
-import { checkEntitlement, PLANS, money, FOUNDING, getPlan } from "../lib/plans.ts";
+import { PLANS, FOUNDING, checkEntitlement, getPlan, money } from "../lib/plans.ts";
 
-let fail = 0;
-const ok = (n, c, d = "") => {
-  if (!c) fail++;
-  console.log(`  ${c ? "ok   " : "FAIL "} ${n}${!c && d ? ` — ${d}` : ""}`);
+let failures = 0;
+const ok = (name, cond, detail = "") => {
+  if (!cond) failures++;
+  console.log(`  ${cond ? "ok   " : "FAIL "} ${name}${detail && !cond ? ` — ${detail}` : ""}`);
 };
 
-console.log("prices match the business plan:");
-ok("Creator $9.99/mo", money(PLANS.creator.monthly) === "$9.99");
-ok("Creator $79.99/yr", money(PLANS.creator.annual) === "$79.99");
-ok("Creator AI $16.99/mo", money(PLANS.creator_ai.monthly) === "$16.99");
-ok("Creator AI $139.99/yr", money(PLANS.creator_ai.annual) === "$139.99");
-ok("Teams $19.99/mo", money(PLANS.teams.monthly) === "$19.99");
-// Quoted as a monthly-equivalent when billed annually
-ok(
-  "Teams annual works out at $14.99/seat/mo",
-  money(Math.round(PLANS.teams.annual / 12)) === "$14.99",
-  money(Math.round(PLANS.teams.annual / 12))
-);
-ok("Founding year $59.99", money(FOUNDING.priceCents) === "$59.99");
-ok("Founding capped at 1,000", FOUNDING.seats === 1000);
-ok("Free is 10 exports a month", PLANS.free.exportsPerMonth === 10);
-ok("annual beats monthly on every paid plan",
-  ["creator", "creator_ai", "teams"].every((id) => PLANS[id].annual < PLANS[id].monthly * 12));
+console.log("two plans, both real:");
+ok("exactly Free and Pro", Object.keys(PLANS).join(",") === "free,pro", Object.keys(PLANS).join(","));
+ok("Pro is $10/mo", money(PLANS.pro.monthly) === "$10", money(PLANS.pro.monthly));
+ok("Pro annual is cheaper per month", PLANS.pro.annual / 12 < PLANS.pro.monthly);
+ok("Free costs nothing", money(PLANS.free.monthly) === "Free");
+ok("founding price beats the annual", FOUNDING.priceCents < PLANS.pro.annual);
+ok("founding upgrades to Pro", FOUNDING.planId === "pro");
 
-const base = { clipSeconds: 15, formats: ["vertical"] };
-console.log("\nfree plan:");
-ok("allows the first export", checkEntitlement({ planId: "free", usedThisMonth: 0, ...base }).allowed);
-ok("allows the tenth", checkEntitlement({ planId: "free", usedThisMonth: 9, ...base }).allowed);
-ok("refuses the eleventh", !checkEntitlement({ planId: "free", usedThisMonth: 10, ...base }).allowed);
-const spent = checkEntitlement({ planId: "free", usedThisMonth: 10, ...base });
-ok("keeps the failed-renders promise in the wording",
-  /failed don't count/i.test(spent.reason ?? ""), spent.reason);
-const tooLong = checkEntitlement({ planId: "free", usedThisMonth: 0, clipSeconds: 60, formats: ["vertical"] });
-ok("refuses a 60s clip", !tooLong.allowed);
-ok("says why, and what fixes it", /60 seconds|upgrade/i.test(tooLong.reason ?? ""), tooLong.reason);
+console.log("");
+console.log("Free is limited but not crippled:");
+ok("every format on Free", PLANS.free.formats.length === 3);
+ok("shorter clips on Free", PLANS.free.maxClipSeconds < PLANS.pro.maxClipSeconds);
+ok("fewer templates on Free", PLANS.free.templates < PLANS.pro.templates);
+ok("end card only on Free", PLANS.free.endCard && !PLANS.pro.endCard);
+ok("brand kit is a Pro feature", !PLANS.free.brandKit && PLANS.pro.brandKit);
 
-console.log("\npaid plans:");
-ok("Creator allows 60s", checkEntitlement({ planId: "creator", usedThisMonth: 0, clipSeconds: 60, formats: ["vertical"] }).allowed);
-ok("Creator allows 100 a month", checkEntitlement({ planId: "creator", usedThisMonth: 99, ...base }).allowed);
-ok("Creator stops after 100", !checkEntitlement({ planId: "creator", usedThisMonth: 100, ...base }).allowed);
-ok("every plan includes all three formats",
-  Object.values(PLANS).every((p) => ["vertical", "square", "wide"].every((f) => p.formats.includes(f))));
+console.log("");
+console.log("entitlement decisions:");
+const free = (over) => checkEntitlement({ planId: "free", usedThisMonth: 0, clipSeconds: 15, formats: ["vertical"], ...over });
 
-console.log("\nunknown plan must fall back to free, never to unlimited:");
-ok("null", !checkEntitlement({ planId: null, usedThisMonth: 10, ...base }).allowed);
-ok("undefined", !checkEntitlement({ planId: undefined, usedThisMonth: 10, ...base }).allowed);
-ok("made-up id", !checkEntitlement({ planId: "enterprise_ultra", usedThisMonth: 10, ...base }).allowed);
-ok("getPlan falls back to free", getPlan("nonsense").id === "free");
-ok("remaining is never negative", checkEntitlement({ planId: "free", usedThisMonth: 999, ...base }).remaining === 0);
+ok("a normal free render is allowed", free({}).allowed);
+ok("a 60s clip is refused on Free", !free({ clipSeconds: 60 }).allowed);
+ok("...and the reason names Pro", /Pro/.test(free({ clipSeconds: 60 }).reason ?? ""));
+ok("60s is allowed on Pro",
+  checkEntitlement({ planId: "pro", usedThisMonth: 0, clipSeconds: 60, formats: ["wide"] }).allowed);
 
-console.log(fail === 0 ? "\nPASS — entitlements match the plan" : `\nFAIL — ${fail} problem(s)`);
-process.exit(fail ? 1 : 0);
+ok("running out is refused", !free({ usedThisMonth: 5 }).allowed);
+ok("...and says failures are free",
+  /failed/i.test(free({ usedThisMonth: 5 }).reason ?? ""), free({ usedThisMonth: 5 }).reason);
+ok("remaining never goes negative", free({ usedThisMonth: 99 }).remaining === 0);
+ok("remaining is reported for the UI", free({ usedThisMonth: 2 }).remaining === 3);
+
+console.log("");
+console.log("unknown input falls back rather than throwing:");
+ok("unknown plan id -> Free", getPlan("enterprise").id === "free");
+ok("null plan id -> Free", getPlan(null).id === "free");
+ok("an unknown format is refused",
+  !checkEntitlement({ planId: "pro", usedThisMonth: 0, clipSeconds: 15, formats: ["hologram"] }).allowed);
+
+console.log(failures === 0 ? "\nPASS — entitlements match the plan" : `\nFAIL — ${failures}`);
+process.exit(failures === 0 ? 0 : 1);

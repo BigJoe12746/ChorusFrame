@@ -51,6 +51,8 @@ export default function RenderControls({
   lyrics,
   beatGrid,
   savedTimings,
+  maxClipSeconds,
+  planName,
   autoOpen = false,
 }: {
   submissionId: string;
@@ -63,6 +65,8 @@ export default function RenderControls({
   lyrics: string;
   beatGrid: { bpm: number; offset: number } | null;
   savedTimings: TimedLine[];
+  maxClipSeconds: number;
+  planName: string;
   autoOpen?: boolean;
 }) {
   const [job, setJob] = useState<RenderJob | null>(initialJob);
@@ -263,12 +267,18 @@ export default function RenderControls({
                 <button
                   key={secs}
                   type="button"
+                  disabled={secs > maxClipSeconds}
+                  title={
+                    secs > maxClipSeconds
+                      ? `${planName} covers clips up to ${maxClipSeconds}s`
+                      : undefined
+                  }
                   onClick={() => setClipLength(secs)}
                   className={`rounded-lg border px-3 py-1 text-xs transition ${
                     clipLength === secs
                       ? "border-cyan text-foreground"
                       : "border-borderline text-muted hover:border-muted"
-                  }`}
+                  } disabled:cursor-not-allowed disabled:opacity-35 disabled:hover:border-borderline`}
                 >
                   {secs}s
                 </button>
