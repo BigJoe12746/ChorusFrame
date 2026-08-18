@@ -19,9 +19,6 @@ type Submission = {
   sample_clip_url: string | null;
   vibe: string | null;
   lyrics: string | null;
-  /** Beat grid detected in the browser; null until a song has been opened. */
-  bpm: number | null;
-  beat_offset: number | null;
 };
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -59,7 +56,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const { data, error } = await supabase
     .from("submissions")
     .select(
-      "id, song_title, artist_name, status, created_at, artwork_path, song_path, sample_clip_url, vibe, lyrics, bpm, beat_offset"
+      "id, song_title, artist_name, status, created_at, artwork_path, song_path, sample_clip_url, vibe, lyrics"
     )
     .order("created_at", { ascending: false });
   const submissions = (data ?? []) as Submission[];
@@ -73,6 +70,22 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const latestJob = new Map<string, RenderJob>();
   for (const j of (jobRows ?? []) as (RenderJob & { submission_id: string })[]) {
     if (!latestJob.has(j.submission_id)) latestJob.set(j.submission_id, j);
+  }
+
+  /*
+   * Beat grids sit behind a migration that may not have been run yet, so this
+   * is a separate query that is allowed to fail. Selecting these columns in the
+   * main query took the entire dashboard down with "column submissions.bpm does
+   * not exist" — a missing optional feature must never cost an artist the page.
+   */
+  const beatGrids = new Map<string, { bpm: number; offset: number }>();
+  {
+    const { data: grids } = await supabase.from("submissions").select("id, bpm, beat_offset");
+    for (const g of (grids ?? []) as { id: string; bpm: number | null; beat_offset: number | null }[]) {
+      if (g.bpm != null && g.beat_offset != null) {
+        beatGrids.set(g.id, { bpm: Number(g.bpm), offset: Number(g.beat_offset) });
+      }
+    }
   }
 
   // The artist's saved brand kit. RLS scopes this to their own row, and a
@@ -244,11 +257,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                         songTitle={s.song_title}
                         artistName={s.artist_name ?? ""}
                         lyrics={s.lyrics ?? ""}
-                        beatGrid={
-                          s.bpm && s.beat_offset !== null
-                            ? { bpm: Number(s.bpm), offset: Number(s.beat_offset) }
-                            : null
-                        }
+                        beatGrid={beatGrids.get(s.id) ?? null}
                         autoOpen={s.id === justUploaded}
                       />
                     </div>
