@@ -6,6 +6,7 @@ import HookPicker from "@/components/HookPicker";
 import ClipPreview from "@/components/ClipPreview";
 import LyricsEditor from "@/components/LyricsEditor";
 import TapToSync from "@/components/TapToSync";
+import LyricTimingEditor, { type TimedLine } from "@/components/LyricTimingEditor";
 
 export type RenderJob = {
   id: string;
@@ -49,6 +50,7 @@ export default function RenderControls({
   artistName,
   lyrics,
   beatGrid,
+  savedTimings,
   autoOpen = false,
 }: {
   submissionId: string;
@@ -60,6 +62,7 @@ export default function RenderControls({
   artistName: string;
   lyrics: string;
   beatGrid: { bpm: number; offset: number } | null;
+  savedTimings: TimedLine[];
   autoOpen?: boolean;
 }) {
   const [job, setJob] = useState<RenderJob | null>(initialJob);
@@ -237,6 +240,13 @@ export default function RenderControls({
               startAt={clipStart}
             />
           ) : null}
+
+          {/* Only meaningful once something has been timed */}
+          <LyricTimingEditor
+            submissionId={submissionId}
+            audioUrl={audioUrl}
+            initialTimings={savedTimings}
+          />
 
           <HookPicker
             submissionId={submissionId}

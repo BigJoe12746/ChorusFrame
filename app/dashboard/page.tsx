@@ -4,6 +4,7 @@ import RenderControls, { type RenderJob } from "@/components/RenderControls";
 import SetPassword from "@/components/SetPassword";
 import BrandKit from "@/components/BrandKit";
 import ShareLink from "@/components/ShareLink";
+import type { TimedLine } from "@/components/LyricTimingEditor";
 import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -79,9 +80,20 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
    * not exist" — a missing optional feature must never cost an artist the page.
    */
   const beatGrids = new Map<string, { bpm: number; offset: number }>();
+  const savedTimings = new Map<string, TimedLine[]>();
   {
-    const { data: grids } = await supabase.from("submissions").select("id, bpm, beat_offset");
-    for (const g of (grids ?? []) as { id: string; bpm: number | null; beat_offset: number | null }[]) {
+    const { data: grids } = await supabase
+      .from("submissions")
+      .select("id, bpm, beat_offset, lyrics_timing");
+    for (const g of (grids ?? []) as {
+      id: string;
+      bpm: number | null;
+      beat_offset: number | null;
+      lyrics_timing: TimedLine[] | null;
+    }[]) {
+      if (Array.isArray(g.lyrics_timing) && g.lyrics_timing.length) {
+        savedTimings.set(g.id, g.lyrics_timing);
+      }
       if (g.bpm != null && g.beat_offset != null) {
         beatGrids.set(g.id, { bpm: Number(g.bpm), offset: Number(g.beat_offset) });
       }
@@ -258,6 +270,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                         artistName={s.artist_name ?? ""}
                         lyrics={s.lyrics ?? ""}
                         beatGrid={beatGrids.get(s.id) ?? null}
+                        savedTimings={savedTimings.get(s.id) ?? []}
                         autoOpen={s.id === justUploaded}
                       />
                     </div>
