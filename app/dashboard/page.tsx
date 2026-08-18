@@ -153,7 +153,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   }
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-6">
+    <main className="mx-auto w-full max-w-5xl flex-1 px-6">
       <header className="flex items-center justify-between py-6">
         <Link href="/">
           <Logo size={26} />

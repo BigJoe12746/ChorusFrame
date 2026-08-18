@@ -287,30 +287,46 @@ export default function RenderControls({
           </div>
 
           <div>
-          <p className="mb-2 text-xs font-medium">Pick a vibe</p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {VIBES.map((v) => (
-              <button
-                key={v.id}
-                onClick={() => setVibe(v.id)}
-                className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition ${
-                  vibe === v.id
-                    ? "border-cyan bg-surface"
-                    : "border-borderline hover:border-muted"
-                }`}
-              >
-                <span
-                  aria-hidden
-                  className="h-6 w-6 shrink-0 rounded-md"
-                  style={{ background: `linear-gradient(135deg, ${v.from}, ${v.to})` }}
-                />
-                <span className="min-w-0">
-                  <span className="block truncate text-xs font-medium">{v.label}</span>
-                  <span className="block truncate text-[10px] text-muted">{v.blurb}</span>
-                </span>
-              </button>
-            ))}
-          </div>
+            <div className="mb-2 flex items-baseline justify-between gap-3">
+              <p className="text-xs font-medium">Pick a vibe</p>
+              {/* One description for the current choice, rather than ten
+                  truncated ones nobody can read */}
+              <p className="truncate text-[11px] text-muted">
+                {VIBES.find((v) => v.id === vibe)?.blurb}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+              {VIBES.map((v) => {
+                const on = vibe === v.id;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setVibe(v.id)}
+                    title={`${v.label} — ${v.blurb}`}
+                    aria-pressed={on}
+                    className="group flex flex-col items-center gap-1 rounded-lg p-1 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+                  >
+                    {/* A 9:16 chip, so the swatch reads as a clip rather than a colour */}
+                    <span
+                      aria-hidden
+                      className={`block h-12 w-full rounded-md border-2 transition ${
+                        on ? "border-cyan" : "border-transparent group-hover:border-muted"
+                      }`}
+                      style={{ background: `linear-gradient(150deg, ${v.from}, ${v.to})` }}
+                    />
+                    <span
+                      className={`w-full text-center text-[11px] leading-tight ${
+                        on ? "font-semibold text-foreground" : "text-muted"
+                      }`}
+                    >
+                      {v.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="flex gap-2">
