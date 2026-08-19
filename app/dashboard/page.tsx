@@ -132,6 +132,13 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   // choice the API will reject.
   const plan = getPlan(profile?.plan);
 
+  // The name they release under — from their newest song, their signup
+  // metadata, or the front of their email, in that order.
+  const displayName =
+    submissions.find((x) => x.artist_name)?.artist_name ??
+    (user?.user_metadata?.artist_name as string | undefined) ??
+    (user?.email ?? "artist").split("@")[0];
+
   const admin = getSupabaseAdmin();
   const artThumbs = new Map<string, string>();
   const audioUrls = new Map<string, string>();
@@ -169,6 +176,15 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
     );
   }
 
+  // One vertical per song, newest song first — the dashboard's shop window
+  const freshClips = submissions
+    .map((x) => {
+      const v = (clipFiles.get(x.id) ?? []).find((f) => f.name === "sample-vertical.mp4");
+      return v ? { song: x.song_title, url: v.url } : null;
+    })
+    .filter((x): x is { song: string; url: string } => x !== null)
+    .slice(0, 4);
+
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-6">
       <header className="flex items-center justify-between py-6">
@@ -188,7 +204,22 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
       </header>
 
       <section className="py-8">
-        <h1 className="text-3xl font-bold tracking-tight">Your songs</h1>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Welcome back, <span className="brand-text">{displayName}</span>
+            </h1>
+            <p className="mt-1 text-sm text-muted">
+              Here&apos;s where your releases stand.
+            </p>
+          </div>
+          <Link
+            href="/upload"
+            className="brand-gradient rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+          >
+            Upload a song
+          </Link>
+        </div>
         <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <p className="text-sm text-muted">Signed in as {user?.email}</p>
           <SetPassword
@@ -221,6 +252,35 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           </div>
         ) : null}
 
+        {freshClips.length > 0 ? (
+          <section className="mt-6">
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-lg font-semibold">Fresh clips</h2>
+              <p className="text-xs text-muted">Newest first — tap to play</p>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {freshClips.map((c) => (
+                <figure key={c.url}>
+                  <video
+                    src={c.url}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="w-full rounded-xl border border-borderline bg-surface"
+                    style={{ aspectRatio: "9 / 16" }}
+                  />
+                  <figcaption className="mt-1.5 flex items-baseline justify-between gap-2 text-xs">
+                    <span className="truncate">{c.song}</span>
+                    <a href={c.url} download className="shrink-0 text-cyan underline underline-offset-4">
+                      Download
+                    </a>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
         {error ? (
           <p className="mt-8 rounded-xl border border-borderline bg-surface p-4 text-sm text-danger">
             Could not load your uploads: {error.message}
@@ -243,7 +303,11 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
             </Link>
           </div>
         ) : (
-          <ul className="mt-8 flex flex-col gap-4">
+          <>
+          <h2 className="mt-8 text-lg font-semibold">
+            Your songs <span className="text-sm font-normal text-muted">({submissions.length})</span>
+          </h2>
+          <ul className="mt-3 flex flex-col gap-4">
             {submissions.map((s) => {
               const badge = STATUS[s.status] ?? {
                 label: s.status,
@@ -334,6 +398,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
               );
             })}
           </ul>
+          </>
         )}
       </section>
     </main>
