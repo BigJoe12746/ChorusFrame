@@ -5,6 +5,8 @@ import SetPassword from "@/components/SetPassword";
 import BrandKit from "@/components/BrandKit";
 import ShareLink from "@/components/ShareLink";
 import DeleteSong from "@/components/DeleteSong";
+import LibraryStats from "@/components/LibraryStats";
+import SongMeta from "@/components/SongMeta";
 import { getPlan } from "@/lib/plans";
 import type { TimedLine } from "@/components/LyricTimingEditor";
 import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase";
@@ -83,16 +85,19 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
    */
   const beatGrids = new Map<string, { bpm: number; offset: number }>();
   const savedTimings = new Map<string, TimedLine[]>();
+  const timingSources = new Map<string, string>();
   {
     const { data: grids } = await supabase
       .from("submissions")
-      .select("id, bpm, beat_offset, lyrics_timing");
+      .select("id, bpm, beat_offset, lyrics_timing, timing_source");
     for (const g of (grids ?? []) as {
       id: string;
       bpm: number | null;
       beat_offset: number | null;
       lyrics_timing: TimedLine[] | null;
+      timing_source: string | null;
     }[]) {
+      if (g.timing_source) timingSources.set(g.id, g.timing_source);
       if (Array.isArray(g.lyrics_timing) && g.lyrics_timing.length) {
         savedTimings.set(g.id, g.lyrics_timing);
       }
@@ -100,6 +105,17 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
         beatGrids.set(g.id, { bpm: Number(g.bpm), offset: Number(g.beat_offset) });
       }
     }
+  }
+
+  // Counted in SQL rather than here, so the rule that failed renders don't
+  // count is defined once. A missing function (unrun migration) reads as zero
+  // rather than taking the page down.
+  let exportsUsed = 0;
+  {
+    const { data: used } = await supabase.rpc("exports_used_this_month", {
+      p_user: user?.id ?? "",
+    });
+    if (typeof used === "number") exportsUsed = used;
   }
 
   // The artist's saved brand kit. RLS scopes this to their own row, and a
@@ -194,6 +210,17 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           />
         </div>
 
+        {submissions.length > 0 ? (
+          <div className="mt-6">
+            <LibraryStats
+              plan={plan}
+              exportsUsed={exportsUsed}
+              songs={submissions.length}
+              clips={[...clipFiles.values()].reduce((n, c) => n + c.length, 0)}
+            />
+          </div>
+        ) : null}
+
         {error ? (
           <p className="mt-8 rounded-xl border border-borderline bg-surface p-4 text-sm text-danger">
             Could not load your uploads: {error.message}
@@ -249,6 +276,13 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                         day: "numeric",
                       })}
                     </p>
+                    <SongMeta
+                      hasLyrics={Boolean((s.lyrics ?? "").trim())}
+                      timingSource={timingSources.get(s.id) ?? null}
+                      bpm={beatGrids.get(s.id)?.bpm ?? null}
+                      clipCount={clips.length}
+                    />
+
                     {clips.length > 0 ? (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <ShareLink submissionId={s.id} />
