@@ -13,9 +13,18 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://verseframe.vercel.app"),
+  openGraph: {
+    siteName: "ChorusFrame",
+    type: "website",
+    title: "ChorusFrame - Upload one song, get your release clips",
+    description:
+      "Vertical, square and widescreen cuts from one project, timed to your song.",
+  },
+  twitter: { card: "summary_large_image" },
   title: "ChorusFrame — Upload one song, get your entire release campaign",
   description:
-    "Song, cover, and lyrics in — vertical cuts, lyric video, Canvas loop, visualizer, and teasers out. One project, every format, in minutes.",
+    "Song, cover, and lyrics in — vertical, square and widescreen cuts out, timed to your music. One project, three formats, in minutes.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

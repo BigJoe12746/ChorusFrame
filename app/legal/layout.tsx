@@ -21,9 +21,9 @@ export default function LegalLayout({ children }: LayoutProps<"/legal">) {
       </article>
 
       <footer className="flex flex-wrap justify-center gap-4 border-t border-borderline py-8 text-center text-xs text-muted">
-        <Link href="/legal/terms">Terms</Link>
-        <Link href="/legal/privacy">Privacy</Link>
-        <Link href="/legal/copyright">Copyright</Link>
+        <Link href="/legal/terms" className="transition hover:text-foreground">Terms</Link>
+        <Link href="/legal/privacy" className="transition hover:text-foreground">Privacy</Link>
+        <Link href="/legal/copyright" className="transition hover:text-foreground">Copyright</Link>
       </footer>
     </main>
   );

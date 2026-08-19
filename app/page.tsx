@@ -3,13 +3,11 @@ import Logo from "@/components/Logo";
 import NavAuth from "@/components/NavAuth";
 
 const kit = [
-  { name: "TikTok / Reels", detail: "9:16 vertical, caption-safe zones" },
-  { name: "YouTube Shorts", detail: "Vertical cut sized for Shorts" },
+  { name: "TikTok / Reels / Shorts", detail: "9:16 vertical, caption-safe zones" },
   { name: "Square post", detail: "1:1 for feed and carousels" },
-  { name: "Lyric video", detail: "Full-length 16:9 for YouTube" },
-  { name: "Canvas loop", detail: "Short looping vertical for streaming profiles" },
-  { name: "Visualizer", detail: "Cover art in motion, reacting to your mix" },
-  { name: "Teasers", detail: "15s, 30s, and 60s hook cuts" },
+  { name: "Lyric video", detail: "Wide 16:9 cut for YouTube" },
+  { name: "Visualizer", detail: "Cover art in motion when you skip the lyrics" },
+  { name: "Teasers", detail: "Any length from 5 to 60 seconds" },
 ];
 
 const steps = [
@@ -21,7 +19,7 @@ const steps = [
   {
     n: "02",
     title: "We read the song",
-    body: "Tempo, beats, sections, and energy changes get detected automatically — then lyrics align to the audio.",
+    body: "Tempo, beats, sections, and energy changes get detected automatically — the clip opens on your strongest moment.",
   },
   {
     n: "03",
@@ -36,7 +34,7 @@ const steps = [
   {
     n: "05",
     title: "Export the campaign",
-    body: "Every format above, from one project, in one pass.",
+    body: "9:16, 1:1 and 16:9 from one project, in one pass.",
   },
 ];
 
@@ -47,7 +45,7 @@ const promises = [
   "Your master audio stays at full quality.",
   "The preview matches the export.",
   "Every release format comes from one project.",
-  "Paste your real lyrics — timing is our job.",
+  "Paste your real lyrics — tap them into time once, no timeline editing.",
 ];
 
 export default function Home() {
@@ -69,13 +67,13 @@ export default function Home() {
           <span className="brand-text">release campaign</span>.
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-muted">
-          Song, cover, lyrics in — a full set of platform-ready videos out.
-          Vertical cuts, lyric video, Canvas loop, visualizer, teasers. One
-          project, every format, minutes instead of a weekend.
+          Song, cover, lyrics in — platform-ready videos out. Vertical cuts,
+          square posts, a widescreen lyric video, visualizers, teasers. One
+          project, three formats, minutes instead of a weekend.
         </p>
         <div className="mx-auto mt-10 flex max-w-2xl flex-col items-center gap-4">
           <Link
-            href="/login"
+            href="/login?new=1"
             className="brand-gradient rounded-xl px-8 py-3.5 text-base font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
           >
             Start free — upload a song
@@ -91,7 +89,7 @@ export default function Home() {
             and we&apos;ll build it by hand.
           </p>
           <p className="text-xs text-muted">
-            Free while in beta · No card, no waiting list
+            Free plan, no card · Pro is $10 a month when you need more
           </p>
         </div>
       </section>
@@ -173,7 +171,7 @@ export default function Home() {
         </p>
         <div className="mt-8 flex flex-col items-center gap-3">
           <Link
-            href="/login"
+            href="/login?new=1"
             className="brand-gradient inline-block rounded-xl px-8 py-3 font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
           >
             Start free

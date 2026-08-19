@@ -80,13 +80,13 @@ export default function TermsPage() {
 
       <h2>Beta, limits and availability</h2>
       <p>
-        ChorusFrame is in beta and free to use, with a cap on how many renders you can
-        start per day. Features may change or break. We don&apos;t promise the service
+        ChorusFrame has a free plan and a paid plan, each with a monthly cap on how
+        many renders you can start. Features may change or break. We don&apos;t promise the service
         will be available at any particular moment, and we may change limits with
         notice.
       </p>
       <p>
-        If a render fails, it doesn&apos;t count against your daily limit — a render
+        If a render fails, it doesn&apos;t count against your monthly limit — a render
         that produced nothing should never cost you anything.
       </p>
 

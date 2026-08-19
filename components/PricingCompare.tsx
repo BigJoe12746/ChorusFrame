@@ -55,7 +55,7 @@ const ROWS: { label: string; general: string; us: string; better: boolean }[] = 
 export default function PricingCompare() {
   return (
     <section className="pb-16">
-      <h2 className="text-center text-2xl font-bold tracking-tight">
+      <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
         Why not just use a video editor?
       </h2>
       <p className="mx-auto mt-3 max-w-2xl text-center text-muted">

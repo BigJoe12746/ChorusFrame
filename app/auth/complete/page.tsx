@@ -81,7 +81,9 @@ export default function CompletePage() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-6">
       <header className="py-6">
-        <Logo size={26} />
+        <Link href="/" className="inline-flex rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan">
+          <Logo size={26} />
+        </Link>
       </header>
       <section className="pt-16">
         <Suspense

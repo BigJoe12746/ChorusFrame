@@ -13,6 +13,8 @@ import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = { title: "Dashboard - ChorusFrame" };
+
 type Submission = {
   id: string;
   song_title: string;
@@ -140,6 +142,18 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
     (user?.email ?? "artist").split("@")[0];
 
   const admin = getSupabaseAdmin();
+
+  // Claim mechanic: anonymous uploads made with this (now verified) email
+  // become theirs. The upload page promises exactly this, and sign-in is what
+  // proves the address, so this is the safe moment to adopt.
+  if (admin && user?.email) {
+    await admin
+      .from("submissions")
+      .update({ user_id: user.id })
+      .eq("email", user.email.toLowerCase())
+      .is("user_id", null);
+  }
+
   const artThumbs = new Map<string, string>();
   const audioUrls = new Map<string, string>();
   const clipFiles = new Map<string, { name: string; url: string }[]>();
@@ -188,7 +202,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 px-6">
       <header className="flex items-center justify-between py-6">
-        <Link href="/">
+        <Link href="/" className="inline-flex rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan">
           <Logo size={26} />
         </Link>
         <div className="flex items-center gap-4 text-sm">
@@ -196,7 +210,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
             New upload
           </Link>
           <form action="/auth/signout" method="post">
-            <button type="submit" className="text-muted transition hover:text-foreground">
+            <button type="submit" className="rounded-lg text-muted transition hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan">
               Sign out
             </button>
           </form>
@@ -292,8 +306,8 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
             <p className="text-4xl">🎵</p>
             <h2 className="mt-4 text-lg font-semibold">Nothing here yet</h2>
             <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
-              Send us a song and we&apos;ll build your first clip. It shows up
-              here when it&apos;s ready.
+              Upload a song, pick the hook, and render every format yourself —
+              your first clip is minutes away.
             </p>
             <Link
               href="/upload"

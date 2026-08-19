@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
 import { authConfigured, getSupabaseBrowser } from "@/lib/supabase-browser";
@@ -24,12 +24,25 @@ function LoginForm() {
 
   // Password is the default: an artist who has one shouldn't have to go via
   // their inbox every single time.
-  const [mode, setMode] = useState<"password" | "link">("password");
+  const isNew = params.get("new") === "1";
+  const [mode, setMode] = useState<"password" | "link">(isNew ? "link" : "password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [artistName, setArtistName] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!authConfigured) return;
+    getSupabaseBrowser()
+      .auth.getSession()
+      .then(({ data }) => {
+        if (data.session) {
+          router.replace(resolveNext(nextParam, window.location.origin));
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function signInWithPassword(e: React.FormEvent) {
     e.preventDefault();
@@ -225,6 +238,23 @@ function LoginForm() {
   );
 }
 
+function LoginHeading() {
+  const params = useSearchParams();
+  const isNew = params.get("new") === "1";
+  return (
+    <>
+      <h1 className="text-3xl font-bold tracking-tight">
+        {isNew ? "Create your account" : "Log in"}
+      </h1>
+      <p className="mt-3 text-muted">
+        {isNew
+          ? "The email link creates your account — no password needed."
+          : "Track your songs and grab your finished clips."}
+      </p>
+    </>
+  );
+}
+
 export default function LoginPage() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col px-6">
@@ -238,8 +268,9 @@ export default function LoginPage() {
         </Link>
       </header>
       <section className="pb-20 pt-8">
-        <h1 className="text-3xl font-bold tracking-tight">Log in</h1>
-        <p className="mt-3 text-muted">Track your songs and grab your finished clips.</p>
+        <Suspense fallback={null}>
+          <LoginHeading />
+        </Suspense>
         <div className="mt-8">
           <Suspense fallback={<p className="text-sm text-muted">Loading…</p>}>
             <LoginForm />

@@ -38,7 +38,7 @@ async function loadClips(id: string) {
   if (sub.artwork_path) {
     const { data: signed } = await admin.storage
       .from("submissions")
-      .createSignedUrl(sub.artwork_path, 3600);
+      .createSignedUrl(sub.artwork_path, 60 * 60 * 24 * 7);
     artwork = signed?.signedUrl ?? null;
   }
   return { sub, clips, artwork };
@@ -57,6 +57,7 @@ export async function generateMetadata({
       title: `${data.sub.song_title}${who}`,
       description: "Release clips, ready to post.",
       videos: data.clips.map((c) => c.url),
+      images: data.artwork ? [data.artwork] : undefined,
     },
   };
 }
@@ -75,12 +76,12 @@ export default async function ClipPage({ params }: PageProps<"/c/[id]">) {
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 px-6">
       <header className="flex items-center justify-between py-6">
-        <Link href="/">
+        <Link href="/" className="inline-flex rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan">
           <Logo size={26} />
         </Link>
         <Link
           href="/login"
-          className="rounded-lg border border-borderline px-4 py-2 text-sm text-muted transition hover:border-cyan hover:text-foreground"
+          className="rounded-lg border border-borderline px-4 py-2 text-sm text-muted transition hover:border-cyan hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
         >
           Make your own
         </Link>
@@ -131,7 +132,7 @@ export default async function ClipPage({ params }: PageProps<"/c/[id]">) {
                 <a
                   href={c.url}
                   download
-                  className="text-cyan underline underline-offset-4"
+                  className="rounded text-cyan underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan"
                 >
                   Download
                 </a>
@@ -150,9 +151,9 @@ export default async function ClipPage({ params }: PageProps<"/c/[id]">) {
           — upload a song, get your release clips.
         </p>
         <nav className="flex gap-4">
-          <Link href="/legal/terms">Terms</Link>
-          <Link href="/legal/privacy">Privacy</Link>
-          <Link href="/legal/copyright">Copyright</Link>
+          <Link href="/legal/terms" className="transition hover:text-foreground">Terms</Link>
+          <Link href="/legal/privacy" className="transition hover:text-foreground">Privacy</Link>
+          <Link href="/legal/copyright" className="transition hover:text-foreground">Copyright</Link>
         </nav>
       </footer>
     </main>

@@ -189,13 +189,29 @@ export default function UploadPage() {
         </section>
       ) : (
         <section className="pb-20 pt-8">
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Get a free sample clip
-          </h1>
-          <p className="mt-3 text-muted">
-            Upload one finished song and we&apos;ll send back a short promo clip — free,
-            no strings.
-          </p>
+          {signedIn ? (
+            <>
+              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                Add a song to your library
+              </h1>
+              <p className="mt-3 text-muted">
+                Upload a finished song and it lands on your dashboard, ready to
+                pick a hook and render every format.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+                Get a free sample clip
+              </h1>
+              <p className="mt-3 text-muted">
+                Upload one finished song and we&apos;ll send back a short promo
+                clip built from our template library — free, no strings. Make an
+                account with this email afterwards and the song appears in your
+                dashboard automatically.
+              </p>
+            </>
+          )}
 
           <form ref={formRef} onSubmit={submit} className="mt-10 flex flex-col gap-5">
             <div className="grid gap-5 sm:grid-cols-2">

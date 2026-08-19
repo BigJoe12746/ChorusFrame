@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: dark;
   /* ChorusFrame brand: dark, cinematic, electric */
   --background: #080b16; /* midnight navy, near-black */
   --surface: #0e1326;
