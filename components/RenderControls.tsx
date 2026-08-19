@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { authConfigured, getSupabaseBrowser } from "@/lib/supabase-browser";
+import { MAX_DURATION, MIN_DURATION } from "@/lib/clip-limits";
 import HookPicker from "@/components/HookPicker";
 import ClipPreview from "@/components/ClipPreview";
 import LyricsEditor from "@/components/LyricsEditor";
@@ -261,8 +262,25 @@ export default function RenderControls({
           />
 
           <div>
-            <p className="mb-1.5 text-xs font-medium">Clip length</p>
-            <div className="flex gap-2">
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <p className="text-xs font-medium">Clip length</p>
+              <span className="font-mono text-[11px] text-cyan">{clipLength}s</span>
+            </div>
+
+            {/* Any length, not just the three presets — a hook is however long
+                the hook is, and 22s is a perfectly reasonable answer. */}
+            <input
+              type="range"
+              aria-label="Clip length in seconds"
+              min={MIN_DURATION}
+              max={maxClipSeconds}
+              step={1}
+              value={Math.min(clipLength, maxClipSeconds)}
+              onChange={(e) => setClipLength(Number(e.target.value))}
+              className="w-full accent-[var(--cyan)]"
+            />
+
+            <div className="mt-1.5 flex items-center gap-2">
               {[15, 30, 60].map((secs) => (
                 <button
                   key={secs}
@@ -271,10 +289,10 @@ export default function RenderControls({
                   title={
                     secs > maxClipSeconds
                       ? `${planName} covers clips up to ${maxClipSeconds}s`
-                      : undefined
+                      : `Set the clip to ${secs} seconds`
                   }
                   onClick={() => setClipLength(secs)}
-                  className={`rounded-lg border px-3 py-1 text-xs transition ${
+                  className={`rounded-lg border px-2.5 py-0.5 text-[11px] transition ${
                     clipLength === secs
                       ? "border-cyan text-foreground"
                       : "border-borderline text-muted hover:border-muted"
@@ -283,6 +301,10 @@ export default function RenderControls({
                   {secs}s
                 </button>
               ))}
+              <span className="ml-auto text-[11px] text-muted">
+                {MIN_DURATION}–{maxClipSeconds}s
+                {maxClipSeconds < MAX_DURATION ? ` on ${planName}` : ""}
+              </span>
             </div>
           </div>
 
