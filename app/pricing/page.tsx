@@ -79,14 +79,14 @@ export default function PricingPage() {
               </ul>
 
               <Link
-                href="/login?new=1"
+                href={p.monthly === 0 ? "/login?new=1" : "/dashboard/billing"}
                 className={`mt-6 rounded-xl px-4 py-2.5 text-center text-sm font-semibold transition ${
                   featured
                     ? "brand-gradient text-white hover:opacity-90"
                     : "border border-borderline text-muted hover:border-cyan hover:text-foreground"
                 }`}
               >
-                {p.monthly === 0 ? "Start on Free" : "Start on Free — checkout soon"}
+                {p.monthly === 0 ? "Start on Free" : "Go Pro"}
               </Link>
             </div>
           );
