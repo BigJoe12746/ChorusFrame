@@ -175,17 +175,39 @@ export default function RenderControls({
   }, [submissionId, vibe, clipStart, clipLength]);
 
   if (active && job) {
+    const ready = job.clip_urls ?? [];
     return (
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-2 text-xs text-cyan">
           <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-cyan" />
-          {job.status === "rendering" ? "Rendering your clips…" : "Queued…"}
+          {job.status === "rendering"
+            ? ready.length
+              ? `Rendering… ${ready.length} of ${job.formats.length} ready`
+              : "Rendering your clips…"
+            : "Queued…"}
           {job.attempts > 1 ? (
             <span className="text-muted">
               (retry {job.attempts} of {job.max_attempts})
             </span>
           ) : null}
         </div>
+        {/* Progressive delivery: grab finished formats while the rest render */}
+        {ready.length ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {ready.map((c) => (
+              <a
+                key={c.format}
+                href={c.url}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-lg border border-borderline px-2.5 py-1 text-xs text-muted transition hover:border-cyan hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+              >
+                {FORMAT_LABELS[c.format] ?? c.format} ↗
+              </a>
+            ))}
+            <span className="text-[11px] text-muted">no need to wait for the rest</span>
+          </div>
+        ) : null}
         {stale ? (
           <p className="text-[11px] text-muted">
             Can&apos;t reach the status right now — still retrying. Your render

@@ -158,6 +158,12 @@ export async function renderFormats({
   artworkColors = true,
   endCardUrl = "",
   vibe = null,
+  /**
+   * Called after each format finishes rendering, before the next begins.
+   * The worker uses it to upload and publish clips progressively — the
+   * vertical reaches the artist while square and wide are still cooking.
+   */
+  onFormat = null,
   env = {},
   outDir = path.join(ROOT, "out"),
   outFile: singleOut = null,
@@ -278,6 +284,7 @@ export async function renderFormats({
       );
       log(`✔ ${format}: ${outFile}`);
       rendered.push({ format, outFile });
+      if (onFormat) await onFormat({ format, outFile });
     }
   } catch (e) {
     // Don't leave half-finished files behind for the caller to clean up

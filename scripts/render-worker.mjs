@@ -115,7 +115,15 @@ async function runJob(job) {
       return;
     }
 
-    const rendered = await renderFormats({
+    /*
+     * Progressive delivery: each format uploads the moment it renders and is
+     * written onto the job (fenced) while status stays "rendering", so the
+     * dashboard shows the vertical while square and wide are still cooking.
+     * A failed partial write means the lease was lost — stop rendering for
+     * the new owner rather than finishing work that will be discarded.
+     */
+    const urls = [];
+    await renderFormats({
       supabase,
       sub,
       formats: job.formats,
@@ -125,10 +133,17 @@ async function runJob(job) {
       vibe: job.vibe,
       env,
       log: (m) => log(`   ${m}`),
+      onFormat: async ({ format, outFile }) => {
+        artifacts.push(outFile);
+        const [u] = await uploadClips(supabase, sub.id, [{ format, outFile }]);
+        urls.push(u);
+        rmSync(outFile, { force: true });
+        const kept = await writeFenced({ clip_urls: urls });
+        if (!kept) throw new Error("lease lost mid-render; stopping");
+        log(`   ↑ ${format} published (${urls.length}/${job.formats.length})`);
+      },
     });
-    artifacts.push(...rendered.map((r) => r.outFile));
 
-    const urls = await uploadClips(supabase, sub.id, rendered);
     const primary = urls.find((u) => u.format === "vertical") ?? urls[0];
 
     // Only write the job's terminal state if we still hold the lease.
