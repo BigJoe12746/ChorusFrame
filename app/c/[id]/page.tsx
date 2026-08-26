@@ -81,7 +81,7 @@ export default async function ClipPage({ params }: PageProps<"/c/[id]">) {
         </Link>
         <Link
           href="/login"
-          className="rounded-lg border border-borderline px-4 py-2 text-sm text-muted transition hover:border-cyan hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+          className="glow-hover rounded-lg border border-borderline px-4 py-2 text-sm text-muted transition hover:border-cyan hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
         >
           Make your own
         </Link>

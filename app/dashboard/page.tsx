@@ -229,7 +229,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           </div>
           <Link
             href="/upload"
-            className="brand-gradient rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+            className="glow-hover-strong brand-gradient rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
           >
             Upload a song
           </Link>
@@ -311,7 +311,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
             </p>
             <Link
               href="/upload"
-              className="brand-gradient mt-6 inline-block rounded-xl px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+              className="glow-hover-strong brand-gradient mt-6 inline-block rounded-xl px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90"
             >
               Upload a song
             </Link>
@@ -370,7 +370,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                             href={c.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="rounded-lg border border-borderline px-2.5 py-1 text-xs text-muted transition hover:border-cyan hover:text-foreground"
+                            className="glow-hover rounded-lg border border-borderline px-2.5 py-1 text-xs text-muted transition hover:border-cyan hover:text-foreground"
                           >
                             {FORMAT_LABELS[c.name] ?? c.name} ↗
                           </a>

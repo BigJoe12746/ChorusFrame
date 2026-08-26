@@ -200,7 +200,7 @@ export default function RenderControls({
                 href={c.url}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-lg border border-borderline px-2.5 py-1 text-xs text-muted transition hover:border-cyan hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+                className="glow-hover rounded-lg border border-borderline px-2.5 py-1 text-xs text-muted transition hover:border-cyan hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
               >
                 {FORMAT_LABELS[c.format] ?? c.format} ↗
               </a>
@@ -234,7 +234,7 @@ export default function RenderControls({
               href={c.url}
               target="_blank"
               rel="noreferrer"
-              className="rounded-lg border border-borderline px-2.5 py-1 text-xs text-muted transition hover:border-cyan hover:text-foreground"
+              className="glow-hover rounded-lg border border-borderline px-2.5 py-1 text-xs text-muted transition hover:border-cyan hover:text-foreground"
             >
               {FORMAT_LABELS[c.format] ?? c.format} ↗
             </a>
@@ -387,7 +387,7 @@ export default function RenderControls({
               onClick={start}
               disabled={starting}
               data-render-submit
-              className="brand-gradient rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+              className="glow-hover-strong brand-gradient rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
             >
               {starting ? "Starting…" : "Start render"}
             </button>
@@ -403,7 +403,7 @@ export default function RenderControls({
       ) : (
         <button
           onClick={() => setPicking(true)}
-          className="self-start rounded-lg border border-borderline px-3 py-1.5 text-xs font-medium text-muted transition hover:border-cyan hover:text-foreground"
+          className="glow-hover self-start rounded-lg border border-borderline px-3 py-1.5 text-xs font-medium text-muted transition hover:border-cyan hover:text-foreground"
         >
           {job?.status === "done" || job?.status === "failed"
             ? "Render another vibe"

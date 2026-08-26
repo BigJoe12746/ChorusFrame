@@ -132,7 +132,7 @@ export default function TapToSync({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="self-start rounded-lg border border-borderline px-3 py-1.5 text-xs font-medium text-muted transition hover:border-cyan hover:text-foreground"
+        className="glow-hover self-start rounded-lg border border-borderline px-3 py-1.5 text-xs font-medium text-muted transition hover:border-cyan hover:text-foreground"
       >
         Sync lyrics to the beat
       </button>
@@ -178,7 +178,7 @@ export default function TapToSync({
         <button
           onClick={tap}
           disabled={done}
-          className="brand-gradient rounded-lg px-5 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+          className="glow-hover-strong brand-gradient rounded-lg px-5 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
         >
           Tap
         </button>

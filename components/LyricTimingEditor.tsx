@@ -114,7 +114,7 @@ export default function LyricTimingEditor({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="self-start rounded-lg border border-borderline px-3 py-1.5 text-xs font-medium text-muted transition hover:border-cyan hover:text-foreground"
+        className="glow-hover self-start rounded-lg border border-borderline px-3 py-1.5 text-xs font-medium text-muted transition hover:border-cyan hover:text-foreground"
       >
         Adjust lyric timing ({initialTimings.length} lines)
       </button>

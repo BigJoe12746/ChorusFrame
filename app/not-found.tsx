@@ -25,7 +25,7 @@ export default function NotFound() {
           <div className="mt-6 flex flex-col items-center gap-3">
             <Link
               href="/"
-              className="brand-gradient rounded-xl px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+              className="glow-hover-strong brand-gradient rounded-xl px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
             >
               Back to ChorusFrame
             </Link>

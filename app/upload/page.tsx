@@ -336,7 +336,7 @@ export default function UploadPage() {
             <button
               type="submit"
               disabled={state === "sending"}
-              className="brand-gradient rounded-xl px-6 py-3.5 font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan disabled:opacity-70"
+              className="glow-hover-strong brand-gradient rounded-xl px-6 py-3.5 font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan disabled:opacity-70"
             >
               {state === "sending"
                 ? progress > 0 && progress < 100

@@ -61,7 +61,7 @@ export default function BrandKit({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-lg border border-borderline px-3 py-1.5 text-xs text-muted transition hover:border-cyan hover:text-foreground"
+        className="glow-hover flex items-center gap-2 rounded-lg border border-borderline px-3 py-1.5 text-xs text-muted transition hover:border-cyan hover:text-foreground"
       >
         {on ? (
           <>
@@ -153,7 +153,7 @@ export default function BrandKit({
         <button
           onClick={() => save(false)}
           disabled={state === "saving"}
-          className="brand-gradient rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+          className="glow-hover-strong brand-gradient rounded-lg px-4 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
         >
           {state === "saving" ? "Saving…" : "Save brand kit"}
         </button>
