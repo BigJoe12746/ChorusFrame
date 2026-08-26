@@ -81,7 +81,7 @@ export default function LyricsEditor({
         value={lyrics}
         onChange={(e) => setLyrics(e.target.value)}
         rows={5}
-        placeholder={"Late checkout, I'm still here\nSay my name, make it clear"}
+        placeholder={"Paste your chorus here\nOne line per line"}
         className="w-full rounded-lg border border-borderline bg-surface px-3 py-2 text-xs text-foreground placeholder:text-muted focus:border-cyan focus:outline-none focus:ring-2 focus:ring-cyan/40"
       />
       <p className="mt-1 text-[11px] text-muted">

@@ -293,7 +293,7 @@ export default function UploadPage() {
                 rows={5}
                 value={lyrics}
                 onChange={(e) => setLyrics(e.target.value)}
-                placeholder={"Late checkout, I'm still here\nSay my name, make it clear"}
+                placeholder={"Paste your chorus here\nOne line per line"}
                 className={inputCls}
               />
               {/* Skipping this silently produces a visualizer instead of a
