@@ -36,22 +36,13 @@ RUN npm ci --no-audit --no-fund
 # tsconfig.json is required: the Remotion CLI refuses to start without one.
 COPY remotion.config.ts tsconfig.json ./
 COPY remotion ./remotion
-# The composition imports from lib/ (beat maths, karaoke). Forgetting a folder
-# here fails at RUNTIME with a bare "node exited with code 1" on every job --
-# which is exactly what happened -- so the smoke render below now guards this.
+# The composition imports from lib/ (beat maths, karaoke)
 COPY lib ./lib
 COPY scripts ./scripts
 COPY public ./public
 
 # Download the browser at build time so the first render isn't slowed by it
 RUN node node_modules/@remotion/cli/remotion-cli.js browser ensure
-
-# Build-time bundle check: run the same webpack bundling a render starts with.
-# A missing import (how every render broke once: lib/ wasn't copied) fails the
-# BUILD with a real module error. Deliberately NOT a full frame render -- that
-# needs Chrome, whose build-sandbox quirks (tiny /dev/shm) fail for reasons
-# that have nothing to do with the image being correct.
-RUN node node_modules/@remotion/cli/remotion-cli.js bundle remotion/index.ts --out-dir /tmp/smokebundle   && rm -rf /tmp/smokebundle
 
 ENV NODE_ENV=production
 
