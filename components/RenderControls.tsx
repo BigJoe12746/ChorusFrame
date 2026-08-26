@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { authConfigured, getSupabaseBrowser } from "@/lib/supabase-browser";
 import { MAX_DURATION, MIN_DURATION } from "@/lib/clip-limits";
 import HookPicker from "@/components/HookPicker";
@@ -8,6 +8,7 @@ import ClipPreview from "@/components/ClipPreview";
 import LyricsEditor from "@/components/LyricsEditor";
 import TapToSync from "@/components/TapToSync";
 import LyricTimingEditor, { type TimedLine } from "@/components/LyricTimingEditor";
+import { windowLyrics } from "@/remotion/karaoke";
 
 export type RenderJob = {
   id: string;
@@ -79,6 +80,13 @@ export default function RenderControls({
   const [error, setError] = useState("");
   /** Status reads keep failing — say so rather than spinning silently. */
   const [stale, setStale] = useState(false);
+
+  // Saved timings are song-absolute; the preview needs them clip-relative —
+  // the same windowing the worker applies, so preview and export agree.
+  const previewTiming = useMemo(
+    () => windowLyrics(savedTimings, clipStart, clipLength),
+    [savedTimings, clipStart, clipLength]
+  );
 
   const jobId = job?.id ?? null;
   const status = job?.status ?? null;
@@ -228,6 +236,7 @@ export default function RenderControls({
               duration={clipLength}
               vibe={vibe}
               beatGrid={beatGrid}
+              lyricTiming={previewTiming}
             />
           </div>
 

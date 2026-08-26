@@ -23,6 +23,7 @@ export default function ClipPreview({
   duration,
   vibe,
   beatGrid,
+  lyricTiming,
 }: {
   audioUrl: string | null;
   artworkUrl: string | null;
@@ -33,6 +34,7 @@ export default function ClipPreview({
   duration: number;
   vibe: string;
   beatGrid: { bpm: number; offset: number } | null;
+  lyricTiming: { text: string; start: number; end: number }[];
 }) {
   const inputProps = useMemo(
     () => ({
@@ -42,9 +44,7 @@ export default function ClipPreview({
       artistName,
       lyrics,
       // Left empty on purpose: with no timing supplied the composition spreads
-      // the lines across the clip, which is exactly what a render does today
-      // while no transcription key is configured.
-      lyricTiming: [],
+      lyricTiming,
       clipStartSeconds: clipStart,
       durationSeconds: duration,
       showEndCard: true,
@@ -54,7 +54,7 @@ export default function ClipPreview({
       brand: null,
       beatGrid,
     }),
-    [audioUrl, artworkUrl, songTitle, artistName, lyrics, clipStart, duration, vibe, beatGrid]
+    [audioUrl, artworkUrl, songTitle, artistName, lyrics, clipStart, duration, vibe, beatGrid, lyricTiming]
   );
 
   if (!audioUrl) {

@@ -16,6 +16,7 @@ import { getLayout } from "./layout";
 import { BRAND_PALETTE, extractPalette, type Palette } from "./palette";
 import { DEFAULT_VIBE, getVibe } from "./vibes";
 import { beatHitAt } from "../lib/audio-analysis";
+import { activeWordIndex, sceneAt, wordSpans } from "./karaoke";
 
 export type SampleClipProps = {
   audioSrc: string;
@@ -413,8 +414,25 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   const lyricTop =
     V.lyricPlacement === "center" ? Math.round(height * 0.42) : L.lyric.top;
 
+  /*
+   * Bar-synced scenes: the backdrop treatment shifts every four bars, on the
+   * downbeat, so the clip reads as edited to the music rather than generated.
+   * Three variants cycle; each changes zoom, drift direction and pan phase.
+   * A short punch on entry marks the cut without a hard jump. No beat grid
+   * means one settled scene — exactly the old behaviour.
+   */
+  const scene = sceneAt(songSeconds, beatGrid, fps);
+  const sceneEntry = Math.min(1, scene.framesIn / 8); // 8-frame settle
+  const scenePunch = 1 + (1 - sceneEntry) * 0.035;
+  const SCENES = [
+    { zoom: 1.0, spin: 1, panPhase: 0 },
+    { zoom: 1.08, spin: -1, panPhase: Math.PI / 2 },
+    { zoom: 0.94, spin: 1, panPhase: Math.PI },
+  ] as const;
+  const SC = SCENES[scene.variant];
+
   const artSway = Math.sin(frame / 55) * V.art.sway;
-  const bgDrift = frame * 0.12;
+  const bgDrift = frame * 0.12 * SC.spin;
 
   // Letterbox eats the bottom of the frame, so the whole lower cluster
   // (waveform + watermark) moves up together rather than one piece sliding
@@ -442,8 +460,8 @@ export const SampleClip: React.FC<SampleClipProps> = ({
               width: "100%",
               height: "100%",
               objectFit: "cover",
-              transform: `scale(${V.backdrop.scale}) rotate(${bgDrift * 0.05}deg) translateY(${
-                Math.sin(frame / 90) * 14
+              transform: `scale(${V.backdrop.scale * SC.zoom * scenePunch}) rotate(${bgDrift * 0.05}deg) translateY(${
+                Math.sin(frame / 90 + SC.panPhase) * 14
               }px)`,
               filter: `blur(${V.backdrop.blur}px) saturate(${V.backdrop.saturate}) brightness(${V.backdrop.brightness})`,
             }}
@@ -570,23 +588,52 @@ export const SampleClip: React.FC<SampleClipProps> = ({
             overflow: "hidden",
           }}
         >
-          <span
-            style={{
-              color: "#ffffff",
+          {(() => {
+            /*
+             * Karaoke: words are placed inside the line by syllable weight —
+             * the artist's taps anchor the line, syllables place the words.
+             * Sung words stay bright, the active word lifts in the accent
+             * colour, upcoming words wait dimmed. Word-level transcription
+             * can replace the placement later without changing this display.
+             */
+            const spans = wordSpans(active.text, active.startF, active.endF);
+            const wordAt = activeWordIndex(spans, frame);
+            const base = {
               fontFamily: lyricFont,
               fontSize:
                 (active.text.length > 54 ? L.lyric.size * 0.79 : L.lyric.size) *
                 V.lyric.sizeScale,
               fontWeight: V.lyric.weight,
-              fontStyle: V.lyric.italic ? "italic" : "normal",
+              fontStyle: V.lyric.italic ? ("italic" as const) : ("normal" as const),
               letterSpacing: V.lyric.letterSpacing,
               textTransform: V.lyric.transform,
               lineHeight: 1.25,
               textShadow: V.lyric.shadow,
-            }}
-          >
-            {active.text}
-          </span>
+            };
+            return (
+              <span style={base}>
+                {spans.map((w, i) => {
+                  const sung = i < wordAt;
+                  const now = i === wordAt;
+                  return (
+                    <span
+                      key={i}
+                      style={{
+                        color: now ? palette.primary : "#ffffff",
+                        opacity: sung || now ? 1 : 0.5,
+                        display: "inline-block",
+                        transform: now ? "scale(1.07)" : undefined,
+                        transition: undefined, // renders are per-frame; no CSS time
+                      }}
+                    >
+                      {w.text}
+                      {i < spans.length - 1 ? " " : ""}
+                    </span>
+                  );
+                })}
+              </span>
+            );
+          })()}
         </div>
       ) : null}
 

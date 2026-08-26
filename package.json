@@ -16,7 +16,8 @@
     "test:redirect": "node --experimental-strip-types scripts/test-safe-next.mjs",
     "test:align": "node scripts/test-align.mjs",
     "test:audio": "node --experimental-strip-types scripts/test-audio-analysis.mjs",
-    "test:plans": "node --experimental-strip-types scripts/test-plans.mjs"
+    "test:plans": "node --experimental-strip-types scripts/test-plans.mjs",
+    "test:karaoke": "node --experimental-strip-types scripts/test-karaoke.mjs"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.512",
