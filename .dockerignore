@@ -6,7 +6,6 @@ out
 .env*
 app
 components
-lib
 supabase
 *.md
 next.config.ts
