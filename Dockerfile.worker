@@ -46,10 +46,12 @@ COPY public ./public
 # Download the browser at build time so the first render isn't slowed by it
 RUN node node_modules/@remotion/cli/remotion-cli.js browser ensure
 
-# Build-time smoke render: bundle the real composition and paint one frame
-# with the bundled demo assets. If any import is missing from the image the
-# BUILD fails here, loudly, instead of every artist's render failing quietly.
-RUN node node_modules/@remotion/cli/remotion-cli.js still remotion/index.ts SampleClip /tmp/smoke.png --frame=0   && rm -f /tmp/smoke.png
+# Build-time bundle check: run the same webpack bundling a render starts with.
+# A missing import (how every render broke once: lib/ wasn't copied) fails the
+# BUILD with a real module error. Deliberately NOT a full frame render -- that
+# needs Chrome, whose build-sandbox quirks (tiny /dev/shm) fail for reasons
+# that have nothing to do with the image being correct.
+RUN node node_modules/@remotion/cli/remotion-cli.js bundle remotion/index.ts --out-dir /tmp/smokebundle   && rm -rf /tmp/smokebundle
 
 ENV NODE_ENV=production
 
