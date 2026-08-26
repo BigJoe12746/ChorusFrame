@@ -143,6 +143,64 @@ export async function signInputs(supabase, sub, seconds = 14400) {
   };
 }
 
+/** Longest side of the copy of the artwork that renders use. */
+const RENDER_ART_MAX = 1440;
+/** Originals at or under this size are used as-is. */
+const RENDER_ART_BYTES = 2 * 1024 * 1024;
+
+/**
+ * A render-sized copy of oversized artwork, cached in storage per song.
+ *
+ * Distribution artwork is routinely 3000x3000 (an 8.6MB PNG in the case that
+ * surfaced this): decoded that is a ~36MB bitmap, drawn TWICE per frame —
+ * once through a heavy blur at 2.6x scale — which OOMs the render container
+ * while sailing through a dev machine. 1440px is comfortably above the
+ * largest size the artwork is ever shown at (a 720px card, or full-bleed at
+ * 1080 wide) and renders identically.
+ *
+ * Never fatal: any failure here falls back to the original, because a
+ * possibly-heavy render beats no render.
+ */
+async function ensureRenderArtwork(supabase, sub, log = console.log) {
+  if (!sub.artwork_path) return null;
+  const dir = sub.artwork_path.split("/")[0];
+  const cachedPath = `${dir}/artwork-render.jpg`;
+  if (sub.artwork_path.endsWith("artwork-render.jpg")) return sub.artwork_path;
+
+  try {
+    // Already made on an earlier render?
+    const { data: files } = await supabase.storage.from("submissions").list(dir);
+    const existing = (files ?? []).find((f) => f.name === "artwork-render.jpg");
+    if (existing) return cachedPath;
+
+    const original = (files ?? []).find((f) => sub.artwork_path.endsWith(`/${f.name}`));
+    const size = (original?.metadata && original.metadata.size) || 0;
+    if (size > 0 && size <= RENDER_ART_BYTES) return sub.artwork_path;
+
+    const { data: blob, error: dlErr } = await supabase.storage
+      .from("submissions")
+      .download(sub.artwork_path);
+    if (dlErr || !blob) throw new Error(dlErr?.message ?? "download failed");
+
+    const sharp = (await import("sharp")).default;
+    const resized = await sharp(Buffer.from(await blob.arrayBuffer()))
+      .resize(RENDER_ART_MAX, RENDER_ART_MAX, { fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 92 })
+      .toBuffer();
+
+    const { error: upErr } = await supabase.storage
+      .from("submissions")
+      .upload(cachedPath, resized, { contentType: "image/jpeg", upsert: true });
+    if (upErr) throw new Error(upErr.message);
+
+    log(`artwork: ${(size / 1024 / 1024).toFixed(1)}MB original → ${(resized.length / 1024 / 1024).toFixed(1)}MB render copy`);
+    return cachedPath;
+  } catch (e) {
+    log(`artwork downscale skipped (${String(e?.message ?? e).slice(0, 80)}) — using original`);
+    return sub.artwork_path;
+  }
+}
+
 /**
  * Render one submission into the requested formats.
  * The composition validates the clip window against the real audio duration,
@@ -172,7 +230,12 @@ export async function renderFormats({
   const list = validateFormats(formats);
   validateWindow({ start, duration });
 
-  const { audioSrc, artworkSrc } = await signInputs(supabase, sub);
+  const renderArt = await ensureRenderArtwork(supabase, sub, log);
+  const { audioSrc, artworkSrc } = await signInputs(
+    supabase,
+    { ...sub, artwork_path: renderArt },
+    undefined
+  );
 
   // The artist's saved identity, so their fifth release looks like their first
   let brand = null;
