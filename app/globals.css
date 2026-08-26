@@ -64,3 +64,31 @@ body {
   background-clip: text;
   color: transparent;
 }
+
+/*
+ * The "logo light": a layered cyan-to-blue halo, the same hues as the mark.
+ * One utility so every hover glow on the site is the same light, rather than
+ * each element inventing its own.
+ */
+.glow-hover {
+  transition:
+    box-shadow 0.25s ease,
+    border-color 0.25s ease,
+    color 0.25s ease,
+    opacity 0.25s ease;
+}
+.glow-hover:hover,
+.glow-hover:focus-visible {
+  box-shadow:
+    0 0 0 1px rgba(34, 220, 245, 0.4),
+    0 0 16px rgba(34, 220, 245, 0.22),
+    0 0 40px rgba(43, 140, 255, 0.14);
+}
+/* Stronger halo for the gradient CTAs, which sit on darker ground */
+.glow-hover-strong:hover,
+.glow-hover-strong:focus-visible {
+  box-shadow:
+    0 0 0 1px rgba(34, 220, 245, 0.5),
+    0 0 22px rgba(34, 220, 245, 0.35),
+    0 0 60px rgba(124, 58, 237, 0.3);
+}

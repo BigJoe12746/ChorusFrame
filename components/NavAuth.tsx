@@ -38,7 +38,7 @@ export default function NavAuth() {
       {signedIn ? (
         <Link
           href="/dashboard"
-          className="rounded-lg border border-borderline px-4 py-2 text-muted transition hover:border-cyan hover:text-foreground"
+          className="glow-hover rounded-lg border border-borderline px-4 py-2 text-muted hover:border-cyan hover:text-foreground"
         >
           Your songs
         </Link>
@@ -46,14 +46,14 @@ export default function NavAuth() {
         <>
           <Link
             href="/upload"
-            className="px-2 py-2 text-muted transition hover:text-foreground"
+            className="glow-hover rounded-lg px-2 py-2 text-muted hover:text-foreground"
           >
             Free sample clip
           </Link>
           {authConfigured ? (
             <Link
               href="/login"
-              className="rounded-lg border border-borderline px-4 py-2 font-medium text-foreground transition hover:border-cyan"
+              className="glow-hover rounded-lg border border-borderline px-4 py-2 font-medium text-foreground hover:border-cyan"
             >
               Log in
             </Link>

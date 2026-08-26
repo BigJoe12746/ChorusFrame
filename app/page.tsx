@@ -74,7 +74,7 @@ export default function Home() {
         <div className="mx-auto mt-10 flex max-w-2xl flex-col items-center gap-4">
           <Link
             href="/login?new=1"
-            className="brand-gradient rounded-xl px-8 py-3.5 text-base font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+            className="glow-hover-strong brand-gradient rounded-xl px-8 py-3.5 text-base font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
           >
             Start free — upload a song
           </Link>
@@ -125,7 +125,7 @@ export default function Home() {
           {kit.map((item) => (
             <div
               key={item.name}
-              className="rounded-xl border border-borderline bg-surface-raised p-4 transition hover:border-cyan"
+              className="glow-hover rounded-xl border border-borderline bg-surface-raised p-4 hover:border-cyan"
             >
               <p className="font-semibold">{item.name}</p>
               <p className="mt-1 text-xs leading-relaxed text-muted">
@@ -172,7 +172,7 @@ export default function Home() {
         <div className="mt-8 flex flex-col items-center gap-3">
           <Link
             href="/login?new=1"
-            className="brand-gradient inline-block rounded-xl px-8 py-3 font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+            className="glow-hover-strong brand-gradient inline-block rounded-xl px-8 py-3 font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
           >
             Start free
           </Link>
