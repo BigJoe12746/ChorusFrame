@@ -36,11 +36,20 @@ RUN npm ci --no-audit --no-fund
 # tsconfig.json is required: the Remotion CLI refuses to start without one.
 COPY remotion.config.ts tsconfig.json ./
 COPY remotion ./remotion
+# The composition imports from lib/ (beat maths, karaoke). Forgetting a folder
+# here fails at RUNTIME with a bare "node exited with code 1" on every job --
+# which is exactly what happened -- so the smoke render below now guards this.
+COPY lib ./lib
 COPY scripts ./scripts
 COPY public ./public
 
 # Download the browser at build time so the first render isn't slowed by it
 RUN node node_modules/@remotion/cli/remotion-cli.js browser ensure
+
+# Build-time smoke render: bundle the real composition and paint one frame
+# with the bundled demo assets. If any import is missing from the image the
+# BUILD fails here, loudly, instead of every artist's render failing quietly.
+RUN node node_modules/@remotion/cli/remotion-cli.js still remotion/index.ts SampleClip /tmp/smoke.png --frame=0   && rm -f /tmp/smoke.png
 
 ENV NODE_ENV=production
 
