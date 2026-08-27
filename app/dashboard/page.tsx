@@ -435,7 +435,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                             href={c.url}
                             target="_blank"
                             rel="noreferrer"
-                            className="glow-hover rounded-lg border border-borderline px-2.5 py-1 text-xs text-muted transition hover:border-cyan hover:text-foreground"
+                            className="glow-hover rounded-lg bg-surface-raised px-2.5 py-1 text-xs text-muted transition hover:text-foreground"
                           >
                             {FORMAT_LABELS[c.format] ?? c.format} ↗
                           </a>
@@ -456,7 +456,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                                   href={c.url}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="rounded border border-borderline px-2 py-0.5 transition hover:border-cyan hover:text-foreground"
+                                  className="rounded bg-surface-raised px-2 py-0.5 transition hover:text-foreground"
                                 >
                                   {FORMAT_LABELS[c.format] ?? c.format} ↗
                                 </a>

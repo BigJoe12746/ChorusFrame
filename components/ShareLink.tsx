@@ -29,7 +29,7 @@ export default function ShareLink({ submissionId }: { submissionId: string }) {
   return (
     <button
       onClick={copy}
-      className="glow-hover rounded-lg border border-borderline px-2.5 py-1 text-xs text-muted transition hover:border-cyan hover:text-foreground"
+      className="glow-hover rounded-lg bg-surface-raised px-2.5 py-1 text-xs text-muted transition hover:text-foreground"
       title="Public link to these clips"
     >
       {copied ? "Link copied" : "Share"}

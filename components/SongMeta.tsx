@@ -46,7 +46,7 @@ export default function SongMeta({
           className={`rounded-full border px-2 py-0.5 text-[11px] ${
             c.tone === "good"
               ? "border-borderline text-muted"
-              : "border-danger/40 text-danger"
+              : "border-dashed border-borderline text-muted"
           }`}
         >
           {c.text}

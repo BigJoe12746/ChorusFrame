@@ -224,7 +224,7 @@ export default function RenderControls({
                 href={c.url}
                 target="_blank"
                 rel="noreferrer"
-                className="glow-hover rounded-lg border border-borderline px-2.5 py-1 text-xs text-muted transition hover:border-cyan hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+                className="glow-hover rounded-lg bg-surface-raised px-2.5 py-1 text-xs text-muted transition hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
               >
                 {FORMAT_LABELS[c.format] ?? c.format} ↗
               </a>
@@ -249,21 +249,6 @@ export default function RenderControls({
           That render didn&apos;t finish{job.error ? `: ${job.error}` : "."} It didn&apos;t
           count against your limit.
         </p>
-      ) : null}
-      {job?.status === "done" && job.clip_urls?.length ? (
-        <div className="flex flex-wrap gap-2">
-          {job.clip_urls.map((c) => (
-            <a
-              key={c.format}
-              href={c.url}
-              target="_blank"
-              rel="noreferrer"
-              className="glow-hover rounded-lg border border-borderline px-2.5 py-1 text-xs text-muted transition hover:border-cyan hover:text-foreground"
-            >
-              {FORMAT_LABELS[c.format] ?? c.format} ↗
-            </a>
-          ))}
-        </div>
       ) : null}
       {error ? <p className="text-xs text-danger">{error}</p> : null}
 
@@ -498,7 +483,7 @@ export default function RenderControls({
       ) : (
         <button
           onClick={() => setPicking(true)}
-          className="glow-hover self-start rounded-lg border border-borderline px-3 py-1.5 text-xs font-medium text-muted transition hover:border-cyan hover:text-foreground"
+          className="glow-hover self-start rounded-lg border border-cyan/50 px-3.5 py-1.5 text-xs font-semibold text-cyan transition hover:border-cyan hover:bg-surface-raised"
         >
           {job?.status === "done" || job?.status === "failed"
             ? "Render another vibe"
