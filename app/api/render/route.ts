@@ -5,7 +5,7 @@ import { checkEntitlement } from "@/lib/plans";
 
 export const runtime = "nodejs";
 
-const VALID_FORMATS = ["vertical", "square", "wide"] as const;
+const VALID_FORMATS = ["vertical", "square", "wide", "canvas"] as const;
 /** Keep in step with remotion/vibes.ts — an unknown id renders the default. */
 const VALID_VIBES = [
   "hyperpop",

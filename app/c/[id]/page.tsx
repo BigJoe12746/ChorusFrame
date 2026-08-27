@@ -11,6 +11,7 @@ const FORMATS: Record<string, { label: string; where: string; ratio: string }> =
   vertical: { label: "9:16 vertical", where: "TikTok, Reels, Shorts", ratio: "9 / 16" },
   square: { label: "1:1 square", where: "Feed posts", ratio: "1 / 1" },
   wide: { label: "16:9 wide", where: "YouTube", ratio: "16 / 9" },
+  canvas: { label: "Canvas loop", where: "Spotify Canvas", ratio: "9 / 16" },
   sample: { label: "Clip", where: "", ratio: "9 / 16" },
 };
 
@@ -168,6 +169,7 @@ export default async function ClipPage({ params }: PageProps<"/c/[id]">) {
                 src={c.url}
                 controls
                 playsInline
+                loop={c.format === "canvas"}
                 preload="metadata"
                 className="w-full rounded-xl border border-borderline bg-surface"
                 style={{ aspectRatio: meta.ratio }}

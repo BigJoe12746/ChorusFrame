@@ -2,6 +2,7 @@ import React from "react";
 import { Composition, staticFile } from "remotion";
 import { getAudioDurationInSeconds } from "@remotion/media-utils";
 import { SampleClip, FPS, END_CARD_SECONDS, type SampleClipProps } from "./SampleClip";
+import { CanvasLoop, CANVAS_SECONDS } from "./CanvasLoop";
 import { DEFAULT_VIBE } from "./vibes";
 
 const defaultProps: SampleClipProps = {
@@ -53,6 +54,23 @@ export const FORMATS = [
 export const RemotionRoot: React.FC = () => {
   return (
     <>
+      {/* The Spotify Canvas loop: fixed length, no audio, seam-free by
+          construction — reads the same props file as the clip formats. */}
+      <Composition
+        id="CanvasLoop"
+        component={CanvasLoop}
+        width={1080}
+        height={1920}
+        fps={FPS}
+        durationInFrames={CANVAS_SECONDS * FPS}
+        defaultProps={{
+          artworkSrc: defaultProps.artworkSrc,
+          songTitle: defaultProps.songTitle,
+          vibe: defaultProps.vibe,
+          brand: null,
+          beatGrid: null,
+        }}
+      />
       {FORMATS.map((f) => (
         <Composition
           key={f.id}

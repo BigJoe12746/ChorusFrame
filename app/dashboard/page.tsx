@@ -39,6 +39,7 @@ const FORMAT_LABELS: Record<string, string> = {
   vertical: "9:16 vertical",
   square: "1:1 square",
   wide: "16:9 wide",
+  canvas: "Canvas loop",
   sample: "Clip",
 };
 

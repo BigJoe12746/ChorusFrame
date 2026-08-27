@@ -144,6 +144,17 @@ async function runJob(job) {
       vibe = "hyperpop";
     }
 
+    // Same for formats: the API refuses canvas for Free at enqueue, but a job
+    // can outlive a downgrade (queue backlog, retries across a billing change)
+    // — and the Canvas loop carries no watermark at all, so it must never
+    // render for a free plan.
+    let formats = job.formats;
+    if (!isPro && formats.includes("canvas")) {
+      formats = formats.filter((f) => f !== "canvas");
+      log(`   canvas is Pro-only; dropped for a free plan`);
+      if (!formats.length) throw new Error("the Canvas loop is a Pro format");
+    }
+
     /*
      * Progressive delivery: each format uploads the moment it renders and is
      * written onto the job (fenced) while status stays "rendering", so the
@@ -155,7 +166,7 @@ async function runJob(job) {
     await renderFormats({
       supabase,
       sub,
-      formats: job.formats,
+      formats,
       start: Number(job.clip_start_seconds),
       duration: Number(job.duration_seconds),
       endCard: !isPro,
@@ -178,7 +189,7 @@ async function runJob(job) {
         rmSync(outFile, { force: true });
         const kept = await writeFenced({ clip_urls: urls });
         if (!kept) throw new Error("lease lost mid-render; stopping");
-        log(`   ↑ ${format} published (${urls.length}/${job.formats.length})`);
+        log(`   ↑ ${format} published (${urls.length}/${formats.length})`);
       },
     });
 

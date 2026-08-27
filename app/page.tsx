@@ -8,6 +8,7 @@ const kit = [
   { name: "Square post", detail: "1:1 for feed and carousels" },
   { name: "Lyric video", detail: "Wide 16:9 cut for YouTube" },
   { name: "Visualizer", detail: "Cover art in motion when you skip the lyrics" },
+  { name: "Canvas loop", detail: "8-second seamless loop for Spotify (Pro)" },
   { name: "Teasers", detail: "Any length from 5 to 60 seconds" },
 ];
 
@@ -35,7 +36,7 @@ const steps = [
   {
     n: "05",
     title: "Export the campaign",
-    body: "9:16, 1:1 and 16:9 from one project, in one pass.",
+    body: "9:16, 1:1 and 16:9 in one pass — plus an 8-second Canvas loop on Pro.",
   },
 ];
 
@@ -70,7 +71,7 @@ export default function Home() {
         <p className="mx-auto mt-6 max-w-2xl text-lg text-muted">
           Song, cover, lyrics in — platform-ready videos out. Vertical cuts,
           square posts, a widescreen lyric video, visualizers, teasers. One
-          project, three formats, minutes instead of a weekend.
+          project, every format, minutes instead of a weekend.
         </p>
         <div className="mx-auto mt-10 flex max-w-2xl flex-col items-center gap-4">
           <Link

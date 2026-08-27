@@ -27,6 +27,9 @@ ok("shorter clips on Free", PLANS.free.maxClipSeconds < PLANS.pro.maxClipSeconds
 ok("fewer templates on Free", PLANS.free.templates < PLANS.pro.templates);
 ok("end card only on Free", PLANS.free.endCard && !PLANS.pro.endCard);
 ok("brand kit is a Pro feature", !PLANS.free.brandKit && PLANS.pro.brandKit);
+ok("watermark only on Free", PLANS.free.watermark && !PLANS.pro.watermark);
+ok("Canvas loop is a Pro format",
+  !PLANS.free.formats.includes("canvas") && PLANS.pro.formats.includes("canvas"));
 
 console.log("");
 console.log("entitlement decisions:");
@@ -37,6 +40,10 @@ ok("a 60s clip is refused on Free", !free({ clipSeconds: 60 }).allowed);
 ok("...and the reason names Pro", /Pro/.test(free({ clipSeconds: 60 }).reason ?? ""));
 ok("60s is allowed on Pro",
   checkEntitlement({ planId: "pro", usedThisMonth: 0, clipSeconds: 60, formats: ["wide"] }).allowed);
+ok("canvas is refused on Free with a reason that names it",
+  !free({ formats: ["canvas"] }).allowed && /Canvas/.test(free({ formats: ["canvas"] }).reason ?? ""));
+ok("canvas is allowed on Pro",
+  checkEntitlement({ planId: "pro", usedThisMonth: 0, clipSeconds: 15, formats: ["canvas"] }).allowed);
 
 ok("running out is refused", !free({ usedThisMonth: 5 }).allowed);
 ok("...and says failures are free",

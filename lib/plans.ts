@@ -25,7 +25,7 @@ export type Plan = {
   /** Renders an artist may START per calendar month. Failures don't count. */
   exportsPerMonth: number;
   /** Formats available per render. */
-  formats: ("vertical" | "square" | "wide")[];
+  formats: ("vertical" | "square" | "wide" | "canvas")[];
   maxClipSeconds: number;
   /** How many of the ten visual directions are available. */
   templates: number;
@@ -77,7 +77,7 @@ export const PLANS: Record<PlanId, Plan> = {
     annual: 9900,
     tagline: "For artists releasing regularly",
     exportsPerMonth: 100,
-    formats: ["vertical", "square", "wide"],
+    formats: ["vertical", "square", "wide", "canvas"],
     maxClipSeconds: 60,
     templates: 10,
     templateIds: [
@@ -93,6 +93,7 @@ export const PLANS: Record<PlanId, Plan> = {
       "Clips up to 60 seconds",
       "All 10 templates",
       "Your brand kit on every render",
+      "8-second Canvas loop for Spotify",
       "No watermark, no end card",
     ],
   },
@@ -157,7 +158,9 @@ export function checkEntitlement({
     return {
       ...base,
       allowed: false,
-      reason: `${plan.name} doesn't include ${unavailable.join(", ")}.`,
+      reason: unavailable.includes("canvas")
+        ? "The 8-second Canvas loop is a Pro format."
+        : `${plan.name} doesn't include ${unavailable.join(", ")}.`,
     };
   }
   if (remaining <= 0) {

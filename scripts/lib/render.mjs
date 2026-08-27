@@ -18,6 +18,7 @@ export const FORMATS = {
   vertical: { composition: "SampleClip", label: "9:16 vertical (TikTok/Reels/Shorts)" },
   square: { composition: "SampleClipSquare", label: "1:1 square (feed post)" },
   wide: { composition: "SampleClipWide", label: "16:9 wide (YouTube)" },
+  canvas: { composition: "CanvasLoop", label: "8s Canvas loop (Spotify)" },
 };
 
 export const MIN_DURATION = 5;
@@ -264,7 +265,11 @@ export async function renderFormats({
   // the song), otherwise a syllable-weighted spread across this clip window.
   let lyricTiming = [];
   let timingSource = "none";
-  if (sub.lyrics?.trim()) {
+  // The Canvas loop shows no words — a canvas-only job must not spend a
+  // transcription call (real money, minutes of latency) on timing nothing
+  // will read.
+  const needsLyrics = list.some((f) => f !== "canvas");
+  if (needsLyrics && sub.lyrics?.trim()) {
     const { timings, source } = await ensureLyricTiming({
       supabase,
       sub,

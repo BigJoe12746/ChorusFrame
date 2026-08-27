@@ -58,7 +58,10 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === "--formats") {
     const raw = takeValue().toLowerCase();
     flags.formats =
-      raw === "all" ? Object.keys(FORMATS) : raw.split(",").map((f) => f.trim()).filter(Boolean);
+      // "all" keeps its long-standing meaning: the three clip sizes. The
+      // Canvas loop is asked for by name — it's silent and Pro-flavoured,
+      // not part of the standard concierge kit.
+      raw === "all" ? ["vertical", "square", "wide"] : raw.split(",").map((f) => f.trim()).filter(Boolean);
     const unknown = flags.formats.filter((f) => !FORMATS[f]);
     if (unknown.length) {
       fail(`Unknown format(s): ${unknown.join(", ")}. Valid: ${Object.keys(FORMATS).join(", ")}, all`);

@@ -11,6 +11,7 @@ const FORMAT_LABELS = {
   vertical: "9:16 vertical — TikTok, Reels, Shorts",
   square: "1:1 square — feed posts",
   wide: "16:9 wide — YouTube",
+  canvas: "8s Canvas loop — Spotify",
 };
 
 function getProvider(env) {

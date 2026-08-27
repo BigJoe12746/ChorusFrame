@@ -24,6 +24,7 @@ const FORMAT_LABELS: Record<string, string> = {
   vertical: "9:16 vertical",
   square: "1:1 square",
   wide: "16:9 wide",
+  canvas: "Canvas loop",
 };
 
 const ACTIVE = ["queued", "rendering"];
@@ -81,6 +82,7 @@ export default function RenderControls({
     initialVibe && allowedVibes.includes(initialVibe) ? initialVibe : "hyperpop"
   );
   const [lockedNote, setLockedNote] = useState("");
+  const [formatNote, setFormatNote] = useState("");
   const [formats, setFormats] = useState<string[]>(["vertical"]);
   const [clipStart, setClipStart] = useState(0);
   const [clipLength, setClipLength] = useState(15);
@@ -311,46 +313,76 @@ export default function RenderControls({
               </span>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {(["vertical", "square", "wide"] as const).map((f) => {
+              {(["vertical", "square", "wide", "canvas"] as const).map((f) => {
                 const on = formats.includes(f);
+                // The Canvas loop is a Pro format; the API enforces it, the
+                // picker explains it.
+                const locked = f === "canvas" && planName !== "Pro";
                 return (
                   <button
                     key={f}
                     type="button"
                     aria-pressed={on}
                     onClick={() =>
-                      setFormats((cur) =>
-                        cur.includes(f)
-                          ? cur.length > 1
-                            ? cur.filter((x) => x !== f)
-                            : cur // never zero formats
-                          : [...cur, f]
-                      )
+                      locked
+                        ? setFormatNote("The 8-second Canvas loop for Spotify is on Pro.")
+                        : setFormats((cur) =>
+                            cur.includes(f)
+                              ? cur.length > 1
+                                ? cur.filter((x) => x !== f)
+                                : cur // never zero formats
+                              : [...cur, f]
+                          )
                     }
-                    className={`rounded-lg border px-3 py-1.5 text-xs transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan ${
+                    className={`relative rounded-lg border px-3 py-1.5 text-xs transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan ${
                       on
                         ? "border-cyan bg-surface text-foreground"
-                        : "border-borderline text-muted hover:border-cyan hover:text-foreground"
+                        : locked
+                          ? "border-borderline text-muted opacity-60"
+                          : "border-borderline text-muted hover:border-cyan hover:text-foreground"
                     }`}
                   >
                     {FORMAT_LABELS[f]}
+                    {locked ? (
+                      <span className="ml-1.5 text-[9px] font-semibold uppercase tracking-wide text-cyan">
+                        Pro
+                      </span>
+                    ) : null}
                   </button>
                 );
               })}
-              {formats.length < 3 ? (
+              {["vertical", "square", "wide"].some((f) => !formats.includes(f)) ? (
                 <button
                   type="button"
-                  onClick={() => setFormats(["vertical", "square", "wide"])}
+                  // Additive: a selected Canvas loop survives the shortcut
+                  onClick={() =>
+                    setFormats((cur) => [...new Set([...cur, "vertical", "square", "wide"])])
+                  }
                   className="rounded-lg px-2 py-1.5 text-xs text-muted transition hover:text-foreground"
                 >
-                  All three
+                  All three sizes
                 </button>
               ) : null}
             </div>
+            {formatNote ? (
+              <p className="mt-1.5 text-[11px] text-muted">
+                {formatNote}{" "}
+                <a href="/dashboard/billing" className="text-cyan underline underline-offset-2">
+                  Go Pro
+                </a>
+              </p>
+            ) : null}
+            {formats.includes("canvas") ? (
+              <p className="mt-1.5 text-[11px] text-muted">
+                The Canvas loop is always 8 seconds and silent — your artwork
+                breathing at the song&apos;s tempo. Hook, clip length and the
+                preview apply to the other formats.
+              </p>
+            ) : null}
             <p className="mt-1.5 text-[11px] text-muted">
-              One format renders fastest. Every render costs one export whether
-              it&apos;s one format or all three — so if you want them all, take
-              them in one go.
+              One format renders fastest. Every render costs one export however
+              many formats it includes — so if you want them all, take them in
+              one go.
             </p>
           </div>
 
