@@ -17,7 +17,8 @@
     "test:align": "node scripts/test-align.mjs",
     "test:audio": "node --experimental-strip-types scripts/test-audio-analysis.mjs",
     "test:plans": "node --experimental-strip-types scripts/test-plans.mjs",
-    "test:karaoke": "node --experimental-strip-types scripts/test-karaoke.mjs"
+    "test:karaoke": "node --experimental-strip-types scripts/test-karaoke.mjs",
+    "test:bars": "node --experimental-strip-types scripts/test-bars.mjs"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.512",
