@@ -5,5 +5,8 @@
 # "Can't resolve @/remotion/SampleClip". Only the worker-side pieces are cut.
 scripts
 remotion.config.ts
-public/demo
+# The demo source assets (song, art) are render inputs and stay local, but
+# the rendered demo clips are the homepage's proof — they must ship.
+public/demo/*
+!public/demo/clips
 out
