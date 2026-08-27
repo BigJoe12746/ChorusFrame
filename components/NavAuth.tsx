@@ -36,6 +36,12 @@ export default function NavAuth() {
   return (
     <div className="flex items-center gap-3 text-sm">
       <Link
+        href="/examples"
+        className="glow-hover rounded-lg px-2 py-2 text-muted hover:text-foreground"
+      >
+        Examples
+      </Link>
+      <Link
         href="/pricing"
         className="glow-hover rounded-lg px-2 py-2 text-muted hover:text-foreground"
       >
@@ -52,7 +58,7 @@ export default function NavAuth() {
         <>
           <Link
             href="/upload"
-            className="glow-hover rounded-lg px-2 py-2 text-muted hover:text-foreground"
+            className="glow-hover hidden rounded-lg px-2 py-2 text-muted hover:text-foreground sm:block"
           >
             Free sample clip
           </Link>

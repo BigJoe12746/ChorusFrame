@@ -379,11 +379,18 @@ export async function ensureClipsBucket(supabase) {
   }
 }
 
-/** Upload rendered files to the public bucket under stable per-format keys. */
 /** Storage rejects anything past this; checked before we spend the upload. */
 export const MAX_CLIP_BYTES = 45 * 1024 * 1024;
 
-export async function uploadClips(supabase, submissionId, rendered, now = Date.now()) {
+/**
+ * Upload rendered files to the public bucket.
+ *
+ * `prefix` keys the files to one render: the worker passes a slice of the job
+ * id, so every render keeps its own files and an artist can compare vibes or
+ * trust a shared link not to change underneath a follower. The default keeps
+ * the legacy stable key for the manual CLI, which deliberately overwrites.
+ */
+export async function uploadClips(supabase, submissionId, rendered, { prefix = "sample", now = Date.now() } = {}) {
   await ensureClipsBucket(supabase);
 
   // Check every file first. Discovering "too large" halfway through means some
@@ -403,7 +410,7 @@ export async function uploadClips(supabase, submissionId, rendered, now = Date.n
 
   const urls = [];
   for (const { format, outFile } of rendered) {
-    const clipPath = `${submissionId}/sample-${format}.mp4`;
+    const clipPath = `${submissionId}/${prefix}-${format}.mp4`;
     const { error } = await supabase.storage.from("clips").upload(clipPath, readFileSync(outFile), {
       contentType: "video/mp4",
       upsert: true,

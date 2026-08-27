@@ -36,11 +36,15 @@ const STATUS: Record<string, { label: string; cls: string }> = {
 };
 
 const FORMAT_LABELS: Record<string, string> = {
-  "sample-vertical.mp4": "9:16 vertical",
-  "sample-square.mp4": "1:1 square",
-  "sample-wide.mp4": "16:9 wide",
-  "sample.mp4": "Clip",
+  vertical: "9:16 vertical",
+  square: "1:1 square",
+  wide: "16:9 wide",
+  sample: "Clip",
 };
+
+/** "abc123-vertical.mp4" or legacy "sample-vertical.mp4" -> "vertical". */
+const formatOfName = (name: string) =>
+  name.replace(/\.mp4$/, "").split("-").pop() ?? "clip";
 
 export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
   // Set when an artist has just uploaded: open that song's picker for them
@@ -75,8 +79,16 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
     .select("id, submission_id, status, formats, attempts, max_attempts, error, clip_urls")
     .order("created_at", { ascending: false });
   const latestJob = new Map<string, RenderJob>();
+  // Every finished render, newest first — the clip library. Files are keyed
+  // per render in storage, so nothing here ever overwrites anything else.
+  const doneJobs = new Map<string, (RenderJob & { submission_id: string })[]>();
   for (const j of (jobRows ?? []) as (RenderJob & { submission_id: string })[]) {
     if (!latestJob.has(j.submission_id)) latestJob.set(j.submission_id, j);
+    if (j.status === "done" && j.clip_urls?.length) {
+      const list = doneJobs.get(j.submission_id) ?? [];
+      list.push(j);
+      doneJobs.set(j.submission_id, list);
+    }
   }
 
   /*
@@ -174,30 +186,54 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
             .createSignedUrl(s.song_path, 3600);
           if (signedAudio) audioUrls.set(s.id, signedAudio.signedUrl);
         }
-        const { data: files } = await admin.storage.from("clips").list(s.id);
-        if (files?.length) {
-          clipFiles.set(
-            s.id,
-            files
-              .filter((f) => f.name.endsWith(".mp4"))
-              .map((f) => ({
-                name: f.name,
-                // Clips cache at the edge for a year; the URL must change when
-                // the file does, or a re-render keeps serving the old clip.
-                url: `${admin.storage.from("clips").getPublicUrl(`${s.id}/${f.name}`).data.publicUrl}?v=${encodeURIComponent(
-                  f.updated_at ?? f.created_at ?? ""
-                )}`,
-              }))
-          );
+        // Legacy only: songs rendered before the job table carried clip_urls.
+        if (!doneJobs.has(s.id)) {
+          const { data: files } = await admin.storage.from("clips").list(s.id);
+          if (files?.length) {
+            clipFiles.set(
+              s.id,
+              files
+                // Legacy stable names only: job-keyed files belong to the job
+                // table, and a failed job's partial uploads must not surface
+                .filter((f) => f.name.endsWith(".mp4") && f.name.startsWith("sample"))
+                .map((f) => ({
+                  name: f.name,
+                  // Clips cache at the edge for a year; the URL must change
+                  // when the file does.
+                  url: `${admin.storage.from("clips").getPublicUrl(`${s.id}/${f.name}`).data.publicUrl}?v=${encodeURIComponent(
+                    f.updated_at ?? f.created_at ?? ""
+                  )}`,
+                }))
+            );
+          }
         }
       })
     );
   }
 
+  /**
+   * The song's current clips: the newest finished render of EACH format —
+   * a quick vertical-only re-render must not make the square and wide
+   * disappear from the page — or legacy files for pre-queue songs.
+   */
+  const currentClips = (id: string): { format: string; url: string }[] => {
+    const jobs = doneJobs.get(id);
+    if (jobs?.length) {
+      const byFormat = new Map<string, { format: string; url: string }>();
+      for (const j of jobs) {
+        for (const c of j.clip_urls ?? []) {
+          if (!byFormat.has(c.format)) byFormat.set(c.format, c);
+        }
+      }
+      return [...byFormat.values()];
+    }
+    return (clipFiles.get(id) ?? []).map((f) => ({ format: formatOfName(f.name), url: f.url }));
+  };
+
   // One vertical per song, newest song first — the dashboard's shop window
   const freshClips = submissions
     .map((x) => {
-      const v = (clipFiles.get(x.id) ?? []).find((f) => f.name === "sample-vertical.mp4");
+      const v = currentClips(x.id).find((c) => c.format === "vertical");
       return v ? { song: x.song_title, url: v.url } : null;
     })
     .filter((x): x is { song: string; url: string } => x !== null)
@@ -281,7 +317,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
               plan={plan}
               exportsUsed={exportsUsed}
               songs={submissions.length}
-              clips={[...clipFiles.values()].reduce((n, c) => n + c.length, 0)}
+              clips={submissions.reduce((n, x) => n + currentClips(x.id).length, 0)}
             />
           </div>
         ) : null}
@@ -347,8 +383,17 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                 label: s.status,
                 cls: "border-borderline text-muted",
               };
-              const clips = clipFiles.get(s.id) ?? [];
+              const clips = currentClips(s.id);
+              // Pre-deploy jobs all alias the same overwritten sample-* files;
+              // listing them as "earlier renders" would show duplicates at
+              // best and year-old edge-cached bytes at worst.
+              const earlier = (doneJobs.get(s.id) ?? [])
+                .slice(1)
+                .filter((j) => !(j.clip_urls ?? []).some((c) => c.url.includes("/sample-")));
               const thumb = artThumbs.get(s.id);
+              const totalClipCount =
+                (doneJobs.get(s.id) ?? []).reduce((n, j) => n + (j.clip_urls?.length ?? 0), 0) ||
+                clips.length;
               return (
                 <li
                   key={s.id}
@@ -386,16 +431,40 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                         <ShareLink submissionId={s.id} />
                         {clips.map((c) => (
                           <a
-                            key={c.name}
+                            key={c.url}
                             href={c.url}
                             target="_blank"
                             rel="noreferrer"
                             className="glow-hover rounded-lg border border-borderline px-2.5 py-1 text-xs text-muted transition hover:border-cyan hover:text-foreground"
                           >
-                            {FORMAT_LABELS[c.name] ?? c.name} ↗
+                            {FORMAT_LABELS[c.format] ?? c.format} ↗
                           </a>
                         ))}
                       </div>
+                    ) : null}
+                    {earlier.length > 0 ? (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-xs text-muted transition hover:text-foreground">
+                          Earlier renders ({earlier.length})
+                        </summary>
+                        <ul className="mt-1.5 flex flex-col gap-1.5">
+                          {earlier.map((j) => (
+                            <li key={j.id} className="flex flex-wrap items-center gap-2 text-xs text-muted">
+                              {(j.clip_urls ?? []).map((c) => (
+                                <a
+                                  key={c.url}
+                                  href={c.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="rounded border border-borderline px-2 py-0.5 transition hover:border-cyan hover:text-foreground"
+                                >
+                                  {FORMAT_LABELS[c.format] ?? c.format} ↗
+                                </a>
+                              ))}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
                     ) : null}
                     <div className="mt-3">
                       <RenderControls
@@ -426,7 +495,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                     <DeleteSong
                       submissionId={s.id}
                       songTitle={s.song_title}
-                      clipCount={clips.length}
+                      clipCount={totalClipCount}
                     />
                   </div>
                 </li>

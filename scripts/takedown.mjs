@@ -48,12 +48,31 @@ const { error: flagErr } = await supabase
   .eq("id", id);
 if (flagErr) throw new Error(flagErr.message);
 
-const { data: files } = await supabase.storage.from("clips").list(id);
-const names = (files ?? []).map((f) => `${id}/${f.name}`);
+// Paged: storage lists at most 100 names per call, and per-render keying
+// can push a much-rendered song past that. A takedown that misses page two
+// is not a takedown.
+const names = [];
+for (let offset = 0; ; offset += 100) {
+  const { data: page, error: listErr } = await supabase.storage
+    .from("clips")
+    .list(id, { limit: 100, offset });
+  if (listErr) throw new Error(`flag set but clip listing failed: ${listErr.message}`);
+  names.push(...(page ?? []).map((f) => `${id}/${f.name}`));
+  if (!page || page.length < 100) break;
+}
 if (names.length) {
   const { error: rmErr } = await supabase.storage.from("clips").remove(names);
   if (rmErr) throw new Error(`flag set but clip delete failed: ${rmErr.message}`);
 }
+
+// The job rows still point at the files we just deleted; clear them so the
+// share page and dashboard stop advertising dead videos (and a --restore
+// shows an honest empty state until the artist re-renders).
+const { error: urlErr } = await supabase
+  .from("render_jobs")
+  .update({ clip_urls: null })
+  .eq("submission_id", id);
+if (urlErr) throw new Error(`files deleted but clearing job urls failed: ${urlErr.message}`);
 
 console.log(
   `took down "${sub.song_title}": share page hidden, ${names.length} public file(s) deleted (reason: ${reason})`

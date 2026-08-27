@@ -81,6 +81,7 @@ export default function RenderControls({
     initialVibe && allowedVibes.includes(initialVibe) ? initialVibe : "hyperpop"
   );
   const [lockedNote, setLockedNote] = useState("");
+  const [formats, setFormats] = useState<string[]>(["vertical"]);
   const [clipStart, setClipStart] = useState(0);
   const [clipLength, setClipLength] = useState(15);
   /** Real decoded song length, once HookPicker knows it. */
@@ -166,7 +167,7 @@ export default function RenderControls({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           submissionId,
-          formats: ["vertical", "square", "wide"],
+          formats,
           clipStartSeconds: clipStart,
           durationSeconds: clipLength,
           vibe,
@@ -177,7 +178,9 @@ export default function RenderControls({
       setJob({
         id: data.id,
         status: "queued",
-        formats: ["vertical", "square", "wide"],
+        // An already-running job keeps its own formats; the first status poll
+        // fills them in. Claiming ours here would promise the wrong clips.
+        formats: data.alreadyQueued ? [] : formats,
         attempts: 0,
         max_attempts: 3,
         error: null,
@@ -193,7 +196,7 @@ export default function RenderControls({
     } finally {
       setStarting(false);
     }
-  }, [submissionId, vibe, clipStart, clipLength]);
+  }, [submissionId, vibe, clipStart, clipLength, formats]);
 
   if (active && job) {
     const ready = job.clip_urls ?? [];
@@ -203,7 +206,7 @@ export default function RenderControls({
           <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-cyan" />
           {job.status === "rendering"
             ? ready.length
-              ? `Rendering… ${ready.length} of ${job.formats.length} ready`
+              ? `Rendering… ${ready.length} of ${job.formats.length || "?"} ready`
               : "Rendering your clips…"
             : "Queued…"}
           {job.attempts > 1 ? (
@@ -314,6 +317,57 @@ export default function RenderControls({
             onChange={setClipStart}
             onDuration={setSongSeconds}
           />
+
+          <div>
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <p className="text-xs font-medium">Formats</p>
+              <span className="text-[11px] text-muted">
+                {formats.length === 1 ? "fastest" : `${formats.length} renders`}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {(["vertical", "square", "wide"] as const).map((f) => {
+                const on = formats.includes(f);
+                return (
+                  <button
+                    key={f}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() =>
+                      setFormats((cur) =>
+                        cur.includes(f)
+                          ? cur.length > 1
+                            ? cur.filter((x) => x !== f)
+                            : cur // never zero formats
+                          : [...cur, f]
+                      )
+                    }
+                    className={`rounded-lg border px-3 py-1.5 text-xs transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan ${
+                      on
+                        ? "border-cyan bg-surface text-foreground"
+                        : "border-borderline text-muted hover:border-cyan hover:text-foreground"
+                    }`}
+                  >
+                    {FORMAT_LABELS[f]}
+                  </button>
+                );
+              })}
+              {formats.length < 3 ? (
+                <button
+                  type="button"
+                  onClick={() => setFormats(["vertical", "square", "wide"])}
+                  className="rounded-lg px-2 py-1.5 text-xs text-muted transition hover:text-foreground"
+                >
+                  All three
+                </button>
+              ) : null}
+            </div>
+            <p className="mt-1.5 text-[11px] text-muted">
+              One format renders fastest. Every render costs one export whether
+              it&apos;s one format or all three — so if you want them all, take
+              them in one go.
+            </p>
+          </div>
 
           <div>
             <div className="mb-1.5 flex items-baseline justify-between">

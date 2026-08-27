@@ -98,6 +98,7 @@ async function runJob(job) {
   }, HEARTBEAT_MS);
 
   const artifacts = [];
+  const uploadedPaths = [];
   try {
     const { data: sub, error: subErr } = await supabase
       .from("submissions")
@@ -166,7 +167,13 @@ async function runJob(job) {
       log: (m) => log(`   ${m}`),
       onFormat: async ({ format, outFile }) => {
         artifacts.push(outFile);
-        const [u] = await uploadClips(supabase, sub.id, [{ format, outFile }]);
+        const prefix = String(job.id).split("-")[0];
+        const [u] = await uploadClips(supabase, sub.id, [{ format, outFile }], {
+          // Each render keeps its own files; the first uuid segment is unique
+          // enough within one submission and keeps names readable.
+          prefix,
+        });
+        uploadedPaths.push(`${sub.id}/${prefix}-${format}.mp4`);
         urls.push(u);
         rmSync(outFile, { force: true });
         const kept = await writeFenced({ clip_urls: urls });
@@ -209,13 +216,21 @@ async function runJob(job) {
   } catch (e) {
     const message = String(e?.message ?? e).slice(0, 500);
     const exhausted = job.attempts >= job.max_attempts;
-    await writeFenced({
+    const kept = await writeFenced({
       // Leave it queued while retries remain; claim_render_job picks it up again
       status: exhausted ? "failed" : "queued",
       error: message,
       worker_id: null,
+      // A permanently failed job must not leave half a render published
+      clip_urls: exhausted ? null : undefined,
       finished_at: exhausted ? new Date().toISOString() : null,
     });
+    // Only if we still owned the job: a reclaimed job's new owner shares the
+    // same file prefix, and deleting under it would destroy a good render.
+    if (kept && exhausted && uploadedPaths.length) {
+      await supabase.storage.from("clips").remove(uploadedPaths).catch(() => {});
+      log(`   cleaned ${uploadedPaths.length} partial upload(s) from the failed job`);
+    }
     lease = null;
     log(`✖ job ${job.id} ${exhausted ? "FAILED permanently" : "failed, will retry"}: ${message}`);
   } finally {

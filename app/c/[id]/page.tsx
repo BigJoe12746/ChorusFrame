@@ -8,11 +8,15 @@ import { LEGAL_CONTACT } from "@/app/legal/contact";
 export const dynamic = "force-dynamic";
 
 const FORMATS: Record<string, { label: string; where: string; ratio: string }> = {
-  "sample-vertical.mp4": { label: "9:16 vertical", where: "TikTok, Reels, Shorts", ratio: "9 / 16" },
-  "sample-square.mp4": { label: "1:1 square", where: "Feed posts", ratio: "1 / 1" },
-  "sample-wide.mp4": { label: "16:9 wide", where: "YouTube", ratio: "16 / 9" },
-  "sample.mp4": { label: "Clip", where: "", ratio: "9 / 16" },
+  vertical: { label: "9:16 vertical", where: "TikTok, Reels, Shorts", ratio: "9 / 16" },
+  square: { label: "1:1 square", where: "Feed posts", ratio: "1 / 1" },
+  wide: { label: "16:9 wide", where: "YouTube", ratio: "16 / 9" },
+  sample: { label: "Clip", where: "", ratio: "9 / 16" },
 };
+
+/** "abc123-vertical.mp4" or legacy "sample-vertical.mp4" -> "vertical". */
+const formatOfName = (name: string) =>
+  name.replace(/\.mp4$/, "").split("-").pop() ?? "clip";
 
 /** Only what a public page should know — never the email or the master audio. */
 async function loadClips(id: string) {
@@ -43,17 +47,38 @@ async function loadClips(id: string) {
   }
   if (!sub || sub.removed_at) return null;
 
-  const { data: files } = await admin.storage.from("clips").list(id);
-  const clips = (files ?? [])
-    .filter((f) => f.name.endsWith(".mp4"))
-    .map((f) => ({
-      name: f.name,
-      // The clips carry a year-long CDN lifetime, so the URL must change when
-      // the file does — updated_at is exactly that fingerprint.
-      url: `${admin.storage.from("clips").getPublicUrl(`${id}/${f.name}`).data.publicUrl}?v=${encodeURIComponent(
-        f.updated_at ?? f.created_at ?? ""
-      )}`,
-    }));
+  // The newest finished render of EACH format. Merging across renders means
+  // a quick vertical-only re-render can't shrink a page an artist already
+  // shared — followers keep seeing the square and wide from the last full run.
+  let clips: { format: string; url: string }[] = [];
+  const { data: doneJobs } = await admin
+    .from("render_jobs")
+    .select("clip_urls")
+    .eq("submission_id", id)
+    .eq("status", "done")
+    .order("finished_at", { ascending: false })
+    .limit(10);
+  const byFormat = new Map<string, { format: string; url: string }>();
+  for (const j of doneJobs ?? []) {
+    for (const c of (j.clip_urls ?? []) as { format: string; url: string }[]) {
+      if (!byFormat.has(c.format)) byFormat.set(c.format, c);
+    }
+  }
+  clips = [...byFormat.values()];
+  if (!clips.length) {
+    // Legacy songs rendered before jobs carried clip_urls. Stable names only:
+    // a failed job's partial uploads must not surface here.
+    const { data: files } = await admin.storage.from("clips").list(id);
+    clips = (files ?? [])
+      .filter((f) => f.name.endsWith(".mp4") && f.name.startsWith("sample"))
+      .map((f) => ({
+        format: formatOfName(f.name),
+        // Year-long CDN lifetime: the URL must change when the file does.
+        url: `${admin.storage.from("clips").getPublicUrl(`${id}/${f.name}`).data.publicUrl}?v=${encodeURIComponent(
+          f.updated_at ?? f.created_at ?? ""
+        )}`,
+      }));
+  }
   if (!clips.length) return null;
 
   let artwork: string | null = null;
@@ -91,8 +116,9 @@ export default async function ClipPage({ params }: PageProps<"/c/[id]">) {
   if (!data) notFound();
 
   const { sub, clips, artwork } = data;
-  const ordered = clips.sort(
-    (a, b) => Object.keys(FORMATS).indexOf(a.name) - Object.keys(FORMATS).indexOf(b.name)
+  const order = Object.keys(FORMATS);
+  const ordered = [...clips].sort(
+    (a, b) => order.indexOf(a.format) - order.indexOf(b.format)
   );
 
   return (
@@ -135,9 +161,9 @@ export default async function ClipPage({ params }: PageProps<"/c/[id]">) {
 
       <section className="grid gap-6 pb-16 sm:grid-cols-2 lg:grid-cols-3">
         {ordered.map((c) => {
-          const meta = FORMATS[c.name] ?? { label: c.name, where: "", ratio: "9 / 16" };
+          const meta = FORMATS[c.format] ?? { label: c.format, where: "", ratio: "9 / 16" };
           return (
-            <figure key={c.name} className="flex flex-col gap-2">
+            <figure key={c.url} className="flex flex-col gap-2">
               <video
                 src={c.url}
                 controls

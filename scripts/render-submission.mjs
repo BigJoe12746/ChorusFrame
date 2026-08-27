@@ -137,8 +137,24 @@ try {
   });
 
   if (flags.upload) {
-    const urls = await uploadClips(supabase, sub.id, rendered);
+    // Per-run prefix (no dashes — the format is parsed off the last segment),
+    // and a done job row: the dashboard and share page read render history
+    // now, so an upload that isn't in the job table is invisible.
+    const prefix = `manual${Date.now().toString(36)}`;
+    const urls = await uploadClips(supabase, sub.id, rendered, { prefix });
     const primary = urls.find((u) => u.format === "vertical") ?? urls[0];
+    const { error: jobErr } = await supabase.from("render_jobs").insert({
+      submission_id: sub.id,
+      user_id: sub.user_id ?? null,
+      formats: rendered.map((r) => r.format),
+      clip_start_seconds: flags.start,
+      duration_seconds: flags.duration,
+      status: "done",
+      attempts: 1,
+      clip_urls: urls,
+      finished_at: new Date().toISOString(),
+    });
+    if (jobErr) throw new Error(`Recording the render failed: ${jobErr.message}`);
     const { error: updErr } = await supabase
       .from("submissions")
       .update({ sample_clip_url: primary.url, status: "clip_ready" })

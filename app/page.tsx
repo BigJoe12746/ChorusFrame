@@ -112,7 +112,10 @@ export default function Home() {
           Same song. <span className="brand-text">Three of ten templates.</span>
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-center text-muted">
-          Rendered by the exact pipeline your songs go through — nothing staged.
+          Rendered by the exact pipeline your songs go through — nothing staged.{" "}
+          <Link href="/examples" className="text-cyan underline underline-offset-4 transition hover:text-foreground">
+            See all six examples
+          </Link>
         </p>
         <div className="mx-auto mt-8 grid max-w-3xl grid-cols-3 gap-3 sm:gap-4">
           {[
@@ -232,6 +235,9 @@ export default function Home() {
         <Logo size={26} />
         <p>The video studio built for music releases. · © 2026 ChorusFrame</p>
         <nav className="flex flex-wrap justify-center gap-4">
+          <Link href="/examples" className="transition hover:text-foreground">
+            Examples
+          </Link>
           <Link href="/pricing" className="transition hover:text-foreground">
             Pricing
           </Link>

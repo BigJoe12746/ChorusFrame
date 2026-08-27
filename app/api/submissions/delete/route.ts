@@ -52,12 +52,24 @@ export async function POST(req: Request) {
   }
 
   // Clips first. If this fails we stop, rather than deleting the row and
-  // orphaning the files with nothing left pointing at them.
-  const { data: clips } = await supabase.storage.from("clips").list(sub.id);
-  if (clips?.length) {
-    const { error } = await supabase.storage
+  // orphaning the files with nothing left pointing at them. The listing is
+  // PAGED: storage returns at most 100 names per call, and per-render keying
+  // means a much-rendered song can hold more than that — a single unpaged
+  // list would silently orphan everything past the first page.
+  const clipNames: string[] = [];
+  for (let offset = 0; ; offset += 100) {
+    const { data: page, error: listErr } = await supabase.storage
       .from("clips")
-      .remove(clips.map((f) => `${sub.id}/${f.name}`));
+      .list(sub.id, { limit: 100, offset });
+    if (listErr) {
+      console.error("[delete] clips list:", listErr);
+      return NextResponse.json({ error: "Could not remove the clips" }, { status: 500 });
+    }
+    clipNames.push(...(page ?? []).map((f) => `${sub.id}/${f.name}`));
+    if (!page || page.length < 100) break;
+  }
+  if (clipNames.length) {
+    const { error } = await supabase.storage.from("clips").remove(clipNames);
     if (error) {
       console.error("[delete] clips:", error);
       return NextResponse.json({ error: "Could not remove the clips" }, { status: 500 });
@@ -81,6 +93,6 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    deleted: { song: sub.song_title, clips: clips?.length ?? 0, files: sources.length },
+    deleted: { song: sub.song_title, clips: clipNames.length, files: sources.length },
   });
 }
