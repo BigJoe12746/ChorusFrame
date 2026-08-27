@@ -16,6 +16,7 @@ import { getLayout } from "./layout";
 import { BRAND_PALETTE, extractPalette, type Palette } from "./palette";
 import { DEFAULT_VIBE, getVibe } from "./vibes";
 import { beatHitAt } from "../lib/audio-analysis";
+import { barLevels } from "./bars";
 import { activeWordIndex, sceneAt, wordSpans } from "./karaoke";
 
 export type SampleClipProps = {
@@ -394,7 +395,12 @@ export const SampleClip: React.FC<SampleClipProps> = ({
         )
       : 1;
 
-  const bars = freq.slice(2, 2 + L.bars.count);
+  // Log-spaced bands, not a linear slice — a linear slice leaves everything
+  // past the first third of the bars sitting on silence (see remotion/bars.ts).
+  // Finer bins than the bass read: at 64 the low bands are too coarse for
+  // neighbouring bars to tell apart.
+  const freqFine = visualizeAudio({ audioData, frame: mediaFrame, fps, numberOfSamples: 128 });
+  const bars = barLevels(freqFine, L.bars.count);
   const barWidth = L.bars.width / bars.length;
 
   const progress = Math.min(frame / musicFrames, 1);
@@ -652,8 +658,7 @@ export const SampleClip: React.FC<SampleClipProps> = ({
             opacity: V.bars.opacity,
           }}
         >
-          {bars.map((v, i) => {
-            const level = Math.min(1, Math.pow(v * 4.5, 0.75));
+          {bars.map((level, i) => {
             const t = i / Math.max(1, bars.length - 1);
             const color = t < 0.5 ? palette.primary : palette.secondary;
             const w = barWidth * V.bars.thickness;
@@ -680,8 +685,10 @@ export const SampleClip: React.FC<SampleClipProps> = ({
             }
 
             if (V.bars.style === "line") {
-              // A thin symmetric trace — reads as an instrument readout
-              const h = Math.max(2, level * L.bars.height * 0.82);
+              // A thin trace that reads as an instrument readout. The resting
+              // height is a visible line, not a vanishing point — a readout
+              // that disappears between hits looks broken, not minimal.
+              const h = Math.max(2, (0.05 + level * 0.85) * L.bars.height);
               return (
                 <div
                   key={i}

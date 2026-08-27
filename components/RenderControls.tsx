@@ -75,17 +75,30 @@ export default function RenderControls({
   const [vibe, setVibe] = useState(initialVibe || "hyperpop");
   const [clipStart, setClipStart] = useState(0);
   const [clipLength, setClipLength] = useState(15);
+  /** Real decoded song length, once HookPicker knows it. */
+  const [songSeconds, setSongSeconds] = useState<number | null>(null);
   const [picking, setPicking] = useState(autoOpen);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   /** Status reads keep failing — say so rather than spinning silently. */
   const [stale, setStale] = useState(false);
 
+  // The render clamps an overlong clip window to the real song length in
+  // calculateMetadata; the preview has no such hook, so mirror the clamp here
+  // or its tail plays frozen bars over silence.
+  const previewLength = useMemo(
+    () =>
+      songSeconds === null
+        ? clipLength
+        : Math.max(1, Math.min(clipLength, songSeconds - clipStart)),
+    [songSeconds, clipLength, clipStart]
+  );
+
   // Saved timings are song-absolute; the preview needs them clip-relative —
   // the same windowing the worker applies, so preview and export agree.
   const previewTiming = useMemo(
-    () => windowLyrics(savedTimings, clipStart, clipLength),
-    [savedTimings, clipStart, clipLength]
+    () => windowLyrics(savedTimings, clipStart, previewLength),
+    [savedTimings, clipStart, previewLength]
   );
 
   const jobId = job?.id ?? null;
@@ -255,7 +268,7 @@ export default function RenderControls({
               artistName={artistName}
               lyrics={lyrics}
               clipStart={clipStart}
-              duration={clipLength}
+              duration={previewLength}
               vibe={vibe}
               beatGrid={beatGrid}
               lyricTiming={previewTiming}
@@ -290,6 +303,7 @@ export default function RenderControls({
             start={clipStart}
             duration={clipLength}
             onChange={setClipStart}
+            onDuration={setSongSeconds}
           />
 
           <div>

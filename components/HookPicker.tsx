@@ -27,12 +27,19 @@ export default function HookPicker({
   start,
   duration,
   onChange,
+  onDuration,
 }: {
   submissionId: string;
   audioUrl: string | null;
   start: number;
   duration: number;
   onChange: (start: number) => void;
+  /**
+   * Reports the real decoded song length. The preview needs it: renders clamp
+   * an overlong clip window in calculateMetadata, and without this the player
+   * can't do the same — its tail would show frozen bars over silence.
+   */
+  onDuration?: (seconds: number) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -77,6 +84,7 @@ export default function HookPicker({
         const max = Math.max(...out, 0.0001);
         setPeaks(out.map((p) => p / max));
         setAudioDuration(audio.duration);
+        onDuration?.(audio.duration);
 
         // Same samples, second use: find the loudest sustained stretch and
         // open there. The old default of 0:00 was the intro of most tracks.
@@ -113,10 +121,11 @@ export default function HookPicker({
     return () => {
       live = false;
     };
-    // Intentionally keyed on the URL alone. Adding `duration` or `onChange`
-    // would re-run the decode — a second download of the whole song — every
-    // time the artist changed clip length. The suggestion is computed once
-    // from the length in effect at decode time, which is what we want.
+    // Intentionally keyed on the URL alone. Adding `duration`, `onChange` or
+    // `onDuration` would re-run the decode — a second download of the whole
+    // song — every time the artist changed clip length. The suggestion is
+    // computed once from the length in effect at decode time, which is what
+    // we want.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioUrl]);
 
