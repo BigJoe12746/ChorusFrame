@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import NavAuth from "@/components/NavAuth";
+import { FOUNDING, money } from "@/lib/plans";
 
 const kit = [
   { name: "TikTok / Reels / Shorts", detail: "9:16 vertical, caption-safe zones" },
@@ -19,7 +20,7 @@ const steps = [
   {
     n: "02",
     title: "We read the song",
-    body: "Tempo, beats, sections, and energy changes get detected automatically — the clip opens on your strongest moment.",
+    body: "Tempo, beats, and energy get read automatically — the clip opens on your strongest moment.",
   },
   {
     n: "03",
@@ -40,7 +41,7 @@ const steps = [
 
 const promises = [
   "You always know what an export costs before you run it.",
-  "Failed renders never consume credits.",
+  "Failed renders never consume exports.",
   "Your projects are never deleted out from under you.",
   "Your master audio stays at full quality.",
   "The preview matches the export.",
@@ -89,8 +90,50 @@ export default function Home() {
             and we&apos;ll build it by hand.
           </p>
           <p className="text-xs text-muted">
-            Free plan, no card · Pro is $10 a month when you need more
+            Free plan, no card ·{" "}
+            <Link href="/pricing" className="underline underline-offset-4 transition hover:text-foreground">
+              Pro is $10 a month
+            </Link>{" "}
+            when you need more
           </p>
+          <p className="text-xs text-cyan">
+            <Link href="/pricing" className="underline underline-offset-4">
+              Founding year: the first {FOUNDING.seats.toLocaleString()} artists get Pro
+              for {money(FOUNDING.priceCents)} — and keep that price
+            </Link>
+          </p>
+        </div>
+      </section>
+
+      {/* The product's output, not a description of it. Same demo song,
+          three of the ten templates — muted loops, tap for sound. */}
+      <section className="py-12">
+        <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
+          Same song. <span className="brand-text">Three of ten templates.</span>
+        </h2>
+        <p className="mx-auto mt-3 max-w-xl text-center text-muted">
+          Rendered by the exact pipeline your songs go through — nothing staged.
+        </p>
+        <div className="mx-auto mt-8 grid max-w-3xl grid-cols-3 gap-3 sm:gap-4">
+          {[
+            { id: "hyperpop", label: "Hyperpop" },
+            { id: "anime", label: "Dark anime" },
+            { id: "minimal", label: "Minimal" },
+          ].map((d) => (
+            <figure key={d.id} className="flex flex-col gap-2">
+              <video
+                src={`/demo/clips/${d.id}.mp4`}
+                autoPlay
+                muted
+                loop
+                playsInline
+                preload="metadata"
+                className="w-full rounded-xl border border-borderline bg-surface"
+                style={{ aspectRatio: "9 / 16" }}
+              />
+              <figcaption className="text-center text-xs text-muted">{d.label}</figcaption>
+            </figure>
+          ))}
         </div>
       </section>
 
@@ -189,6 +232,9 @@ export default function Home() {
         <Logo size={26} />
         <p>The video studio built for music releases. · © 2026 ChorusFrame</p>
         <nav className="flex flex-wrap justify-center gap-4">
+          <Link href="/pricing" className="transition hover:text-foreground">
+            Pricing
+          </Link>
           <Link href="/legal/terms" className="transition hover:text-foreground">
             Terms
           </Link>

@@ -44,6 +44,15 @@ export async function POST(req: Request) {
   if (!songTitle) {
     return NextResponse.json({ error: "Enter a song title" }, { status: 400 });
   }
+  // The upload form can't submit without this box, so its absence here means
+  // the API was called directly — refuse, and record the affirmation below so
+  // the copyright policy's "everyone who uploads confirms..." is auditable.
+  if (body.rightsConfirmed !== true) {
+    return NextResponse.json(
+      { error: "Confirm you hold the rights to this music and artwork" },
+      { status: 400 }
+    );
+  }
   // Paths must sit under the id this request was issued, so a caller can't
   // attach someone else's uploaded audio to their own submission.
   if (!songPath.startsWith(`${id}/`) || (artworkPath && !artworkPath.startsWith(`${id}/`))) {
@@ -86,7 +95,7 @@ export async function POST(req: Request) {
   // (the free-sample flow) keep user_id null and stay service-role-only.
   const user = await getCurrentUser();
 
-  const { error: dbErr } = await supabase.from("submissions").insert({
+  const row = {
     id,
     email,
     artist_name: artistName || null,
@@ -96,7 +105,23 @@ export async function POST(req: Request) {
     artwork_path: art,
     status: "queued",
     user_id: user?.id ?? null,
-  });
+  };
+  // rights_confirmed_at arrives with migration 009. Until it's applied,
+  // retrying without the column keeps uploads working — the affirmation is
+  // still enforced above, just not yet stored.
+  let { error: dbErr } = await supabase
+    .from("submissions")
+    .insert({ ...row, rights_confirmed_at: new Date().toISOString() });
+  if (
+    dbErr &&
+    (dbErr.code === "PGRST204" || dbErr.code === "42703") &&
+    /rights_confirmed_at/.test(dbErr.message)
+  ) {
+    console.warn(
+      "[submissions] rights_confirmed_at column missing — apply supabase/009_trust.sql so affirmations are recorded"
+    );
+    ({ error: dbErr } = await supabase.from("submissions").insert(row));
+  }
 
   if (dbErr) {
     console.error("[submissions] insert failed:", dbErr);

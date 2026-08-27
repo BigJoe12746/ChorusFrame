@@ -58,6 +58,11 @@ export type SampleClipProps = {
    * under it and a music video.
    */
   beatGrid?: { bpm: number; offset: number } | null;
+  /**
+   * The corner watermark. Defaults on — removal is a paid feature, so the
+   * safe default for any caller that forgets to pass it is the free look.
+   */
+  showWatermark?: boolean;
 };
 
 export const FPS = 30;
@@ -230,6 +235,7 @@ export const SampleClip: React.FC<SampleClipProps> = ({
   vibe,
   brand,
   beatGrid,
+  showWatermark = true,
 }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
@@ -721,7 +727,9 @@ export const SampleClip: React.FC<SampleClipProps> = ({
         </div>
       ) : null}
 
-      {/* Watermark — lifted clear of the letterbox bar when there is one */}
+      {/* Watermark — lifted clear of the letterbox bar when there is one.
+          Pro renders without it; that absence is a paid feature. */}
+      {showWatermark ? (
       <div
         style={{
           position: "absolute",
@@ -740,6 +748,7 @@ export const SampleClip: React.FC<SampleClipProps> = ({
           ChorusFrame
         </span>
       </div>
+      ) : null}
 
       {/* Film grain — a static tile, so it costs nothing per frame */}
       {V.grain > 0 ? (

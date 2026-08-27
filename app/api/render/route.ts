@@ -102,6 +102,19 @@ export async function POST(req: Request) {
     );
   }
 
+  // Templates are sold by plan; the picker shows locked vibes but the API is
+  // what actually holds the line.
+  if (vibe && !entitlement.plan.templateIds.includes(vibe)) {
+    return NextResponse.json(
+      {
+        error: `That template is on Pro. ${entitlement.plan.name} includes ${entitlement.plan.templateIds.join(", ")}.`,
+        plan: entitlement.plan.id,
+        upgrade: true,
+      },
+      { status: 402 }
+    );
+  }
+
   // Ownership, per-song dedupe, the abuse ceiling and the insert all happen
   // inside one transaction. Checking in the route and inserting afterwards let
   // several concurrent requests each read "under the limit" and each insert.

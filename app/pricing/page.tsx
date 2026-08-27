@@ -99,8 +99,9 @@ export default function PricingPage() {
         <p className="mx-auto mt-3 max-w-xl text-muted">
           The first {FOUNDING.seats.toLocaleString()} paying artists get a year
           of {PLANS[FOUNDING.planId].name} for <span className="text-foreground">{money(FOUNDING.priceCents)}</span> —
-          about {money(Math.round(FOUNDING.priceCents / 12))} a month. It renews at the
-          standard annual rate, and we&apos;ll tell you before it does.
+          about {money(Math.round(FOUNDING.priceCents / 12))} a month. And founding
+          members <span className="text-foreground">keep that price at renewal</span>,
+          for as long as they stay subscribed. Your price never goes up.
         </p>
       </section>
 
@@ -118,6 +119,7 @@ export default function PricingPage() {
             "Your export count resets in full every month.",
             "We meter only what genuinely costs us; editing and rendering stay generous.",
             "Cancel whenever. Your projects aren't deleted out from under you.",
+            "Annual and founding plans: full refund within 14 days, pro-rated for use.",
             "Price changes come with notice, never a silent renewal.",
           ].map((t) => (
             <li
@@ -131,6 +133,41 @@ export default function PricingPage() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="pb-16">
+        <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
+          Questions artists actually ask
+        </h2>
+        <div className="mx-auto mt-8 flex max-w-3xl flex-col gap-3">
+          {[
+            {
+              q: "Who owns the clips?",
+              a: "You do. Your music, your artwork, your exports — ChorusFrame claims no rights over anything you upload or render. Free clips carry a small watermark and end card; Pro clips carry neither.",
+            },
+            {
+              q: "What counts as an export?",
+              a: "Starting one render of one song, in every format at once, counts as one export. If a render fails, it doesn't count — that's a promise, enforced in the database.",
+            },
+            {
+              q: "Is there a watermark on the Free plan?",
+              a: "Yes — a small corner mark and a 2.6-second end card. Pro removes both.",
+            },
+            {
+              q: "What if I cancel?",
+              a: "You keep access until the end of what you've paid for, and your songs and clips stay in your library on the Free plan's limits. Nothing is deleted out from under you.",
+            },
+            {
+              q: "Refunds?",
+              a: "Monthly plans cancel any time and simply don't renew. Annual and founding plans: full refund within 14 days, pro-rated for exports already used. The details live in the Terms.",
+            },
+          ].map((f) => (
+            <div key={f.q} className="rounded-xl border border-borderline bg-surface p-5">
+              <h3 className="text-sm font-semibold">{f.q}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted">{f.a}</p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <footer className="flex flex-wrap justify-center gap-4 border-t border-borderline py-8 text-center text-xs text-muted">

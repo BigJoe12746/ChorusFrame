@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Logo from "@/components/Logo";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { LEGAL_CONTACT } from "@/app/legal/contact";
 
 export const dynamic = "force-dynamic";
 
@@ -18,19 +19,40 @@ async function loadClips(id: string) {
   const admin = getSupabaseAdmin();
   if (!admin) return null;
 
-  const { data: sub } = await admin
-    .from("submissions")
-    .select("id, song_title, artist_name, artwork_path")
-    .eq("id", id)
-    .maybeSingle();
-  if (!sub) return null;
+  // removed_at is the takedown switch from migration 009; tolerate the
+  // column not existing yet so the page keeps working pre-migration.
+  let sub:
+    | { id: string; song_title: string; artist_name: string | null; artwork_path: string | null; removed_at?: string | null }
+    | null = null;
+  {
+    const withFlag = await admin
+      .from("submissions")
+      .select("id, song_title, artist_name, artwork_path, removed_at")
+      .eq("id", id)
+      .maybeSingle();
+    if (withFlag.error && /removed_at/.test(withFlag.error.message)) {
+      const legacy = await admin
+        .from("submissions")
+        .select("id, song_title, artist_name, artwork_path")
+        .eq("id", id)
+        .maybeSingle();
+      sub = legacy.data;
+    } else {
+      sub = withFlag.data;
+    }
+  }
+  if (!sub || sub.removed_at) return null;
 
   const { data: files } = await admin.storage.from("clips").list(id);
   const clips = (files ?? [])
     .filter((f) => f.name.endsWith(".mp4"))
     .map((f) => ({
       name: f.name,
-      url: admin.storage.from("clips").getPublicUrl(`${id}/${f.name}`).data.publicUrl,
+      // The clips carry a year-long CDN lifetime, so the URL must change when
+      // the file does — updated_at is exactly that fingerprint.
+      url: `${admin.storage.from("clips").getPublicUrl(`${id}/${f.name}`).data.publicUrl}?v=${encodeURIComponent(
+        f.updated_at ?? f.created_at ?? ""
+      )}`,
     }));
   if (!clips.length) return null;
 
@@ -80,7 +102,7 @@ export default async function ClipPage({ params }: PageProps<"/c/[id]">) {
           <Logo size={26} />
         </Link>
         <Link
-          href="/login"
+          href="/upload?from=share"
           className="glow-hover rounded-lg border border-borderline px-4 py-2 text-sm text-muted transition hover:border-cyan hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
         >
           Make your own
@@ -150,10 +172,16 @@ export default async function ClipPage({ params }: PageProps<"/c/[id]">) {
           </Link>{" "}
           — upload a song, get your release clips.
         </p>
-        <nav className="flex gap-4">
+        <nav className="flex flex-wrap justify-center gap-4">
           <Link href="/legal/terms" className="transition hover:text-foreground">Terms</Link>
           <Link href="/legal/privacy" className="transition hover:text-foreground">Privacy</Link>
           <Link href="/legal/copyright" className="transition hover:text-foreground">Copyright</Link>
+          <a
+            href={`mailto:${LEGAL_CONTACT}?subject=Report%20clip%20${sub.id}`}
+            className="transition hover:text-foreground"
+          >
+            Report this clip
+          </a>
         </nav>
       </footer>
     </main>

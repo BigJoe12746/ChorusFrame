@@ -24,6 +24,20 @@ export async function POST(req: Request) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: "Not configured" }, { status: 503 });
 
+  // The kit is a Pro feature — the render pipeline only applies it for Pro,
+  // and letting Free save one that never renders would be a quiet lie.
+  const { data: me } = await supabase
+    .from("profiles")
+    .select("plan")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (me?.plan !== "pro") {
+    return NextResponse.json(
+      { error: "The brand kit is a Pro feature.", upgrade: true },
+      { status: 402 }
+    );
+  }
+
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 

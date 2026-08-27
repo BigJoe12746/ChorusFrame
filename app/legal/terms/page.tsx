@@ -51,8 +51,8 @@ export default function TermsPage() {
 
       <h2>What you get back</h2>
       <p>
-        The clips are yours to use, including commercially. We may show the ChorusFrame
-        end card on clips made on a free plan.
+        The clips are yours to use, including commercially. Clips made on a free plan carry a small
+        ChorusFrame corner mark and end card; paid plans render without them.
       </p>
       <p>
         Finished clips are hosted at public web addresses so they can be shared and
@@ -88,6 +88,22 @@ export default function TermsPage() {
       <p>
         If a render fails, it doesn&apos;t count against your monthly limit — a render
         that produced nothing should never cost you anything.
+      </p>
+
+      <h2>Payments and refunds</h2>
+      <p>
+        Monthly plans can be cancelled at any time from your billing page; you keep
+        access until the end of the period you paid for, and monthly charges
+        aren&apos;t refunded. Annual and founding-year plans can be refunded within
+        14 days of purchase, pro-rated for any exports you&apos;ve already used —
+        email <a href={`mailto:${LEGAL_CONTACT}`}>{LEGAL_CONTACT}</a> and we&apos;ll
+        sort it. If we ever get a charge wrong, tell us and we&apos;ll fix it —
+        that&apos;s not subject to any window.
+      </p>
+      <p>
+        Founding-year members keep their founding price at renewal for as long as
+        they stay subscribed. Other price changes come with notice before they
+        bill, never as a silent renewal.
       </p>
 
       <h2>Ending it</h2>

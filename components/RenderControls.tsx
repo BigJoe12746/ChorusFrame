@@ -55,6 +55,7 @@ export default function RenderControls({
   savedTimings,
   maxClipSeconds,
   planName,
+  allowedVibes,
   autoOpen = false,
 }: {
   submissionId: string;
@@ -69,10 +70,17 @@ export default function RenderControls({
   savedTimings: TimedLine[];
   maxClipSeconds: number;
   planName: string;
+  /** Vibe ids this artist's plan includes; the rest show locked. */
+  allowedVibes: string[];
   autoOpen?: boolean;
 }) {
   const [job, setJob] = useState<RenderJob | null>(initialJob);
-  const [vibe, setVibe] = useState(initialVibe || "hyperpop");
+  // A saved vibe the current plan doesn't include (downgrades, old data) falls
+  // back to hyperpop — every plan has it, and the API would refuse it anyway.
+  const [vibe, setVibe] = useState(() =>
+    initialVibe && allowedVibes.includes(initialVibe) ? initialVibe : "hyperpop"
+  );
+  const [lockedNote, setLockedNote] = useState("");
   const [clipStart, setClipStart] = useState(0);
   const [clipLength, setClipLength] = useState(15);
   /** Real decoded song length, once HookPicker knows it. */
@@ -270,6 +278,7 @@ export default function RenderControls({
               clipStart={clipStart}
               duration={previewLength}
               vibe={vibe}
+              showWatermark={planName !== "Pro"}
               beatGrid={beatGrid}
               lyricTiming={previewTiming}
             />
@@ -366,23 +375,33 @@ export default function RenderControls({
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
               {VIBES.map((v) => {
                 const on = vibe === v.id;
+                const locked = !allowedVibes.includes(v.id);
                 return (
                   <button
                     key={v.id}
                     type="button"
-                    onClick={() => setVibe(v.id)}
-                    title={`${v.label} — ${v.blurb}`}
+                    onClick={() =>
+                      locked
+                        ? setLockedNote(`${v.label} is on Pro — all 10 templates, 60-second clips, no watermark.`)
+                        : (setVibe(v.id), setLockedNote(""))
+                    }
+                    title={locked ? `${v.label} — on Pro` : `${v.label} — ${v.blurb}`}
                     aria-pressed={on}
-                    className="group flex flex-col items-center gap-1 rounded-lg p-1 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+                    className="group relative flex flex-col items-center gap-1 rounded-lg p-1 transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
                   >
                     {/* A 9:16 chip, so the swatch reads as a clip rather than a colour */}
                     <span
                       aria-hidden
                       className={`block h-12 w-full rounded-md border-2 transition ${
                         on ? "border-cyan" : "border-transparent group-hover:border-muted"
-                      }`}
+                      } ${locked ? "opacity-40" : ""}`}
                       style={{ background: `linear-gradient(150deg, ${v.from}, ${v.to})` }}
                     />
+                    {locked ? (
+                      <span className="absolute right-1.5 top-1.5 rounded bg-black/60 px-1 text-[9px] font-semibold uppercase tracking-wide text-cyan">
+                        Pro
+                      </span>
+                    ) : null}
                     <span
                       className={`w-full text-center text-[11px] leading-tight ${
                         on ? "font-semibold text-foreground" : "text-muted"
@@ -394,6 +413,14 @@ export default function RenderControls({
                 );
               })}
             </div>
+            {lockedNote ? (
+              <p className="mt-2 text-[11px] text-muted">
+                {lockedNote}{" "}
+                <a href="/dashboard/billing" className="text-cyan underline underline-offset-2">
+                  Go Pro
+                </a>
+              </p>
+            ) : null}
           </div>
 
           <div className="flex gap-2">

@@ -24,6 +24,7 @@ export default function ClipPreview({
   vibe,
   beatGrid,
   lyricTiming,
+  showWatermark = true,
 }: {
   audioUrl: string | null;
   artworkUrl: string | null;
@@ -35,6 +36,8 @@ export default function ClipPreview({
   vibe: string;
   beatGrid: { bpm: number; offset: number } | null;
   lyricTiming: { text: string; start: number; end: number }[];
+  /** Pro previews without the watermark, matching Pro exports. */
+  showWatermark?: boolean;
 }) {
   const inputProps = useMemo(
     () => ({
@@ -53,8 +56,9 @@ export default function ClipPreview({
       vibe,
       brand: null,
       beatGrid,
+      showWatermark,
     }),
-    [audioUrl, artworkUrl, songTitle, artistName, lyrics, clipStart, duration, vibe, beatGrid, lyricTiming]
+    [audioUrl, artworkUrl, songTitle, artistName, lyrics, clipStart, duration, vibe, beatGrid, lyricTiming, showWatermark]
   );
 
   if (!audioUrl) {

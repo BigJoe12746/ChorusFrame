@@ -182,7 +182,11 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
               .filter((f) => f.name.endsWith(".mp4"))
               .map((f) => ({
                 name: f.name,
-                url: admin.storage.from("clips").getPublicUrl(`${s.id}/${f.name}`).data.publicUrl,
+                // Clips cache at the edge for a year; the URL must change when
+                // the file does, or a re-render keeps serving the old clip.
+                url: `${admin.storage.from("clips").getPublicUrl(`${s.id}/${f.name}`).data.publicUrl}?v=${encodeURIComponent(
+                  f.updated_at ?? f.created_at ?? ""
+                )}`,
               }))
           );
         }
@@ -244,15 +248,31 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           />
         </div>
 
-        {/* A kit belongs to the artist, not to a song, so it lives up here */}
+        {/* A kit belongs to the artist, not to a song, so it lives up here.
+            It's a Pro feature: Free sees what it is and where to get it,
+            not a form that saves settings no render will use. */}
         <div className="mt-4">
-          <BrandKit
-            initial={{
-              primary: profile?.brand_primary ?? null,
-              secondary: profile?.brand_secondary ?? null,
-              font: profile?.brand_font ?? null,
-            }}
-          />
+          {plan.brandKit ? (
+            <BrandKit
+              initial={{
+                primary: profile?.brand_primary ?? null,
+                secondary: profile?.brand_secondary ?? null,
+                font: profile?.brand_font ?? null,
+              }}
+            />
+          ) : (
+            <Link
+              href="/dashboard/billing"
+              className="glow-hover flex w-fit items-center gap-2 rounded-lg border border-borderline px-3 py-1.5 text-xs text-muted transition hover:border-cyan hover:text-foreground"
+            >
+              <span
+                aria-hidden
+                className="h-3 w-3 rounded-full"
+                style={{ background: "linear-gradient(135deg, #22dcf5, #7c3aed)" }}
+              />
+              Brand kit — your colours on every render, on Pro
+            </Link>
+          )}
         </div>
 
         {submissions.length > 0 ? (
@@ -391,6 +411,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                         savedTimings={savedTimings.get(s.id) ?? []}
                         maxClipSeconds={plan.maxClipSeconds}
                         planName={plan.name}
+                        allowedVibes={plan.templateIds}
                         autoOpen={s.id === justUploaded}
                       />
                     </div>

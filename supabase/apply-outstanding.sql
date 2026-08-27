@@ -34,7 +34,7 @@ create unique index if not exists profiles_stripe_customer_idx
   where stripe_customer_id is not null;
 
 comment on column public.profiles.plan is
-  'Plan id matching lib/plans.ts: free | creator | creator_ai | teams';
+  'Plan id matching lib/plans.ts: free | pro';
 
 /*
  * Exports an artist has STARTED this calendar month.

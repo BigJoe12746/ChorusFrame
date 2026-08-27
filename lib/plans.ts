@@ -29,10 +29,14 @@ export type Plan = {
   maxClipSeconds: number;
   /** How many of the ten visual directions are available. */
   templates: number;
+  /** Which vibes those are — enforced by the render API, not just printed. */
+  templateIds: string[];
   /** Saved colours and type applied to every render. */
   brandKit: boolean;
   /** Whether the ChorusFrame end card is appended. */
   endCard: boolean;
+  /** Whether the corner watermark renders on clips. */
+  watermark: boolean;
   storageGb: number;
   features: string[];
 };
@@ -50,16 +54,19 @@ export const PLANS: Record<PlanId, Plan> = {
     formats: ["vertical", "square", "wide"],
     maxClipSeconds: 15,
     templates: 3,
+    // One flashy, one clean, one serious — enough range to hear the pitch.
+    templateIds: ["hyperpop", "minimal", "cinematic"],
     brandKit: false,
     endCard: true,
+    watermark: true,
     storageGb: 2,
     features: [
       "5 exports a month",
       "9:16, 1:1 and 16:9 from one upload",
       "Clips up to 15 seconds",
-      "3 templates",
+      "3 templates: Hyperpop, Minimal, Cinematic",
       "Hook detection and tap-to-sync lyrics",
-      "ChorusFrame end card",
+      "ChorusFrame watermark and end card",
     ],
   },
   pro: {
@@ -73,23 +80,30 @@ export const PLANS: Record<PlanId, Plan> = {
     formats: ["vertical", "square", "wide"],
     maxClipSeconds: 60,
     templates: 10,
+    templateIds: [
+      "hyperpop", "anime", "dreamy", "cinematic", "reggae",
+      "minimal", "poster", "typographic", "retro", "neon",
+    ],
     brandKit: true,
     endCard: false,
+    watermark: false,
     storageGb: 100,
     features: [
       "100 exports a month",
       "Clips up to 60 seconds",
       "All 10 templates",
       "Your brand kit on every render",
-      "No end card",
-      "100GB of storage",
+      "No watermark, no end card",
     ],
   },
 };
 
 /**
- * Founding-year offer: the business plan promises the first 1,000 paying
- * customers a discounted first year, renewing at the standard rate with notice.
+ * Founding offer: the first 1,000 paying customers get Pro at this price and
+ * KEEP it at renewal for as long as they stay subscribed. "Your price never
+ * goes up" is the strongest loyalty promise a small brand can make, and it
+ * matches what supabase/006_billing.sql records. (Decided August 2026 —
+ * previously this comment and the schema contradicted each other.)
  */
 export const FOUNDING = {
   priceCents: 5999,

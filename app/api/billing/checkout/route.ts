@@ -69,8 +69,9 @@ export async function POST(req: Request) {
       ? { unit_amount: pro.monthly, recurring: { interval: "month" as const } }
       : interval === "annual"
         ? { unit_amount: pro.annual, recurring: { interval: "year" as const } }
-        : // Founding: a discounted first year; renewal moves to the standard
-          // rate with notice, which is handled at renewal time, not here.
+        : // Founding: $59.99/yr, and it RENEWS at $59.99 — founding members
+          // keep this price for as long as they stay subscribed. That promise
+          // is in the Terms; do not add a renewal-time price bump.
           { unit_amount: FOUNDING.priceCents, recurring: { interval: "year" as const } };
 
   const session = await stripe.checkout.sessions.create({

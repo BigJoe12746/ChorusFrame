@@ -115,6 +115,34 @@ async function runJob(job) {
       return;
     }
 
+    // What the artist's plan buys, resolved at render time. Mirrors
+    // lib/plans.ts (which this worker can't import — it's TypeScript): Pro
+    // drops the end card and watermark and renders with the brand kit.
+    // Anonymous submissions have no owner and get the free look.
+    let isPro = false;
+    if (sub.user_id) {
+      const { data: owner, error: ownerErr } = await supabase
+        .from("profiles")
+        .select("plan")
+        .eq("id", sub.user_id)
+        .maybeSingle();
+      // A flaky read must retry the job, not quietly render a paying
+      // artist's clip with the free watermark.
+      if (ownerErr) throw new Error(`loading owner plan failed: ${ownerErr.message}`);
+      isPro = owner?.plan === "pro";
+    }
+    log(`   plan: ${isPro ? "pro (no end card, no watermark, brand kit)" : "free"}`);
+
+    // The render API gates the vibe in the request, but the pipeline falls
+    // back to the vibe saved on the song — which can be a Pro template from
+    // before a downgrade. Mirror lib/plans.ts free.templateIds here.
+    const FREE_VIBES = ["hyperpop", "minimal", "cinematic"];
+    let vibe = job.vibe || sub.vibe || null;
+    if (!isPro && vibe && !FREE_VIBES.includes(vibe)) {
+      log(`   vibe ${vibe} is Pro-only; rendering hyperpop for a free plan`);
+      vibe = "hyperpop";
+    }
+
     /*
      * Progressive delivery: each format uploads the moment it renders and is
      * written onto the job (fenced) while status stays "rendering", so the
@@ -129,8 +157,11 @@ async function runJob(job) {
       formats: job.formats,
       start: Number(job.clip_start_seconds),
       duration: Number(job.duration_seconds),
+      endCard: !isPro,
+      watermark: !isPro,
+      allowBrandKit: isPro,
       endCardUrl: env.NEXT_PUBLIC_SITE_URL || "",
-      vibe: job.vibe,
+      vibe,
       env,
       log: (m) => log(`   ${m}`),
       onFormat: async ({ format, outFile }) => {

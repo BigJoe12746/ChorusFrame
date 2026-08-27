@@ -213,6 +213,10 @@ export async function renderFormats({
   start = 0,
   duration = 15,
   endCard = true,
+  // Watermark removal and the brand kit are paid features; default to the
+  // free behavior so a caller that forgets is honest rather than generous.
+  watermark = true,
+  allowBrandKit = true,
   artworkColors = true,
   endCardUrl = "",
   vibe = null,
@@ -237,9 +241,10 @@ export async function renderFormats({
     undefined
   );
 
-  // The artist's saved identity, so their fifth release looks like their first
+  // The artist's saved identity, so their fifth release looks like their first.
+  // Pro-only: the kit saves for anyone, but only a paid plan renders with it.
   let brand = null;
-  if (sub.user_id) {
+  if (allowBrandKit && sub.user_id) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("brand_primary, brand_secondary, brand_font")
@@ -293,6 +298,7 @@ export async function renderFormats({
     clipStartSeconds: start,
     durationSeconds: duration,
     showEndCard: endCard,
+    showWatermark: watermark,
     endCardUrl,
     useArtworkColors: artworkColors,
     // The composition falls back to its default for an unknown id, so a bad
@@ -401,7 +407,9 @@ export async function uploadClips(supabase, submissionId, rendered, now = Date.n
     const { error } = await supabase.storage.from("clips").upload(clipPath, readFileSync(outFile), {
       contentType: "video/mp4",
       upsert: true,
-      cacheControl: "60",
+      // A year at the edge: re-renders bust via ?v= on every consumer,
+        // so immutable caching is safe and cuts share-page egress ~3x.
+        cacheControl: "31536000",
     });
     if (error) throw new Error(`uploading ${format} failed: ${error.message}`);
     const { data: pub } = supabase.storage.from("clips").getPublicUrl(clipPath);

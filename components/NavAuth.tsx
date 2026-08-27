@@ -35,6 +35,12 @@ export default function NavAuth() {
 
   return (
     <div className="flex items-center gap-3 text-sm">
+      <Link
+        href="/pricing"
+        className="glow-hover rounded-lg px-2 py-2 text-muted hover:text-foreground"
+      >
+        Pricing
+      </Link>
       {signedIn ? (
         <Link
           href="/dashboard"

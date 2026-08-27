@@ -121,6 +121,9 @@ export default function UploadPage() {
           lyrics: String(data.get("lyrics") ?? ""),
           songPath: slots.song.path,
           artworkPath: hasArt ? slots.artwork.path : null,
+          // The terms' indemnity leans on this affirmation, so it's recorded
+          // server-side, not just required client-side.
+          rightsConfirmed: data.get("rights") === "on",
         }),
       });
       const finished = await finishRes.json();
@@ -310,6 +313,7 @@ export default function UploadPage() {
             <label className="flex items-start gap-3 text-sm text-muted">
               <input
                 type="checkbox"
+                name="rights"
                 required
                 className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--violet-strong)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
               />
