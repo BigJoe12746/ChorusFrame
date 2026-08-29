@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Logo from "@/components/Logo";
+import SiteHeader from "@/components/SiteHeader";
 import UpgradePanel from "@/components/UpgradePanel";
 import { FOUNDING, PLANS, getPlan, money } from "@/lib/plans";
 import { getSupabaseAdmin, getSupabaseServer } from "@/lib/supabase";
@@ -50,21 +50,16 @@ export default async function BillingPage({ searchParams }: PageProps<"/dashboar
     : null;
 
   return (
+    <>
+    <SiteHeader>
+      <Link
+        href="/dashboard"
+        className="rounded-lg text-sm text-muted transition hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan"
+      >
+        ← Back to your songs
+      </Link>
+    </SiteHeader>
     <main className="mx-auto w-full max-w-3xl flex-1 px-6">
-      <header className="flex items-center justify-between py-6">
-        <Link
-          href="/"
-          className="inline-flex rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan"
-        >
-          <Logo size={26} />
-        </Link>
-        <Link
-          href="/dashboard"
-          className="rounded-lg text-sm text-muted transition hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan"
-        >
-          ← Back to your songs
-        </Link>
-      </header>
 
       <section className="py-8">
         <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
@@ -149,5 +144,6 @@ export default async function BillingPage({ searchParams }: PageProps<"/dashboar
         </p>
       </section>
     </main>
+    </>
   );
 }

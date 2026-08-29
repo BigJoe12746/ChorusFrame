@@ -217,7 +217,7 @@ function LoginForm() {
         <button
           type="submit"
           disabled={state === "sending"}
-          className="glow-hover-strong brand-gradient rounded-xl px-6 py-3.5 font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan disabled:opacity-60"
+          className="glow-hover-strong brand-gradient rounded-full px-6 py-3.5 font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan disabled:opacity-60"
         >
           {state === "sending"
             ? mode === "password"

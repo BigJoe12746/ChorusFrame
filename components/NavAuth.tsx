@@ -50,7 +50,7 @@ export default function NavAuth() {
       {signedIn ? (
         <Link
           href="/dashboard"
-          className="glow-hover rounded-lg border border-borderline px-4 py-2 text-muted hover:border-cyan hover:text-foreground"
+          className="glow-hover rounded-full border border-borderline px-4 py-2 text-muted hover:border-cyan hover:text-foreground"
         >
           Your songs
         </Link>
@@ -65,7 +65,7 @@ export default function NavAuth() {
           {authConfigured ? (
             <Link
               href="/login"
-              className="glow-hover rounded-lg border border-borderline px-4 py-2 font-medium text-foreground hover:border-cyan"
+              className="glow-hover rounded-full border border-borderline px-4 py-2 font-medium text-foreground hover:border-cyan"
             >
               Log in
             </Link>

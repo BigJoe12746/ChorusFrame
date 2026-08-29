@@ -499,7 +499,7 @@ export default function RenderControls({
               onClick={start}
               disabled={starting}
               data-render-submit
-              className="glow-hover-strong brand-gradient rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+              className="glow-hover-strong brand-gradient rounded-full px-4 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
             >
               {starting ? "Starting…" : "Start render"}
             </button>
@@ -515,7 +515,7 @@ export default function RenderControls({
       ) : (
         <button
           onClick={() => setPicking(true)}
-          className="glow-hover self-start rounded-lg border border-cyan/50 px-3.5 py-1.5 text-xs font-semibold text-cyan transition hover:border-cyan hover:bg-surface-raised"
+          className="glow-hover self-start rounded-full border border-cyan/50 px-4 py-1.5 text-xs font-semibold text-cyan transition hover:border-cyan hover:bg-surface-raised"
         >
           {job?.status === "done" || job?.status === "failed"
             ? "Render another vibe"

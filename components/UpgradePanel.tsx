@@ -51,7 +51,7 @@ export default function UpgradePanel({
         <button
           onClick={() => go("/api/billing/portal")}
           disabled={busy !== null}
-          className="self-start rounded-xl border border-borderline px-5 py-2.5 text-sm font-semibold transition hover:border-cyan disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+          className="self-start rounded-full border border-borderline px-5 py-2.5 text-sm font-semibold transition hover:border-cyan disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
         >
           {busy ? "Opening…" : "Manage billing"}
         </button>
@@ -69,14 +69,14 @@ export default function UpgradePanel({
         <button
           onClick={() => go("/api/billing/checkout", { interval: "monthly" })}
           disabled={busy !== null}
-          className="glow-hover-strong brand-gradient rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+          className="glow-hover-strong brand-gradient rounded-full px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
         >
           {monthlyLabel}
         </button>
         <button
           onClick={() => go("/api/billing/checkout", { interval: "annual" })}
           disabled={busy !== null}
-          className="glow-hover rounded-xl border border-borderline px-5 py-2.5 text-sm font-semibold transition hover:border-cyan disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+          className="glow-hover rounded-full border border-borderline px-5 py-2.5 text-sm font-semibold transition hover:border-cyan disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
         >
           {annualLabel}
         </button>
@@ -86,7 +86,7 @@ export default function UpgradePanel({
         <button
           onClick={() => go("/api/billing/checkout", { interval: "founding" })}
           disabled={busy !== null}
-          className="glow-hover self-start rounded-xl border border-cyan/50 px-5 py-2.5 text-sm font-semibold text-cyan transition hover:border-cyan disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+          className="glow-hover self-start rounded-full border border-cyan/50 px-5 py-2.5 text-sm font-semibold text-cyan transition hover:border-cyan disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
         >
           {foundingLabel}
           {foundingLeft !== null ? (

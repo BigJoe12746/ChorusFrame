@@ -6,7 +6,7 @@
   --background: #080b16; /* midnight navy, near-black */
   --surface: #0e1326;
   --surface-raised: #151b33;
-  --border: #232b4a;
+  --border: rgba(139, 147, 181, 0.16); /* hairline, not a drawn box */
   --foreground: #eef0f8;
   --muted: #8b93b5;
   --cyan: #22dcf5; /* electric cyan — signal, energy */
@@ -91,4 +91,23 @@ body {
     0 0 0 1px rgba(34, 220, 245, 0.5),
     0 0 22px rgba(34, 220, 245, 0.35),
     0 0 60px rgba(124, 58, 237, 0.3);
+}
+
+/*
+ * Frosted navigation ground. The blur itself comes from Tailwind's
+ * backdrop-blur utilities — a hand-written backdrop-filter was stripped by
+ * the CSS pipeline in production.
+ */
+.glass {
+  background: rgba(8, 11, 22, 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

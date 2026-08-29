@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import Logo from "@/components/Logo";
-import NavAuth from "@/components/NavAuth";
+import SiteHeader from "@/components/SiteHeader";
+import SiteFooter from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
   title: "Examples — ChorusFrame",
@@ -25,18 +25,10 @@ const EXAMPLES = [
 
 export default function ExamplesPage() {
   return (
+    <>
+    <SiteHeader />
     <main className="mx-auto w-full max-w-5xl flex-1 px-6">
-      <header className="flex items-center justify-between py-6">
-        <Link
-          href="/"
-          className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan"
-        >
-          <Logo />
-        </Link>
-        <NavAuth />
-      </header>
-
-      <section className="py-12 text-center sm:py-16">
+      <section className="py-16 text-center sm:py-20">
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
           One song. <span className="brand-text">Six directions.</span>
         </h1>
@@ -68,7 +60,7 @@ export default function ExamplesPage() {
       </section>
 
       <section className="mb-16 rounded-3xl border border-borderline bg-gradient-to-br from-surface to-surface-raised p-10 text-center">
-        <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+        <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
           Now with your song.
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-muted">
@@ -78,7 +70,7 @@ export default function ExamplesPage() {
         <div className="mt-8 flex flex-col items-center gap-3">
           <Link
             href="/login?new=1"
-            className="glow-hover-strong brand-gradient inline-block rounded-xl px-8 py-3 font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+            className="glow-hover-strong brand-gradient inline-block rounded-full px-8 py-3 font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
           >
             Start free — upload a song
           </Link>
@@ -91,12 +83,8 @@ export default function ExamplesPage() {
         </div>
       </section>
 
-      <footer className="flex flex-wrap justify-center gap-4 border-t border-borderline py-8 text-center text-xs text-muted">
-        <Link href="/pricing">Pricing</Link>
-        <Link href="/legal/terms">Terms</Link>
-        <Link href="/legal/privacy">Privacy</Link>
-        <Link href="/legal/copyright">Copyright</Link>
-      </footer>
+      <SiteFooter />
     </main>
+    </>
   );
 }

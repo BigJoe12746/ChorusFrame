@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import PricingCompare from "@/components/PricingCompare";
 import Link from "next/link";
-import Logo from "@/components/Logo";
-import NavAuth from "@/components/NavAuth";
+import SiteHeader from "@/components/SiteHeader";
+import SiteFooter from "@/components/SiteFooter";
 import { FOUNDING, PLANS, money } from "@/lib/plans";
 
 export const metadata: Metadata = {
@@ -15,15 +15,10 @@ const ORDER = ["free", "pro"] as const;
 
 export default function PricingPage() {
   return (
+    <>
+    <SiteHeader />
     <main className="mx-auto w-full max-w-5xl flex-1 px-6">
-      <header className="flex items-center justify-between py-6">
-        <Link href="/" className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan">
-          <Logo />
-        </Link>
-        <NavAuth />
-      </header>
-
-      <section className="py-12 text-center sm:py-16">
+      <section className="py-16 text-center sm:py-20">
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
           Pricing that doesn&apos;t{" "}
           <span className="brand-text">surprise you</span>
@@ -80,7 +75,7 @@ export default function PricingPage() {
 
               <Link
                 href={p.monthly === 0 ? "/login?new=1" : "/dashboard/billing"}
-                className={`mt-6 rounded-xl px-4 py-2.5 text-center text-sm font-semibold transition ${
+                className={`mt-6 rounded-full px-4 py-2.5 text-center text-sm font-semibold transition ${
                   featured
                     ? "glow-hover-strong brand-gradient text-white hover:opacity-90"
                     : "glow-hover border border-borderline text-muted hover:border-cyan hover:text-foreground"
@@ -95,7 +90,7 @@ export default function PricingPage() {
 
       {/* Founding offer, straight from the plan */}
       <section className="mb-12 rounded-2xl border border-borderline bg-gradient-to-br from-surface to-surface-raised p-8 text-center">
-        <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Founding year</h2>
+        <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Founding year</h2>
         <p className="mx-auto mt-3 max-w-xl text-muted">
           The first {FOUNDING.seats.toLocaleString()} paying artists get a year
           of {PLANS[FOUNDING.planId].name} for <span className="text-foreground">{money(FOUNDING.priceCents)}</span> —
@@ -109,7 +104,7 @@ export default function PricingPage() {
 
       {/* The promises, restated where they cost us something */}
       <section className="pb-16">
-        <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
+        <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
           What we promise about money
         </h2>
         <ul className="mx-auto mt-8 grid max-w-3xl gap-3 sm:grid-cols-2">
@@ -136,7 +131,7 @@ export default function PricingPage() {
       </section>
 
       <section className="pb-16">
-        <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
+        <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
           Questions artists actually ask
         </h2>
         <div className="mx-auto mt-8 flex max-w-3xl flex-col gap-3">
@@ -170,11 +165,8 @@ export default function PricingPage() {
         </div>
       </section>
 
-      <footer className="flex flex-wrap justify-center gap-4 border-t border-borderline py-8 text-center text-xs text-muted">
-        <Link href="/legal/terms">Terms</Link>
-        <Link href="/legal/privacy">Privacy</Link>
-        <Link href="/legal/copyright">Copyright</Link>
-      </footer>
+      <SiteFooter />
     </main>
+    </>
   );
 }

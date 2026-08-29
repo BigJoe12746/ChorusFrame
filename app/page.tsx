@@ -1,6 +1,6 @@
 import Link from "next/link";
-import Logo from "@/components/Logo";
-import NavAuth from "@/components/NavAuth";
+import SiteHeader from "@/components/SiteHeader";
+import SiteFooter from "@/components/SiteFooter";
 import { FOUNDING, money } from "@/lib/plans";
 
 const kit = [
@@ -52,19 +52,15 @@ const promises = [
 
 export default function Home() {
   return (
+    <>
+    <SiteHeader />
     <main className="mx-auto w-full max-w-5xl flex-1 px-6">
-      {/* Nav */}
-      <header className="flex items-center justify-between py-6">
-        <Logo />
-        <NavAuth />
-      </header>
-
       {/* Hero */}
-      <section className="py-16 text-center sm:py-24">
+      <section className="py-20 text-center sm:py-28">
         <p className="mb-4 text-sm font-medium uppercase tracking-[0.2em] text-cyan">
           For artists, producers &amp; labels
         </p>
-        <h1 className="mx-auto max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
+        <h1 className="mx-auto max-w-3xl text-5xl font-bold leading-[1.05] tracking-[-0.03em] sm:text-7xl">
           Upload one song. Get your entire{" "}
           <span className="brand-text">release campaign</span>.
         </h1>
@@ -76,7 +72,7 @@ export default function Home() {
         <div className="mx-auto mt-10 flex max-w-2xl flex-col items-center gap-4">
           <Link
             href="/login?new=1"
-            className="glow-hover-strong brand-gradient rounded-xl px-8 py-3.5 text-base font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+            className="glow-hover-strong brand-gradient rounded-full px-8 py-3.5 text-base font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
           >
             Start free — upload a song
           </Link>
@@ -91,16 +87,9 @@ export default function Home() {
             and we&apos;ll build it by hand.
           </p>
           <p className="text-xs text-muted">
-            Free plan, no card ·{" "}
-            <Link href="/pricing" className="underline underline-offset-4 transition hover:text-foreground">
-              Pro is $10 a month
-            </Link>{" "}
-            when you need more
-          </p>
-          <p className="text-xs text-cyan">
-            <Link href="/pricing" className="underline underline-offset-4">
-              Founding year: the first {FOUNDING.seats.toLocaleString()} artists get Pro
-              for {money(FOUNDING.priceCents)} — and keep that price
+            Free plan, no card · Founding year:{" "}
+            <Link href="/pricing" className="text-cyan underline underline-offset-4 transition hover:text-foreground">
+              the first {FOUNDING.seats.toLocaleString()} artists get Pro for {money(FOUNDING.priceCents)}, for life
             </Link>
           </p>
         </div>
@@ -109,7 +98,7 @@ export default function Home() {
       {/* The product's output, not a description of it. Same demo song,
           three of the ten templates — muted loops, tap for sound. */}
       <section className="py-12">
-        <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
+        <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
           Same song. <span className="brand-text">Three of ten templates.</span>
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-center text-muted">
@@ -143,7 +132,7 @@ export default function Home() {
 
       {/* How it works */}
       <section className="py-12">
-        <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
+        <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
           How it works
         </h2>
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
@@ -162,7 +151,7 @@ export default function Home() {
 
       {/* What's in the kit */}
       <section className="py-12">
-        <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
+        <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
           One upload. <span className="brand-text">The whole campaign.</span>
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-center text-muted">
@@ -185,7 +174,7 @@ export default function Home() {
 
       {/* Promises */}
       <section className="py-12">
-        <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
+        <h2 className="text-center text-3xl font-bold tracking-tight sm:text-4xl">
           What we promise
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-center text-muted">
@@ -209,7 +198,7 @@ export default function Home() {
 
       {/* CTA */}
       <section className="my-16 rounded-3xl border border-borderline bg-gradient-to-br from-surface to-surface-raised p-10 text-center">
-        <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+        <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
           Releasing soon? Start now.
         </h2>
         <p className="mx-auto mt-3 max-w-xl text-muted">
@@ -219,7 +208,7 @@ export default function Home() {
         <div className="mt-8 flex flex-col items-center gap-3">
           <Link
             href="/login?new=1"
-            className="glow-hover-strong brand-gradient inline-block rounded-xl px-8 py-3 font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
+            className="glow-hover-strong brand-gradient inline-block rounded-full px-8 py-3 font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
           >
             Start free
           </Link>
@@ -232,28 +221,8 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="flex flex-col items-center gap-3 border-t border-borderline py-8 text-center text-xs text-muted">
-        <Logo size={26} />
-        <p>The video studio built for music releases. · © 2026 ChorusFrame</p>
-        <nav className="flex flex-wrap justify-center gap-4">
-          <Link href="/examples" className="transition hover:text-foreground">
-            Examples
-          </Link>
-          <Link href="/pricing" className="transition hover:text-foreground">
-            Pricing
-          </Link>
-          <Link href="/legal/terms" className="transition hover:text-foreground">
-            Terms
-          </Link>
-          <Link href="/legal/privacy" className="transition hover:text-foreground">
-            Privacy
-          </Link>
-          <Link href="/legal/copyright" className="transition hover:text-foreground">
-            Copyright
-          </Link>
-        </nav>
-        <p>By uploading, you confirm you own the rights to your music and artwork.</p>
-      </footer>
+      <SiteFooter />
     </main>
+    </>
   );
 }

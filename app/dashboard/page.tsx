@@ -1,6 +1,6 @@
 import Link from "next/link";
-import Logo from "@/components/Logo";
 import RenderControls, { type RenderJob } from "@/components/RenderControls";
+import SiteHeader from "@/components/SiteHeader";
 import SetPassword from "@/components/SetPassword";
 import BrandKit from "@/components/BrandKit";
 import ShareLink from "@/components/ShareLink";
@@ -241,22 +241,20 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
     .slice(0, 4);
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-6">
-      <header className="flex items-center justify-between py-6">
-        <Link href="/" className="inline-flex rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan">
-          <Logo size={26} />
+    <>
+    <SiteHeader>
+      <div className="flex items-center gap-4 text-sm">
+        <Link href="/upload" className="text-muted transition hover:text-foreground">
+          New upload
         </Link>
-        <div className="flex items-center gap-4 text-sm">
-          <Link href="/upload" className="text-muted transition hover:text-foreground">
-            New upload
-          </Link>
-          <form action="/auth/signout" method="post">
-            <button type="submit" className="rounded-lg text-muted transition hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan">
-              Sign out
-            </button>
-          </form>
-        </div>
-      </header>
+        <form action="/auth/signout" method="post">
+          <button type="submit" className="rounded-lg text-muted transition hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan">
+            Sign out
+          </button>
+        </form>
+      </div>
+    </SiteHeader>
+    <main className="mx-auto w-full max-w-5xl flex-1 px-6">
 
       <section className="py-8">
         <div className="flex flex-wrap items-end justify-between gap-4">
@@ -270,7 +268,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           </div>
           <Link
             href="/upload"
-            className="glow-hover-strong brand-gradient rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+            className="glow-hover-strong brand-gradient rounded-full px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
           >
             Upload a song
           </Link>
@@ -368,7 +366,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
             </p>
             <Link
               href="/upload"
-              className="glow-hover-strong brand-gradient mt-6 inline-block rounded-xl px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+              className="glow-hover-strong brand-gradient mt-6 inline-block rounded-full px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90"
             >
               Upload a song
             </Link>
@@ -507,5 +505,6 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
         )}
       </section>
     </main>
+    </>
   );
 }

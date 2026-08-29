@@ -62,7 +62,7 @@ function Complete() {
         </p>
         <Link
           href="/login"
-          className="glow-hover-strong brand-gradient mt-6 inline-block rounded-xl px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+          className="glow-hover-strong brand-gradient mt-6 inline-block rounded-full px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90"
         >
           Get a new link
         </Link>
