@@ -6,4 +6,4 @@
 export const LEGAL_CONTACT =
   process.env.NEXT_PUBLIC_LEGAL_CONTACT || "set-your-contact-address@example.com";
 
-export const LEGAL_UPDATED = "18 August 2026";
+export const LEGAL_UPDATED = "28 August 2026";

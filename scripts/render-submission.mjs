@@ -158,6 +158,17 @@ try {
       finished_at: new Date().toISOString(),
     });
     if (jobErr) throw new Error(`Recording the render failed: ${jobErr.message}`);
+    // The metrics read renders from render_jobs, so the row above already
+    // counts; this marks it as the concierge path rather than self-serve.
+    await supabase
+      .from("events")
+      .insert({
+        name: "render_done",
+        user_id: sub.user_id ?? null,
+        path: "cli",
+        props: { formats: rendered.map((r) => r.format), concierge: true },
+      })
+      .then(({ error }) => error && console.warn(`(event not recorded: ${error.message})`));
     const { error: updErr } = await supabase
       .from("submissions")
       .update({ sample_clip_url: primary.url, status: "clip_ready" })

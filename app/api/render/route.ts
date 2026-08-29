@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, getSupabaseAdmin } from "@/lib/supabase";
 import { MAX_DURATION, MAX_START, MIN_DURATION } from "@/lib/clip-limits";
 import { checkEntitlement } from "@/lib/plans";
+import { track } from "@/lib/track";
 
 export const runtime = "nodejs";
 
@@ -139,6 +140,16 @@ export async function POST(req: Request) {
   const row = Array.isArray(data) ? data[0] : data;
   switch (row?.outcome) {
     case "created":
+      await track("render_started", {
+        userId: user.id,
+        path: "/dashboard",
+        props: {
+          plan: entitlement.plan.id,
+          formats,
+          vibe: vibe ?? "default",
+          seconds: duration,
+        },
+      });
       return NextResponse.json({ ok: true, id: row.job_id });
     case "already_queued":
       return NextResponse.json({ ok: true, id: row.job_id, alreadyQueued: true });

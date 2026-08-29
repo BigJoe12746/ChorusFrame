@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, getSupabaseAdmin } from "@/lib/supabase";
 import { getStripe, SITE_URL } from "@/lib/stripe";
 import { FOUNDING, PLANS } from "@/lib/plans";
+import { track } from "@/lib/track";
 
 export const runtime = "nodejs";
 
@@ -73,6 +74,12 @@ export async function POST(req: Request) {
           // keep this price for as long as they stay subscribed. That promise
           // is in the Terms; do not add a renewal-time price bump.
           { unit_amount: FOUNDING.priceCents, recurring: { interval: "year" as const } };
+
+  await track("checkout_started", {
+    userId: user.id,
+    path: "/dashboard/billing",
+    props: { interval },
+  });
 
   const session = await stripe.checkout.sessions.create({
     customer: customerId,

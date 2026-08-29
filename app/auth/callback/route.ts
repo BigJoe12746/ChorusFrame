@@ -2,6 +2,17 @@ import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { getSupabaseServer } from "@/lib/supabase";
 import { resolveNext } from "@/lib/safe-next";
+import { recordSignupOnce } from "@/app/api/track/route";
+
+/**
+ * A freshly created account arriving here is a signup; a returning artist is
+ * not. recordSignupOnce owns that judgement (and the once-only guard) so the
+ * fragment flow, which finishes in the browser, reaches the same conclusion.
+ */
+async function recordArrival(supabase: NonNullable<Awaited<ReturnType<typeof getSupabaseServer>>>) {
+  const { data } = await supabase.auth.getUser();
+  if (data.user) await recordSignupOnce(data.user.id, data.user.created_at, null);
+}
 
 export const runtime = "nodejs";
 
@@ -36,6 +47,7 @@ export async function GET(request: Request) {
     if (error) {
       return NextResponse.redirect(new URL("/login?error=expired", url.origin));
     }
+    await recordArrival(supabase);
     return NextResponse.redirect(new URL(safeNext, url.origin));
   }
 
@@ -44,6 +56,7 @@ export async function GET(request: Request) {
     if (error) {
       return NextResponse.redirect(new URL("/login?error=expired", url.origin));
     }
+    await recordArrival(supabase);
     return NextResponse.redirect(new URL(safeNext, url.origin));
   }
 

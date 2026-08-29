@@ -34,10 +34,24 @@ export default function PrivacyPage() {
           <strong>Render records:</strong> which clips you asked for, when, which
           visual style, whether the render succeeded, and any error message.
         </li>
+        <li>
+          <strong>How the product is used:</strong> which pages get viewed, and
+          when an upload, render, or upgrade happens. We store these to answer
+          questions about our own product — how long a first clip takes, how
+          often renders fail — not to build a profile of you. We don&apos;t
+          record your IP address or browser fingerprint with them, and the
+          referring site is kept only as a domain name.
+        </li>
       </ul>
       <p>
-        We don&apos;t use analytics or advertising trackers, and there are no third-party
-        cookies. The only cookie we set is the one that keeps you signed in.
+        There are no third-party analytics or advertising trackers, and no
+        third-party cookies — nothing about your visit is sent to another
+        company. The measurement above is our own, stored in our own database.
+        The only cookie we set is the one that keeps you signed in; we also
+        keep a random id in your browser&apos;s storage so a visit can be
+        connected to the account it becomes. Clearing your site data removes
+        it, and it is never linked to anything about you personally. We keep
+        usage records for 13 months and then delete them.
       </p>
 
       <h2>Where it goes</h2>

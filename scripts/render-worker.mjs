@@ -35,6 +35,34 @@ const supabase = makeClient(env);
 
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
+/**
+ * Record a product event. Mirrors lib/track.ts (which this worker can't
+ * import — it's TypeScript) and follows the same rule: analytics may never
+ * fail a render.
+ */
+async function track(name, { userId = null, props = {} } = {}) {
+  try {
+    const { error } = await supabase
+      .from("events")
+      .insert({ name, user_id: userId, path: "worker", props });
+    if (error) log(`   (event ${name} not recorded: ${error.message})`);
+  } catch (e) {
+    log(`   (event ${name} not recorded: ${e?.message ?? e})`);
+  }
+}
+
+/**
+ * Render errors quote whatever the pipeline was touching — signed URLs and
+ * the artist's own filenames among them. The analytics table wants the shape
+ * of a failure, not its contents.
+ */
+function scrubError(message) {
+  return String(message)
+    .replace(/https?:\/\/\S+/g, "<url>")
+    .replace(/[\w.-]+\.(mp3|wav|png|jpe?g|webp|mp4)/gi, "<file>")
+    .slice(0, 200);
+}
+
 let stopping = false;
 let lease = null; // { id, attempts } — the claim this worker currently holds
 
@@ -99,6 +127,9 @@ async function runJob(job) {
 
   const artifacts = [];
   const uploadedPaths = [];
+  // Hoisted: the failure path needs the owner, and `sub` is block-scoped to
+  // the try below.
+  let ownerId = null;
   try {
     const { data: sub, error: subErr } = await supabase
       .from("submissions")
@@ -107,6 +138,7 @@ async function runJob(job) {
       .maybeSingle();
     if (subErr) throw new Error(`loading submission failed: ${subErr.message}`);
     if (!sub) throw new Error("submission no longer exists");
+    ownerId = sub.user_id ?? null;
 
     // The manual CLI takes a submission-level lock. Respect it rather than
     // rendering the same song twice with different windows.
@@ -212,6 +244,16 @@ async function runJob(job) {
         .eq("id", sub.id)
         .neq("status", "delivered");
       log(`✔ job ${job.id} done — ${urls.map((u) => u.format).join(", ")}`);
+      await track("render_done", {
+        userId: sub.user_id ?? null,
+        props: {
+          formats: urls.map((u) => u.format),
+          seconds: Number(job.duration_seconds),
+          vibe: vibe ?? "default",
+          plan: isPro ? "pro" : "free",
+          attempts: job.attempts,
+        },
+      });
 
       // Self-serve only works if the artist doesn't have to watch a spinner.
       // notifyClipsReady never throws: the clips exist either way.
@@ -244,6 +286,13 @@ async function runJob(job) {
     }
     lease = null;
     log(`✖ job ${job.id} ${exhausted ? "FAILED permanently" : "failed, will retry"}: ${message}`);
+    // Only a permanent failure is a failed export; a retry is still in flight.
+    if (exhausted) {
+      await track("render_failed", {
+        userId: ownerId,
+        props: { error: scrubError(message), attempts: job.attempts },
+      });
+    }
   } finally {
     clearInterval(beat);
     lease = null;

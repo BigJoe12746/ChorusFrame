@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { track } from "@/lib/track";
 
 export const runtime = "nodejs";
 
@@ -59,6 +60,18 @@ export async function POST(req: Request) {
       if (session.mode === "subscription" && session.subscription) {
         const sub = await stripe.subscriptions.retrieve(String(session.subscription));
         await applySubscription(sub);
+        await track("upgrade_completed", {
+          userId: sub.metadata?.user_id ?? null,
+          path: "/dashboard/billing",
+          props: {
+            // The unique index in 010_events.sql keys on this: Stripe
+            // redelivering a webhook must not invent a second conversion.
+            subscriptionId: sub.id,
+            founding: sub.metadata?.founding === "1",
+            interval: sub.items.data[0]?.price?.recurring?.interval ?? "unknown",
+            amountCents: sub.items.data[0]?.price?.unit_amount ?? null,
+          },
+        });
       }
       break;
     }
@@ -72,6 +85,12 @@ export async function POST(req: Request) {
           .from("profiles")
           .update({ plan: "free", plan_status: "canceled", stripe_subscription_id: null })
           .eq("id", userId);
+        // Churn is unanswerable without this; nothing else records an ending.
+        await track("subscription_canceled", {
+          userId,
+          path: "/dashboard/billing",
+          props: { subscriptionId: event.data.object.id },
+        });
       }
       break;
     }

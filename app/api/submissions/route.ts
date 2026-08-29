@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, getSupabaseAdmin } from "@/lib/supabase";
+import { track } from "@/lib/track";
 
 export const runtime = "nodejs";
 
@@ -127,6 +128,16 @@ export async function POST(req: Request) {
     console.error("[submissions] insert failed:", dbErr);
     return NextResponse.json({ error: "Something went wrong. Try again." }, { status: 500 });
   }
+
+  await track("upload_complete", {
+    userId: user?.id ?? null,
+    path: "/upload",
+    props: {
+      hasLyrics: Boolean(lyrics),
+      hasArtwork: Boolean(art),
+      signedIn: Boolean(user),
+    },
+  });
 
   return NextResponse.json({ ok: true, id });
 }
