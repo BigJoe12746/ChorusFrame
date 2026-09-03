@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MAX_START } from "@/lib/clip-limits";
-import { analyzeAudio, type Analysis } from "@/lib/audio-analysis";
+import { analyzeAudio, rankHooks, type Analysis, type HookCandidate } from "@/lib/audio-analysis";
 
 const BUCKETS = 600;
 
@@ -28,6 +28,7 @@ export default function HookPicker({
   duration,
   onChange,
   onDuration,
+  linesInWindow,
 }: {
   submissionId: string;
   audioUrl: string | null;
@@ -40,6 +41,12 @@ export default function HookPicker({
    * can't do the same — its tail would show frozen bars over silence.
    */
   onDuration?: (seconds: number) => void;
+  /**
+   * How many lyric lines land inside the chosen window, or null when the song
+   * has no lyrics. Rendering a "lyric video" with nothing in frame is the
+   * worst failure this product has, and it used to happen silently.
+   */
+  linesInWindow?: number | null;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -129,6 +136,27 @@ export default function HookPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioUrl]);
 
+  /*
+   * Hooks are re-ranked whenever clip length changes.
+   *
+   * The decode effect above is keyed on the URL alone so changing length never
+   * re-downloads the song — but that also meant the suggestion was frozen at
+   * whatever length was set when the song was decoded. Moving the slider from
+   * 15s to 30s left the artist being pointed at the 15s answer forever. The
+   * envelope and onsets are still in memory, so re-scoring is free.
+   */
+  const hooks: HookCandidate[] = useMemo(() => {
+    if (!analysis) return [];
+    return rankHooks(
+      analysis.envelope,
+      analysis.onsets,
+      analysis.frameSeconds,
+      duration,
+      MAX_START,
+      3
+    );
+  }, [analysis, duration]);
+
   // Draw the waveform whenever the peaks or the chosen window change.
   // Also redraws on resize: a canvas sized while the element has no layout
   // (opened in a hidden panel, or the window resized afterwards) would
@@ -167,7 +195,15 @@ export default function HookPicker({
       ctx.fillStyle = inside ? "#22dcf5" : "#2b3355";
       ctx.fillRect(x, (h - bh) / 2, Math.max(1, barW - 0.6), bh);
     });
-  }, [peaks, audioDuration, start, duration, drawTick]);
+
+    // A tick where each suggested hook begins, so the chips below have a place
+    // on the waveform rather than being three abstract timestamps.
+    hooks.forEach((hk, i) => {
+      const x = (hk.start / audioDuration) * w;
+      ctx.fillStyle = i === 0 ? "rgba(139,92,246,0.9)" : "rgba(139,92,246,0.45)";
+      ctx.fillRect(x - 1, 0, 2, h);
+    });
+  }, [peaks, audioDuration, start, duration, drawTick, hooks]);
 
   const setFromClientX = useCallback(
     (clientX: number) => {
@@ -285,25 +321,59 @@ export default function HookPicker({
         className="mt-2 w-full accent-[var(--cyan)]"
       />
 
-      {analysis && Math.abs(analysis.bestStart - start) > 0.6 ? (
-        <button
-          type="button"
-          onClick={() => onChange(Math.min(maxStart, analysis.bestStart))}
-          className="mt-2 rounded-lg border border-borderline px-2.5 py-1 text-[11px] text-muted transition hover:border-cyan hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan"
-        >
-          ✨ Jump to the strongest part ({mmss(analysis.bestStart)})
-        </button>
+      {hooks.length > 0 ? (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] text-muted">
+            {hooks.length > 1 ? "Strongest moments:" : "Strongest moment:"}
+          </span>
+          {hooks.map((hk, i) => {
+            const here = Math.abs(hk.start - start) <= 0.6;
+            return (
+              <button
+                key={hk.start}
+                type="button"
+                aria-pressed={here}
+                onClick={() => onChange(Math.min(maxStart, hk.start))}
+                className={`rounded-full px-2.5 py-1 text-[11px] transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan ${
+                  here
+                    ? "bg-violet/25 text-foreground"
+                    : "bg-surface-raised text-muted hover:text-foreground"
+                }`}
+                title={i === 0 ? "The loudest sustained stretch" : "Another strong moment"}
+              >
+                {i === 0 ? "✨ " : ""}
+                {mmss(hk.start)}
+              </button>
+            );
+          })}
+        </div>
       ) : null}
 
-      <p className="mt-1 text-[11px] text-muted">
-        Drag on the waveform, or use the slider. We start you at the loudest
-        sustained stretch — usually the chorus.
+      <p className="mt-1.5 text-[11px] text-muted">
+        Drag on the waveform, or use the slider. The marks are the strongest
+        stretches we found — usually the chorus.
         {cappedByLimit ? (
           <span className="ml-1 text-cyan">
             Clips can start up to {mmss(MAX_START)}.
           </span>
         ) : null}
       </p>
+
+      {/* Lyric coverage: the answer to "will this window have words in it",
+          which used to be discoverable only by spending an export. */}
+      {typeof linesInWindow === "number" ? (
+        linesInWindow > 0 ? (
+          <p className="mt-1 text-[11px] text-muted">
+            {linesInWindow} lyric line{linesInWindow === 1 ? "" : "s"} land in this
+            window.
+          </p>
+        ) : (
+          <p className="mt-1 text-[11px] text-cyan">
+            No lyrics land in this window — the clip will be a visualizer. Move
+            the window, or tap your lines into time.
+          </p>
+        )
+      ) : null}
     </div>
   );
 }

@@ -57,6 +57,7 @@ export default function RenderControls({
   maxClipSeconds,
   planName,
   allowedVibes,
+  brand,
   autoOpen = false,
 }: {
   submissionId: string;
@@ -73,6 +74,8 @@ export default function RenderControls({
   planName: string;
   /** Vibe ids this artist's plan includes; the rest show locked. */
   allowedVibes: string[];
+  /** The saved brand kit, or null when this plan doesn't apply it. */
+  brand: { primary: string | null; secondary: string | null; font: string | null } | null;
   autoOpen?: boolean;
 }) {
   const [job, setJob] = useState<RenderJob | null>(initialJob);
@@ -111,6 +114,20 @@ export default function RenderControls({
     () => windowLyrics(savedTimings, clipStart, previewLength),
     [savedTimings, clipStart, previewLength]
   );
+
+  /*
+   * How many lyric lines land in the chosen window.
+   *
+   * With saved timings this is exact. Without them the composition spreads the
+   * lines evenly across the clip, so every line appears — the honest answer is
+   * "all of them" rather than a guess. Null means there are no lyrics at all,
+   * and the picker says nothing.
+   */
+  const linesInWindow = useMemo(() => {
+    const lineCount = lyrics.split(/\r?\n/).filter((l) => l.trim() && !/^\[.*\]$/.test(l.trim())).length;
+    if (!lineCount) return null;
+    return savedTimings.length ? previewTiming.length : lineCount;
+  }, [lyrics, savedTimings, previewTiming]);
 
   const jobId = job?.id ?? null;
   const status = job?.status ?? null;
@@ -267,6 +284,11 @@ export default function RenderControls({
               lyrics={lyrics}
               clipStart={clipStart}
               duration={previewLength}
+              formats={formats}
+              brand={brand}
+              // Mirrors the worker: Free renders carry the end card and mark,
+              // Pro renders don't.
+              showEndCard={planName !== "Pro"}
               vibe={vibe}
               showWatermark={planName !== "Pro"}
               beatGrid={beatGrid}
@@ -303,6 +325,7 @@ export default function RenderControls({
             duration={clipLength}
             onChange={setClipStart}
             onDuration={setSongSeconds}
+            linesInWindow={linesInWindow}
           />
 
           <div>

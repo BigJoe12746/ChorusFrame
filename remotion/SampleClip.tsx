@@ -69,7 +69,9 @@ export const FPS = 30;
 export const END_CARD_SECONDS = 2.6;
 
 const NAVY = "#080b16";
-const FONT = 'Inter, "Segoe UI", system-ui, -apple-system, sans-serif';
+// See remotion/vibes.ts: leads with the metric twin of the worker's font so
+// the preview and the export lay out identically.
+const FONT = 'Arial, "Liberation Sans", Helvetica, sans-serif';
 
 const resolveSrc = (src: string) => (src.startsWith("http") ? src : staticFile(src));
 
@@ -257,9 +259,9 @@ export const SampleClip: React.FC<SampleClipProps> = ({
     fromArtwork: vibePalette.fromArtwork && !brand?.primary,
   };
   const BRAND_FONTS = {
-    sans: 'Inter, "Segoe UI", "Liberation Sans", Arial, system-ui, sans-serif',
-    serif: 'Georgia, "Liberation Serif", "Times New Roman", serif',
-    mono: '"Liberation Mono", "Courier New", ui-monospace, monospace',
+    sans: 'Arial, "Liberation Sans", Helvetica, sans-serif',
+    serif: '"Times New Roman", "Liberation Serif", Times, serif',
+    mono: '"Courier New", "Liberation Mono", ui-monospace, monospace',
   } as const;
   const brandFont = brand?.font ? BRAND_FONTS[brand.font] : null;
   const titleFont = brandFont ?? V.fonts.title;

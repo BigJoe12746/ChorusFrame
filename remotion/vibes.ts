@@ -9,9 +9,22 @@
 // worker image (fonts-liberation), so a vibe never silently falls back to the
 // same sans on the render host.
 
-const SANS = 'Inter, "Segoe UI", "Liberation Sans", Arial, system-ui, sans-serif';
-const SERIF = 'Georgia, "Liberation Serif", "Times New Roman", serif';
-const MONO = '"Liberation Mono", "Courier New", ui-monospace, monospace';
+// Font stacks are chosen for AGREEMENT, not preference.
+//
+// The render image ships fonts-liberation and nothing else, so every export
+// has always been Liberation. Any font listed ahead of it resolves only in the
+// artist's browser — which silently made the preview a different design from
+// the file they received. Each stack now leads with the metric twin of the
+// font the worker will actually use (Arial ≡ Liberation Sans, Times New Roman
+// ≡ Liberation Serif, Courier New ≡ Liberation Mono): identical advance
+// widths, so lines break in the same places in both.
+//
+// Self-hosting a face under public/ and loading it with @font-face would let
+// both sides use something nicer than Arial — worth doing, but it must be one
+// file both the browser and the worker load, never a stack that hopes.
+const SANS = 'Arial, "Liberation Sans", Helvetica, sans-serif';
+const SERIF = '"Times New Roman", "Liberation Serif", Times, serif';
+const MONO = '"Courier New", "Liberation Mono", ui-monospace, monospace';
 
 export type BarStyle = "bars" | "dots" | "line" | "none";
 

@@ -479,6 +479,18 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                         savedTimings={savedTimings.get(s.id) ?? []}
                         maxClipSeconds={plan.maxClipSeconds}
                         planName={plan.name}
+                        // Only when the plan actually applies it on render —
+                        // previewing colours a Free export won't have would be
+                        // the same broken promise pointed the other way.
+                        brand={
+                          plan.brandKit
+                            ? {
+                                primary: profile?.brand_primary ?? null,
+                                secondary: profile?.brand_secondary ?? null,
+                                font: profile?.brand_font ?? null,
+                              }
+                            : null
+                        }
                         allowedVibes={plan.templateIds}
                         autoOpen={s.id === justUploaded}
                       />

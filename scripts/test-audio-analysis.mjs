@@ -9,7 +9,9 @@ import {
   energyEnvelope,
   estimateTempo,
   findBestWindow,
+  findHookCandidates,
   onsetStrength,
+  rankHooks,
   snapToOnset,
 } from "../lib/audio-analysis.ts";
 
@@ -115,6 +117,65 @@ console.log("\nsnapping to an onset:");
   check("moves onto the nearby hit", Math.abs(snapped - 262 * 0.02) < 0.05, `got ${snapped}`);
   const none = snapToOnset(new Array(500).fill(0), 0.02, 5.0, 1.0);
   check("stays put when there is no onset", Math.abs(none - 4.0) < 1.05, `got ${none}`);
+}
+
+console.log("\nthree hooks, not one:");
+{
+  // Two loud choruses in known places, well apart, with a quiet bridge between.
+  const samples = song([
+    [20, 0.15], // intro
+    [20, 0.9],  // chorus one at 0:20
+    [20, 0.2],  // verse
+    [20, 0.85], // chorus two at 1:00
+    [15, 0.1],  // outro
+  ]);
+  const env = energyEnvelope(samples, SR);
+  const ons = onsetStrength(env);
+
+  const picks = findHookCandidates(env, 0.02, 15, 900, 3);
+  check("returns several moments", picks.length >= 2, `got ${picks.length}`);
+  check("best first", picks.every((p, i) => i === 0 || picks[i - 1].score >= p.score));
+
+  // The point of suppression: distinct moments, not one chorus sampled thrice.
+  let apart = true;
+  for (let i = 0; i < picks.length; i++)
+    for (let j = i + 1; j < picks.length; j++)
+      if (Math.abs(picks[i].start - picks[j].start) < 15) apart = false;
+  check("picks are at least a clip apart", apart, picks.map((p) => p.start.toFixed(1)).join(", "));
+
+  const starts = picks.map((p) => p.start);
+  check(
+    "finds both choruses",
+    starts.some((v) => v >= 18 && v <= 38) && starts.some((v) => v >= 58 && v <= 78),
+    starts.map((v) => v.toFixed(1)).join(", ")
+  );
+
+  // Every pick must leave room for the clip it promises.
+  const songSeconds = env.length * 0.02;
+  check("every pick leaves room for the clip", picks.every((p) => p.start + 15 <= songSeconds + 0.01));
+
+  // The headline suggestion must not disagree with the ranked list.
+  const a = analyzeAudio(samples, SR, 15, 900);
+  check(
+    "bestStart is the top candidate",
+    Math.abs(a.bestStart - a.candidates[0].start) < 0.01,
+    `${a.bestStart} vs ${a.candidates[0]?.start}`
+  );
+  check("onsets are kept for re-ranking", Array.isArray(a.onsets) && a.onsets.length === env.length);
+
+  // Re-ranking for a longer clip must work off the retained envelope alone.
+  const longer = rankHooks(env, ons, 0.02, 30, 900, 3);
+  check("re-ranks for a longer clip without re-decoding", longer.length >= 1);
+  check(
+    "longer picks still fit",
+    longer.every((p) => p.start + 30 <= songSeconds + 0.01),
+    longer.map((p) => p.start.toFixed(1)).join(", ")
+  );
+
+  // A song barely longer than the clip has one honest answer, not three.
+  const tiny = energyEnvelope(song([[16, 0.5]]), SR);
+  const few = findHookCandidates(tiny, 0.02, 15, 900, 3);
+  check("a short song yields at least one usable pick", few.length >= 1 && few[0].start + 15 <= 16.01);
 }
 
 console.log("\nwindow search is bounded:");

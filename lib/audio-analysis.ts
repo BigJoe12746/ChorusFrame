@@ -19,6 +19,19 @@ export type Analysis = {
   beatGrid: { bpm: number; offset: number } | null;
   /** Suggested clip start, in seconds. */
   bestStart: number;
+  /** Onset strength per frame — kept so hooks can be re-scored on a length
+   *  change without downloading and decoding the song a second time. */
+  onsets: number[];
+  /** The strongest few moments, best first. bestStart is candidates[0]. */
+  candidates: HookCandidate[];
+};
+
+/** One suggested moment: where it starts, and how strong it scored. */
+export type HookCandidate = {
+  /** Clip start, in seconds. */
+  start: number;
+  /** Mean loudness across the window, 0..1 — for labelling, not ranking. */
+  score: number;
 };
 
 const HOP_SECONDS = 0.02; // 50 frames a second
@@ -211,6 +224,63 @@ export function findBestWindow(
 }
 
 /**
+ * The strongest few windows in the song, best first.
+ *
+ * findBestWindow scores every window and keeps only the argmax. The same scan
+ * ranked and thinned gives an artist a real choice: three moments to audition
+ * instead of one suggestion to accept or drag away from.
+ *
+ * Non-maximum suppression is what makes them distinct — without it the top
+ * three are the same chorus sampled a quarter-second apart, which is a choice
+ * in name only. A pick has to sit at least one clip-length from every stronger
+ * pick to survive.
+ */
+export function findHookCandidates(
+  envelope: number[],
+  frameSeconds: number,
+  clipDuration: number,
+  maxStart: number,
+  count = 3
+): HookCandidate[] {
+  const windowFrames = Math.max(1, Math.round(clipDuration / frameSeconds));
+  const songSeconds = envelope.length * frameSeconds;
+  const limit = Math.max(0, Math.min(maxStart, songSeconds - clipDuration));
+  if (limit <= 0 || envelope.length <= windowFrames) return [{ start: 0, score: 0 }];
+
+  let sum = 0;
+  for (let i = 0; i < windowFrames; i++) sum += envelope[i];
+
+  const scored: HookCandidate[] = [];
+  const stepFrames = Math.max(1, Math.round(0.25 / frameSeconds));
+  const limitFrame = Math.round(limit / frameSeconds);
+
+  for (let f = 0; f <= limitFrame; f++) {
+    if (f > 0) {
+      sum += envelope[f + windowFrames - 1] ?? 0;
+      sum -= envelope[f - 1];
+    }
+    if (f % stepFrames !== 0) continue;
+
+    const seconds = f * frameSeconds;
+    let score = sum / windowFrames;
+    // Intros are rarely the hook; taper the penalty over the first 20s.
+    if (seconds < 20) score *= 0.75 + 0.25 * (seconds / 20);
+    scored.push({ start: seconds, score });
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+
+  const picked: HookCandidate[] = [];
+  for (const c of scored) {
+    if (picked.length >= count) break;
+    if (picked.every((p) => Math.abs(p.start - c.start) >= clipDuration)) picked.push(c);
+  }
+  // A short song may not have room for several distinct windows; one real
+  // suggestion beats three padded ones.
+  return picked.length ? picked : [scored[0] ?? { start: 0, score: 0 }];
+}
+
+/**
  * Nudge a start onto the nearest strong onset so the clip opens on a hit
  * rather than halfway through a bar.
  */
@@ -242,16 +312,41 @@ export function analyzeAudio(
 ): Analysis {
   const envelope = energyEnvelope(samples, sampleRate);
   const onsets = onsetStrength(envelope);
-  const rough = findBestWindow(envelope, HOP_SECONDS, clipDuration, maxStart);
-  const snapped = snapToOnset(onsets, HOP_SECONDS, rough);
   const songSeconds = envelope.length * HOP_SECONDS;
   const limit = Math.max(0, Math.min(maxStart, songSeconds - clipDuration));
   const tempo = estimateTempo(onsets);
+  const candidates = rankHooks(envelope, onsets, HOP_SECONDS, clipDuration, maxStart);
   return {
     envelope,
+    onsets,
     frameSeconds: HOP_SECONDS,
     tempo,
     beatGrid: detectBeatGrid(onsets, HOP_SECONDS, tempo),
-    bestStart: Math.min(limit, snapped),
+    candidates,
+    bestStart: Math.min(limit, candidates[0]?.start ?? 0),
   };
+}
+
+/**
+ * Rank the song's strongest moments and snap each onto a hit.
+ *
+ * Separate from analyzeAudio so the picker can re-rank when the artist changes
+ * clip length — the envelope is already in memory, and re-decoding a 50MB song
+ * to answer "where are the best 30 seconds instead of 15" would be absurd.
+ */
+export function rankHooks(
+  envelope: number[],
+  onsets: number[],
+  frameSeconds: number,
+  clipDuration: number,
+  maxStart: number,
+  count = 3
+): HookCandidate[] {
+  const songSeconds = envelope.length * frameSeconds;
+  const limit = Math.max(0, Math.min(maxStart, songSeconds - clipDuration));
+  const seen = new Set<number>();
+  return findHookCandidates(envelope, frameSeconds, clipDuration, maxStart, count)
+    .map((c) => ({ ...c, start: Math.min(limit, snapToOnset(onsets, frameSeconds, c.start)) }))
+    // Snapping can collide two neighbours onto the same hit.
+    .filter((c) => (seen.has(c.start) ? false : (seen.add(c.start), true)));
 }

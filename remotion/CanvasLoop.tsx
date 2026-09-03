@@ -142,7 +142,7 @@ export const CanvasLoop: React.FC<CanvasLoopProps> = ({
                 alignItems: "center",
                 justifyContent: "center",
                 background: `radial-gradient(circle at 30% 25%, ${palette.secondary}, ${V.background} 75%)`,
-                fontFamily: 'Inter, "Liberation Sans", Arial, sans-serif',
+                fontFamily: 'Arial, "Liberation Sans", Helvetica, sans-serif',
                 fontWeight: 800,
                 fontSize: artSize * 0.5,
                 color: "rgba(255,255,255,0.92)",
