@@ -1,0 +1,59 @@
+{
+  "name": "HoneyFarm",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "HoneyFarm": { "$path": "src/shared" },
+      "Assets": {
+        "$className": "Folder",
+        "BeeTemplate": { "$path": "assets/BeeTemplate.rbxm" }
+      },
+      "Remotes": {
+        "$className": "Folder",
+        "ReturnToFarm": { "$className": "RemoteEvent" },
+        "Notify": { "$className": "RemoteEvent" }
+      }
+    },
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "HoneyFarm": { "$path": "src/server" }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "$properties": {
+        "CameraMaxZoomDistance": 70,
+        "CameraMinZoomDistance": 6
+      },
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "HoneyFarm": { "$path": "src/client" }
+      }
+    },
+    "Lighting": {
+      "$className": "Lighting",
+      "$properties": {
+        "ClockTime": 14.5,
+        "Brightness": 3,
+        "Ambient": [0.45, 0.42, 0.38],
+        "OutdoorAmbient": [0.62, 0.58, 0.52],
+        "GlobalShadows": true
+      },
+      "Atmosphere": {
+        "$className": "Atmosphere",
+        "$properties": {
+          "Density": 0.22,
+          "Haze": 0.6,
+          "Color": [1.0, 0.95, 0.82],
+          "Decay": [0.95, 0.84, 0.66]
+        }
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "$properties": {
+        "StreamingEnabled": false
+      }
+    }
+  }
+}
