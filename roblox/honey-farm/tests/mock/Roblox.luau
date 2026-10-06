@@ -475,7 +475,7 @@ function M.newGame()
 	workspace.Name = "Workspace"
 	workspace.Parent = game
 	local services = {}
-	for _, name in { "ReplicatedStorage", "ServerScriptService", "Players", "TweenService", "UserInputService", "RunService" } do
+	for _, name in { "ReplicatedStorage", "ServerScriptService", "Players", "TweenService", "UserInputService", "RunService", "DataStoreService" } do
 		local s = Instance.new(name)
 		s.Name = name
 		s.Parent = game
@@ -486,6 +486,55 @@ function M.newGame()
 	end
 
 	rawget(services.RunService, "_props").Heartbeat = Signal()
+	rawget(services.RunService, "_props").IsStudio = function()
+		return true
+	end
+	rawget(game, "_props").BindToClose = function(_, fn)
+		rawget(game, "_props").closeHandlers = rawget(game, "_props").closeHandlers or {}
+		table.insert(rawget(game, "_props").closeHandlers, fn)
+	end
+
+	-- In-memory DataStore. Test knobs on M.datastore: unavailable, failNext, calls, data[key]
+	local ds = { data = {}, calls = 0, failNext = 0, unavailable = false }
+	M.datastore = ds
+	local function deepcopy(v)
+		if type(v) ~= "table" then
+			return v
+		end
+		local out = {}
+		for k, x in v do
+			out[k] = deepcopy(x)
+		end
+		return out
+	end
+	local store = {}
+	function store:GetAsync(key)
+		ds.calls += 1
+		if ds.failNext > 0 then
+			ds.failNext -= 1
+			error("DataStore request failed (simulated)")
+		end
+		return deepcopy(ds.data[key])
+	end
+	function store:UpdateAsync(key, fn)
+		ds.calls += 1
+		if ds.failNext > 0 then
+			ds.failNext -= 1
+			error("DataStore request failed (simulated)")
+		end
+		local new = fn(deepcopy(ds.data[key]))
+		if new ~= nil then
+			ds.data[key] = deepcopy(new)
+		end
+		return deepcopy(ds.data[key])
+	end
+	rawget(services.DataStoreService, "_props").GetDataStore = function(_, name)
+		if ds.unavailable then
+			error("DataStore API access is not enabled (simulated Studio)")
+		end
+		ds.name = name
+		return store
+	end
 
 	-- Players service
 	local Players = services.Players

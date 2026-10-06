@@ -12,6 +12,9 @@
 --             ShopAction("Buy") / ("Merge", idA, idB) <- the owner's client
 --             BeeMerged(plotId, idA, idB, newId, tier, isNew) -> all clients play the merge effect
 --             UpgradeAction(id)                       <- the owner's client (must be standing on their plot)
+--             WelcomeBack(summary)                    -> the owner's client shows the offline-honey summary
+--   Player attribute FarmLoading = true while the save is being read; no economy action is
+--   possible until it clears (farms[player] stays nil).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,6 +25,7 @@ local FarmState = require(Shared:WaitForChild("FarmState"))
 local BeeAppearance = require(Shared:WaitForChild("BeeAppearance"))
 local PlotService = require(script.Parent:WaitForChild("PlotService"))
 local UpgradeVisuals = require(script.Parent:WaitForChild("UpgradeVisuals"))
+local SaveService = require(script.Parent:WaitForChild("SaveService"))
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local NotifyRemote = Remotes:WaitForChild("Notify") :: RemoteEvent
@@ -30,6 +34,7 @@ local OpenShopRemote = Remotes:WaitForChild("OpenShop") :: RemoteEvent
 local ShopActionRemote = Remotes:WaitForChild("ShopAction") :: RemoteEvent
 local BeeMergedRemote = Remotes:WaitForChild("BeeMerged") :: RemoteEvent
 local UpgradeRemote = Remotes:WaitForChild("UpgradeAction") :: RemoteEvent
+local WelcomeRemote = Remotes:WaitForChild("WelcomeBack") :: RemoteEvent
 
 local FarmService = {}
 
@@ -39,6 +44,8 @@ type Farm = {
 	State: FarmState.State,
 	Replicated: { [string]: any },
 	Busy: boolean, -- a shop action is being processed (blocks double submits)
+	CanSave: boolean, -- false when the load failed: never overwrite that player's real progress
+	LoadedSavedAt: number, -- SavedAt of the save we loaded (0 for a new player)
 }
 
 local farms: { [Player]: Farm } = {}
@@ -329,16 +336,71 @@ end
 -- Lifecycle
 ------------------------------------------------------------------------------
 
+local loading: { [Player]: boolean } = {}
+
+local function formatDuration(seconds: number): string
+	local h = math.floor(seconds / 3600)
+	local m = math.floor((seconds % 3600) / 60)
+	if h > 0 then
+		return ("%dh %dm"):format(h, m)
+	end
+	return ("%dm"):format(math.max(1, m))
+end
+
+local function newState(): FarmState.State
+	return FarmState.new(Config.Economy, Config.Bees, Config.BeeOrder, Config.Upgrades)
+end
+
 local function startFarm(player: Player, plot: Model)
-	if farms[player] then
+	if farms[player] or loading[player] then
 		return
 	end
+	loading[player] = true
+	player:SetAttribute("FarmLoading", true)
+
+	-- Load BEFORE the farm exists, so nothing can be bought, collected or sold on unloaded data.
+	local data, ok = SaveService.Load(player)
+
+	-- the player may have left (or lost the plot) while we waited on the DataStore
+	loading[player] = nil
+	if not player.Parent or PlotService.GetPlot(player) ~= plot then
+		return
+	end
+
+	local state: FarmState.State
+	local canSave = ok
+	local loadedSavedAt = 0
+	local welcome: { [string]: any }? = nil
+
+	if ok and data then
+		state = FarmState.Deserialize(data, Config.Economy, Config.Bees, Config.BeeOrder, Config.Upgrades)
+		loadedSavedAt = tonumber(data.SavedAt) or 0
+		local away = math.max(0, SaveService.Now() - loadedSavedAt)
+		if loadedSavedAt > 0 and away >= 60 then
+			local credited, counted, wouldMake = state:ApplyOffline(away, Config.Save.OfflineCapHours * 3600)
+			welcome = {
+				Away = away,
+				Counted = counted,
+				Credited = credited,
+				WouldMake = wouldMake,
+				HiveFull = credited < wouldMake,
+				Capped = counted < away,
+				HiveStored = state.HiveStored,
+				HiveCapacity = state.HiveCapacity,
+			}
+		end
+	else
+		state = newState()
+	end
+
 	local farm: Farm = {
 		Player = player,
 		Plot = plot,
-		State = FarmState.new(Config.Economy, Config.Bees, Config.BeeOrder, Config.Upgrades),
+		State = state,
 		Replicated = {},
 		Busy = false,
+		CanSave = canSave,
+		LoadedSavedAt = loadedSavedAt,
 	}
 	farms[player] = farm
 	for _, bee in farm.State.Bees do
@@ -346,11 +408,39 @@ local function startFarm(player: Player, plot: Model)
 	end
 	UpgradeVisuals.Apply(plot, farm.State)
 	replicate(farm)
+	player:SetAttribute("FarmLoading", nil)
+
+	if not SaveService.Available then
+		notify(player, "⚠ Saving is unavailable this session, so progress is temporary. " .. SaveService.Reason, "warning")
+	elseif not ok then
+		notify(player, "⚠ Couldn't load your save. You're playing on a temporary farm and nothing will be saved, so your real progress stays safe. Rejoin to try again.", "warning")
+	elseif welcome then
+		WelcomeRemote:FireClient(player, welcome)
+		local w = welcome :: { [string]: any }
+		notify(player, ("Welcome back! Away %s: your bees made %d 🍯%s"):format(formatDuration(w.Away), w.Credited, if w.HiveFull then " (hive full)" else ""), "success")
+	end
+end
+
+-- Writes the farm to the DataStore. Returns true if it was saved.
+local function saveFarm(farm: Farm): boolean
+	if not farm.CanSave or not SaveService.Available then
+		return false
+	end
+	local data = farm.State:Serialize(SaveService.Now())
+	local saved = SaveService.Save(farm.Player, data, farm.LoadedSavedAt)
+	if saved then
+		farm.LoadedSavedAt = data.SavedAt
+	end
+	return saved
 end
 
 local function stopFarm(player: Player, plot: Model)
 	local farm = farms[player]
 	farms[player] = nil
+	loading[player] = nil
+	if farm then
+		saveFarm(farm)
+	end
 	for _, key in PLOT_KEYS do
 		plot:SetAttribute(key, nil)
 	end
@@ -362,6 +452,8 @@ local function stopFarm(player: Player, plot: Model)
 	-- PlotService clears plot.Temp (bee models) when it releases the plot.
 end
 
+local sinceAutosave = 0
+
 -- Advances every farm. Called from Heartbeat; tests call it directly.
 function FarmService.Tick(dt: number)
 	for _, farm in farms do
@@ -371,6 +463,24 @@ function FarmService.Tick(dt: number)
 		end
 		replicate(farm)
 	end
+	sinceAutosave += dt
+	if sinceAutosave >= Config.Save.AutosaveInterval then
+		sinceAutosave = 0
+		for _, farm in farms do
+			task.spawn(saveFarm, farm)
+		end
+	end
+end
+
+-- Saves every farm now (used on shutdown). Returns how many were written.
+function FarmService.SaveAll(): number
+	local n = 0
+	for _, farm in farms do
+		if saveFarm(farm) then
+			n += 1
+		end
+	end
+	return n
 end
 
 function FarmService.GetState(player: Player): FarmState.State?
@@ -379,7 +489,13 @@ function FarmService.GetState(player: Player): FarmState.State?
 end
 
 function FarmService.Start()
-	PlotService.PlotAssigned:Connect(startFarm)
+	SaveService.Start()
+	PlotService.PlotAssigned:Connect(function(player, plot)
+		task.spawn(startFarm, player, plot)
+	end)
+	game:BindToClose(function()
+		FarmService.SaveAll()
+	end)
 	PlotService.PlotReleased:Connect(stopFarm)
 	PlotService.StationTriggered:Connect(function(player: Player, plot: Model, station: string)
 		local farm = farms[player]

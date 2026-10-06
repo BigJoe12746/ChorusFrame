@@ -24,10 +24,11 @@ SCRIPTS = [
     ("ServerScriptService.HoneyFarm.MapBuilder", "ModuleScript", "src/server/MapBuilder.lua"),
     ("ServerScriptService.HoneyFarm.PlotService", "ModuleScript", "src/server/PlotService.lua"),
     ("ServerScriptService.HoneyFarm.UpgradeVisuals", "ModuleScript", "src/server/UpgradeVisuals.lua"),
+    ("ServerScriptService.HoneyFarm.SaveService", "ModuleScript", "src/server/SaveService.lua"),
     ("ServerScriptService.HoneyFarm.FarmService", "ModuleScript", "src/server/FarmService.lua"),
     ("ServerScriptService.HoneyFarm.Main", "Script", "src/server/Main.server.lua"),
 ]
-REMOTES = ["ReturnToFarm", "Notify", "JarStarted", "OpenShop", "ShopAction", "BeeMerged", "UpgradeAction"]
+REMOTES = ["ReturnToFarm", "Notify", "JarStarted", "OpenShop", "ShopAction", "BeeMerged", "UpgradeAction", "WelcomeBack"]
 
 
 def lua_str(s: str) -> str:
@@ -63,6 +64,7 @@ env = function(scriptInst)
 		Instance = M.Instance, Vector3 = M.Vector3, Vector2 = M.Vector2, CFrame = M.CFrame,
 		Color3 = M.Color3, UDim = M.UDim, UDim2 = M.UDim2, Enum = M.Enum, Random = M.Random,
 		TweenInfo = M.TweenInfo, task = M.task,
+		warn = function(...) print("[warn]", ...) end,
 	}, { __index = _G })
 end
 local function place(path, class, source, srcPath)

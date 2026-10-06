@@ -223,4 +223,65 @@ check(u.HiveStored == 250, "stored honey is clamped to capacity")
 local plain = FarmState.new(ECO, BEES, ORDER)
 check(plain.HiveCapacity == 50 and plain:UpgradeValue("HiveStorage") == nil and select(2, plain:BuyUpgrade("HiveStorage")) == "Unknown", "no upgrade table -> base values, purchases refused")
 
+-- SAVING -----------------------------------------------------------------------
+local sv = FarmState.new(ECO, BEES, ORDER, UPG)
+sv.Cash = 1234
+sv:BuyUpgrade("HiveStorage")
+sv:AddBee("Clover")
+sv.HiveStored = 33
+sv.Carried = 7
+sv.BottlingQueue = 4
+sv.BottlingAcc = 0.5
+sv.Jars = { 1.5, 2.5 }
+sv.Unclaimed = 45
+local data = sv:Serialize(1700000000)
+check(data.SavedAt == 1700000000 and data.Version == 1, "save carries a timestamp and version")
+check(data.Cash == 1154 and data.Carried == 7 and data.HiveStored == 33 and data.Unclaimed == 45, "save holds cash, carried, hive, unclaimed")
+check(#data.Bees == 2 and data.Bees[2].Tier == "Clover" and data.Upgrades.HiveStorage == 2, "save holds bees and upgrade levels")
+check(data.BottlingQueue == 4 and #data.Jars == 2 and data.BottlingAcc == 0.5, "save holds the processing inventory")
+check(#data.Discovered == 2, "save holds discovered tiers")
+data.Jars[1] = 99 -- mutate the copy: the live state must not change
+check(sv.Jars[1] == 1.5, "serialize returns copies, not references")
+
+local back = FarmState.Deserialize(sv:Serialize(1700000000), ECO, BEES, ORDER, UPG)
+check(back.Cash == 1154 and back.Carried == 7 and back.HiveStored == 33 and back.Unclaimed == 45, "round trip: money and honey")
+check(#back.Bees == 2 and back.Bees[2].Tier == "Clover" and back.Bees[2].Id == 2 and back.NextBeeId == 3, "round trip: bees keep ids; next id continues")
+check(back.HiveCapacity == 120 and back:UpgradeLevel("HiveStorage") == 2, "round trip: upgrade applied to capacity")
+check(back.BottlingQueue == 4 and #back.Jars == 2 and back.Discovered.Clover == true, "round trip: processing + discoveries")
+check(back:HoneyInSystem() == sv:HoneyInSystem(), "round trip: honey in system identical")
+
+-- corrupt / hostile data is clamped, not fatal
+local bad = FarmState.Deserialize({
+	Cash = -500,
+	Carried = 9999,
+	HiveStored = "lots",
+	Bees = { { Id = 1, Tier = "Dragon" }, { Id = 1, Tier = "Clover" }, { Id = 1, Tier = "Starter" }, "junk" },
+	Upgrades = { HiveStorage = 99, Backpack = -3 },
+	Jars = { 500, -1 },
+	Discovered = { "Dragon", "Royal" },
+}, ECO, BEES, ORDER, UPG)
+check(bad.Cash == 0, "negative cash becomes 0")
+check(bad:UpgradeLevel("HiveStorage") == 3 and bad:UpgradeLevel("Backpack") == 1, "upgrade levels clamped to the table")
+check(bad.Carried == bad.BackpackCapacity and bad.HiveStored == 0, "carried clamped to backpack; non-number hive = 0")
+check(#bad.Bees == 2 and bad.Bees[1].Tier == "Clover" and bad.Bees[2].Tier == "Starter", "unknown tier and junk dropped")
+check(bad.Bees[1].Id ~= bad.Bees[2].Id and bad.NextBeeId > math.max(bad.Bees[1].Id, bad.Bees[2].Id), "duplicate ids repaired")
+check(#bad.Jars == 2 and bad.Jars[1] == ECO.JarTravelTime and bad.Jars[2] == 0, "jar timers clamped")
+check(bad.Discovered.Royal == true and bad.Discovered.Dragon == nil, "discoveries: known kept, unknown dropped")
+local empty = FarmState.Deserialize({}, ECO, BEES, ORDER, UPG)
+check(empty.Cash == 25 and #empty.Bees == 1 and empty.Bees[1].Tier == "Starter", "empty save = new player defaults")
+local noBees = FarmState.Deserialize({ Cash = 10, Bees = {} }, ECO, BEES, ORDER, UPG)
+check(#noBees.Bees == 1, "a farm with no bees gets a Starter")
+
+-- OFFLINE HONEY ------------------------------------------------------------------
+local off = FarmState.new(ECO, BEES, ORDER, UPG) -- 1 starter: 0.2/s, hive 50
+local credited, counted, would = off:ApplyOffline(100, 8 * 3600)
+check(credited == 20 and counted == 100 and would == 20 and off.HiveStored == 20, "100 s away = 20 honey")
+credited, counted, would = off:ApplyOffline(10 * 3600, 8 * 3600)
+check(counted == 8 * 3600 and would == 5760, "offline time is capped at 8 hours")
+check(credited == 30 and off.HiveStored == 50, "credit is capped by hive room")
+check(off.Totals.Produced == 50, "offline honey counts as produced")
+credited = off:ApplyOffline(3600, 8 * 3600)
+check(credited == 0, "full hive: nothing more credited")
+check(off:ApplyOffline(-5, 8 * 3600) == 0, "negative time credits nothing")
+
 print(("FarmState: %d checks passed"):format(passed))

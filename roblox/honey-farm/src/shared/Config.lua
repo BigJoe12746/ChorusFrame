@@ -203,6 +203,15 @@ Config.Upgrades = {
 	},
 }
 
+-- Saving (Phase 5)
+Config.Save = {
+	StoreName = "HoneyFarm_v1", -- change to wipe everyone's progress (e.g. a reset)
+	Version = 1, -- bump when the save format changes
+	AutosaveInterval = 60, -- seconds
+	OfflineCapHours = 8, -- offline honey is credited for at most this long
+	LoadRetries = 3,
+}
+
 -- Bee flight (client visual only)
 Config.BeeFlight = {
 	Speed = 9, -- studs per second

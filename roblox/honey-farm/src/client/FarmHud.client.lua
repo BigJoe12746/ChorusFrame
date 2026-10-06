@@ -147,6 +147,11 @@ local function popCash()
 end
 
 local function refreshPlayer()
+	if player:GetAttribute("FarmLoading") then
+		cashValue.Text = "loading…"
+		carriedValue.Text = "…"
+		return
+	end
 	local cash = player:GetAttribute("Cash") or 0
 	cashValue.Text = money(cash)
 	if lastCash and cash > lastCash then
@@ -206,7 +211,7 @@ local function watchPlot(plot: Instance?)
 	refreshPlot()
 end
 
-for _, key in { "Cash", "Carried", "BackpackCapacity" } do
+for _, key in { "Cash", "Carried", "BackpackCapacity", "FarmLoading" } do
 	player:GetAttributeChangedSignal(key):Connect(refreshPlayer)
 end
 refreshPlayer()

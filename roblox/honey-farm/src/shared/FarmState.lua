@@ -384,6 +384,138 @@ function FarmState.CollectCash(self: State): number
 	return amount
 end
 
+------------------------------------------------------------------------------
+-- Saving
+------------------------------------------------------------------------------
+
+export type SaveData = { [string]: any }
+
+-- Plain table with everything worth keeping. `now` is the save timestamp (os.time()).
+function FarmState.Serialize(self: State, now: number): SaveData
+	local bees = {}
+	for _, bee in self.Bees do
+		table.insert(bees, { Id = bee.Id, Tier = bee.Tier })
+	end
+	local discovered = {}
+	for _, tier in self._order do
+		if self.Discovered[tier] then
+			table.insert(discovered, tier)
+		end
+	end
+	local upgrades = {}
+	for id, level in self.Upgrades do
+		upgrades[id] = level
+	end
+	return {
+		Version = 1,
+		SavedAt = now,
+		Cash = self.Cash,
+		Carried = self.Carried,
+		HiveStored = self.HiveStored,
+		BottlingQueue = self.BottlingQueue,
+		BottlingAcc = self.BottlingAcc,
+		Jars = table.clone(self.Jars),
+		Unclaimed = self.Unclaimed,
+		Bees = bees,
+		NextBeeId = self.NextBeeId,
+		BeesBought = self.BeesBought,
+		Discovered = discovered,
+		Upgrades = upgrades,
+		Totals = table.clone(self.Totals),
+	}
+end
+
+local function num(v: any, default: number, min: number?): number
+	local n = tonumber(v)
+	if n == nil or n ~= n then
+		return default
+	end
+	return math.max(min or -math.huge, n)
+end
+
+-- Rebuilds a state from saved data. Anything odd (unknown tiers, negative numbers,
+-- levels past the table) is clamped or dropped rather than crashing.
+function FarmState.Deserialize(data: SaveData, eco: EconomyConfig, bees: BeeConfig, order: { string }, upgrades: UpgradeConfig?): State
+	local self = FarmState.new(eco, bees, order, upgrades)
+	self.Bees = {}
+	self.Discovered = {}
+
+	if upgrades and type(data.Upgrades) == "table" then
+		for _, id in upgrades.Order do
+			local level = math.floor(num(data.Upgrades[id], 1, 1))
+			self.Upgrades[id] = math.clamp(level, 1, #upgrades[id].Levels)
+		end
+	end
+	self:Recalculate()
+
+	self.Cash = num(data.Cash, eco.StartCash, 0)
+	self.Carried = math.min(num(data.Carried, 0, 0), self.BackpackCapacity)
+	self.HiveStored = math.min(num(data.HiveStored, 0, 0), self.HiveCapacity)
+	self.BottlingQueue = math.floor(num(data.BottlingQueue, 0, 0))
+	self.BottlingAcc = math.clamp(num(data.BottlingAcc, 0, 0), 0, 1)
+	self.Unclaimed = num(data.Unclaimed, 0, 0)
+	self.BeesBought = math.floor(num(data.BeesBought, 0, 0))
+	self.Jars = {}
+	if type(data.Jars) == "table" then
+		for _, t in data.Jars do
+			table.insert(self.Jars, math.clamp(num(t, eco.JarTravelTime, 0), 0, eco.JarTravelTime))
+		end
+	end
+	if type(data.Totals) == "table" then
+		for k, _ in self.Totals do
+			self.Totals[k] = num(data.Totals[k], 0, 0)
+		end
+	end
+
+	local maxId = 0
+	local usedIds: { [number]: boolean } = {}
+	if type(data.Bees) == "table" then
+		for _, b in data.Bees do
+			if type(b) == "table" and type(b.Tier) == "string" and bees[b.Tier] then
+				local id = math.floor(num(b.Id, 0, 1))
+				if id < 1 or usedIds[id] then
+					id = maxId + 1
+				end
+				usedIds[id] = true
+				maxId = math.max(maxId, id)
+				table.insert(self.Bees, { Id = id, Tier = b.Tier })
+				self.Discovered[b.Tier] = true
+			end
+		end
+	end
+	if #self.Bees == 0 then
+		-- a farm always has at least one bee
+		for _, tier in eco.StartBees do
+			local bee = { Id = maxId + 1, Tier = tier }
+			maxId += 1
+			table.insert(self.Bees, bee)
+			self.Discovered[tier] = true
+		end
+	end
+	self.NextBeeId = math.max(maxId + 1, math.floor(num(data.NextBeeId, 1, 1)))
+	if type(data.Discovered) == "table" then
+		for _, tier in data.Discovered do
+			if type(tier) == "string" and bees[tier] then
+				self.Discovered[tier] = true
+			end
+		end
+	end
+	return self
+end
+
+-- Credits honey the bees would have made while the player was away.
+-- Returns credited honey, the seconds actually counted (after the cap), and what the bees
+-- would have made without the hive limit.
+function FarmState.ApplyOffline(self: State, elapsedSeconds: number, capSeconds: number): (number, number, number)
+	local counted = math.clamp(elapsedSeconds, 0, capSeconds)
+	local wouldMake = math.floor(self:ProductionRate() * counted)
+	local room = math.max(0, self.HiveCapacity - self.HiveStored)
+	local credited = math.min(wouldMake, room)
+	self.HiveStored += credited
+	self.Totals.Produced += credited
+	return credited, counted, wouldMake
+end
+
 -- Progress of the jar currently being made (0..1), for the HUD.
 function FarmState.BottlingProgress(self: State): number
 	return if self.BottlingQueue > 0 then math.clamp(self.BottlingAcc, 0, 1) else 0
