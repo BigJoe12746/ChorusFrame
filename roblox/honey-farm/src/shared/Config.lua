@@ -212,6 +212,33 @@ Config.Save = {
 	LoadRetries = 3,
 }
 
+-- New-player introduction (Phase 6). The server advances the step when the real action
+-- succeeds; the client highlights `Station` and shows the text.
+export type TutorialStep = { Station: string, Title: string, Body: string, WaitBody: string? }
+Config.Tutorial = {
+	Reward = 50, -- cash for finishing the introduction
+	Steps = {
+		{ Station = "Hive", Title = "Collect your honey", Body = "Your bee is filling the hive. Walk up to it and press E (or tap) to collect.", WaitBody = "Your bee is making honey… the hive fills 1 honey every 5 seconds." },
+		{ Station = "Bottling", Title = "Bottle it", Body = "Take the honey to the Bottling machine and press E to deposit it. Jars ride the belt to the stand." },
+		{ Station = "SellStand", Title = "Collect your cash", Body = "Every jar is worth $5 at the Honey Stand. Press E there to collect." },
+		{ Station = "BeeShop", Title = "Buy a second bee", Body = "Open the Bee Shop and buy another Starter Bee for $25. Keep collecting if you're short!" },
+		{ Station = "BeeShop", Title = "Make your first merge", Body = "In the Bee Shop, tap both Starter Bees and press Merge to make a Clover Bee (2.5× honey)." },
+	} :: { TutorialStep },
+}
+
+-- Sounds. The rbxasset:// ones ship inside the Roblox client, so they always play.
+-- Buzz is empty by default: paste an asset id from the Creator Store (search "bee buzz loop")
+-- as "rbxassetid://123456" to give the bees a gentle hum.
+Config.Sounds = {
+	Collect = "rbxasset://sounds/electronicpingshort.wav",
+	Deposit = "rbxasset://sounds/swoosh.wav",
+	Cash = "rbxasset://sounds/snap.mp3",
+	Merge = "rbxasset://sounds/victory.wav",
+	Click = "rbxasset://sounds/button.wav",
+	Buzz = "", -- e.g. "rbxassetid://..." (looping bee hum), left off until you pick one
+	BuzzVolume = 0.12,
+}
+
 -- Bee flight (client visual only)
 Config.BeeFlight = {
 	Speed = 9, -- studs per second

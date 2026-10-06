@@ -284,4 +284,17 @@ credited = off:ApplyOffline(3600, 8 * 3600)
 check(credited == 0, "full hive: nothing more credited")
 check(off:ApplyOffline(-5, 8 * 3600) == 0, "negative time credits nothing")
 
+-- INTRODUCTION -----------------------------------------------------------------
+local tu = FarmState.new(ECO, BEES, ORDER, UPG)
+check(tu.TutorialStep == 1, "introduction starts at step 1")
+check(tu:AdvanceTutorial(2) == false and tu.TutorialStep == 1, "a later step's action doesn't skip ahead")
+check(tu:AdvanceTutorial(1) == true and tu.TutorialStep == 2, "the current step's action advances")
+check(tu:AdvanceTutorial(1) == false and tu.TutorialStep == 2, "repeating an old step does nothing")
+tu:AdvanceTutorial(2)
+local tData = tu:Serialize(1)
+check(tData.TutorialStep == 3, "tutorial step is saved")
+local tBack = FarmState.Deserialize(tData, ECO, BEES, ORDER, UPG)
+check(tBack.TutorialStep == 3, "tutorial step is restored")
+check(FarmState.Deserialize({ TutorialStep = -4 }, ECO, BEES, ORDER, UPG).TutorialStep == 1, "bad tutorial step is clamped")
+
 print(("FarmState: %d checks passed"):format(passed))

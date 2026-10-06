@@ -73,7 +73,7 @@ stroke(hint, C.Text, 2)
 local toasts = Instance.new("Frame")
 toasts.Name = "Toasts"
 toasts.AnchorPoint = Vector2.new(0.5, 0)
-toasts.Position = UDim2.new(0.5, 0, 0, 70)
+toasts.Position = UDim2.new(0.5, 0, 0, 150) -- below the My Farm button and the tutorial card
 toasts.Size = UDim2.new(0.9, 0, 0, 200)
 toasts.BackgroundTransparency = 1
 toasts.Parent = gui

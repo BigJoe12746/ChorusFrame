@@ -18,7 +18,8 @@
         "ShopAction": { "$className": "RemoteEvent" },
         "BeeMerged": { "$className": "RemoteEvent" },
         "UpgradeAction": { "$className": "RemoteEvent" },
-        "WelcomeBack": { "$className": "RemoteEvent" }
+        "WelcomeBack": { "$className": "RemoteEvent" },
+        "Feedback": { "$className": "RemoteEvent" }
       }
     },
     "ServerScriptService": {

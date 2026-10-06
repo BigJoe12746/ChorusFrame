@@ -13,6 +13,8 @@
 --             BeeMerged(plotId, idA, idB, newId, tier, isNew) -> all clients play the merge effect
 --             UpgradeAction(id)                       <- the owner's client (must be standing on their plot)
 --             WelcomeBack(summary)                    -> the owner's client shows the offline-honey summary
+--             Feedback(kind, amount, station)         -> the owner's client plays effects/sounds
+--   Player attribute TutorialStep (1..#Config.Tutorial.Steps, or one past = finished)
 --   Player attribute FarmLoading = true while the save is being read; no economy action is
 --   possible until it clears (farms[player] stays nil).
 
@@ -35,6 +37,7 @@ local ShopActionRemote = Remotes:WaitForChild("ShopAction") :: RemoteEvent
 local BeeMergedRemote = Remotes:WaitForChild("BeeMerged") :: RemoteEvent
 local UpgradeRemote = Remotes:WaitForChild("UpgradeAction") :: RemoteEvent
 local WelcomeRemote = Remotes:WaitForChild("WelcomeBack") :: RemoteEvent
+local FeedbackRemote = Remotes:WaitForChild("Feedback") :: RemoteEvent
 
 local FarmService = {}
 
@@ -100,6 +103,7 @@ local function replicate(farm: Farm)
 	setAttr(farm, farm.Player, "Cash", s.Cash)
 	setAttr(farm, farm.Player, "Carried", s.Carried)
 	setAttr(farm, farm.Player, "BackpackCapacity", s.BackpackCapacity)
+	setAttr(farm, farm.Player, "TutorialStep", s.TutorialStep)
 	setAttr(farm, farm.Plot, "HiveStored", s.HiveStored)
 	setAttr(farm, farm.Plot, "HiveCapacity", s.HiveCapacity)
 	setAttr(farm, farm.Plot, "BottlingQueue", s.BottlingQueue)
@@ -118,7 +122,23 @@ local function replicate(farm: Farm)
 end
 
 local PLOT_KEYS = { "HiveStored", "HiveCapacity", "BottlingQueue", "BottlingProgress", "JarsOnBelt", "Unclaimed", "ProductionRate", "BeeCount", "BeeSlots", "BeePrice", "Bees", "Discovered", "BottlingSpeed", "ProductionMultiplier", "Upgrades" }
-local PLAYER_KEYS = { "Cash", "Carried", "BackpackCapacity" }
+local PLAYER_KEYS = { "Cash", "Carried", "BackpackCapacity", "TutorialStep" }
+
+local function feedback(farm: Farm, kind: string, amount: number, station: string)
+	FeedbackRemote:FireClient(farm.Player, kind, amount, station)
+end
+
+-- Advances the introduction when its current step's action just succeeded.
+local function tutorial(farm: Farm, step: number)
+	local s = farm.State
+	if s:AdvanceTutorial(step) then
+		local finished = s.TutorialStep > #Config.Tutorial.Steps
+		if finished and Config.Tutorial.Reward > 0 then
+			s.Cash += Config.Tutorial.Reward
+			notify(farm.Player, ("🎉 Introduction complete! Bonus: +$%d. The farm is all yours."):format(Config.Tutorial.Reward), "success")
+		end
+	end
+end
 
 ------------------------------------------------------------------------------
 -- Bee models (visual only; flight is animated on each client)
@@ -188,6 +208,8 @@ function actions.Hive(farm: Farm)
 	end
 	local moved = s:CollectHive()
 	notify(farm.Player, ("+%s 🍯 honey collected (%s/%s carried)"):format(fmt(moved), fmt(s.Carried), fmt(s.BackpackCapacity)), "success")
+	feedback(farm, "Honey", moved, "Hive")
+	tutorial(farm, 1)
 end
 
 function actions.Bottling(farm: Farm)
@@ -198,6 +220,8 @@ function actions.Bottling(farm: Farm)
 	end
 	local moved = s:Deposit()
 	notify(farm.Player, ("Deposited %s 🍯. Bottling %s honey into jars..."):format(fmt(moved), fmt(s.BottlingQueue)), "success")
+	feedback(farm, "Deposit", moved, "Bottling")
+	tutorial(farm, 2)
 end
 
 function actions.SellStand(farm: Farm)
@@ -208,6 +232,8 @@ function actions.SellStand(farm: Farm)
 	end
 	local moved = s:CollectCash()
 	notify(farm.Player, ("+$%s collected! You now have $%s 💰"):format(fmt(moved), fmt(s.Cash)), "success")
+	feedback(farm, "Cash", moved, "SellStand")
+	tutorial(farm, 3)
 end
 
 function actions.FlowerPatch(farm: Farm)
@@ -237,6 +263,8 @@ local function buyBee(farm: Farm)
 	end
 	spawnBeeModel(farm, bee, true)
 	notify(farm.Player, ("Bought a Starter Bee for $%s! 🐝 (%d/%d slots)"):format(fmt(price), #s.Bees, s.BeeSlots), "success")
+	feedback(farm, "Buy", price, "BeeShop")
+	tutorial(farm, 4)
 end
 
 local MERGE_MESSAGES = {
@@ -260,6 +288,7 @@ local function mergeBees(farm: Farm, idA: any, idB: any)
 	removeBeeModel(farm, idB)
 	spawnBeeModel(farm, bee, true)
 	BeeMergedRemote:FireAllClients(farm.Plot:GetAttribute("PlotId"), idA, idB, bee.Id, bee.Tier, isNew)
+	tutorial(farm, 5)
 	local info = Config.Bees[bee.Tier]
 	if isNew then
 		notify(farm.Player, ("✨ New bee discovered: %s! It makes %.1f 🍯/s."):format(info.Name, info.HoneyPerSecond), "success")

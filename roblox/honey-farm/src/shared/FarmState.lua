@@ -56,6 +56,7 @@ export type State = typeof(setmetatable(
 		NextBeeId: number,
 		BeesBought: number, -- shop purchases so far (drives the price)
 		Discovered: { [string]: boolean }, -- tiers this player has owned
+		TutorialStep: number, -- 1-based index into Config.Tutorial.Steps; past the end = finished
 		Totals: { Produced: number, Lost: number, Jars: number, Earned: number },
 		_eco: EconomyConfig,
 		_bees: BeeConfig,
@@ -85,6 +86,7 @@ function FarmState.new(eco: EconomyConfig, bees: BeeConfig, order: { string }, u
 		NextBeeId = 1,
 		BeesBought = 0,
 		Discovered = {},
+		TutorialStep = 1,
 		Totals = { Produced = 0, Lost = 0, Jars = 0, Earned = 0 },
 		_eco = eco,
 		_bees = bees,
@@ -385,6 +387,19 @@ function FarmState.CollectCash(self: State): number
 end
 
 ------------------------------------------------------------------------------
+-- Introduction
+------------------------------------------------------------------------------
+
+-- Moves to the next step if the player is currently on `step`. Returns true if it advanced.
+function FarmState.AdvanceTutorial(self: State, step: number): boolean
+	if self.TutorialStep == step then
+		self.TutorialStep += 1
+		return true
+	end
+	return false
+end
+
+------------------------------------------------------------------------------
 -- Saving
 ------------------------------------------------------------------------------
 
@@ -422,6 +437,7 @@ function FarmState.Serialize(self: State, now: number): SaveData
 		Discovered = discovered,
 		Upgrades = upgrades,
 		Totals = table.clone(self.Totals),
+		TutorialStep = self.TutorialStep,
 	}
 end
 
@@ -493,6 +509,7 @@ function FarmState.Deserialize(data: SaveData, eco: EconomyConfig, bees: BeeConf
 		end
 	end
 	self.NextBeeId = math.max(maxId + 1, math.floor(num(data.NextBeeId, 1, 1)))
+	self.TutorialStep = math.floor(num(data.TutorialStep, 1, 1))
 	if type(data.Discovered) == "table" then
 		for _, tier in data.Discovered do
 			if type(tier) == "string" and bees[tier] then
