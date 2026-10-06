@@ -24,8 +24,11 @@ local PlotService = {}
 
 local assignedEvent = Instance.new("BindableEvent")
 local releasedEvent = Instance.new("BindableEvent")
+local stationEvent = Instance.new("BindableEvent")
 PlotService.PlotAssigned = assignedEvent.Event
 PlotService.PlotReleased = releasedEvent.Event
+-- (player, plot, stationName) — only fires after ownership and distance have been checked
+PlotService.StationTriggered = stationEvent.Event
 
 local plotsFolder: Folder
 local plotModels: { [number]: Model } = {}
@@ -210,6 +213,16 @@ local function onReturnRequest(player: Player)
 	end
 end
 
+-- Is the player's character close enough to this part to be using it?
+local function withinReach(player: Player, part: BasePart): boolean
+	local character = player.Character
+	if not character then
+		return false
+	end
+	local distance = (character:GetPivot().Position - part.Position).Magnitude
+	return distance <= Config.PromptDistance + 10 -- slack for lag / big characters
+end
+
 local function hookPrompt(prompt: ProximityPrompt)
 	prompt.Triggered:Connect(function(player)
 		local plot = PlotService.GetPlotFromInstance(prompt)
@@ -221,10 +234,14 @@ local function hookPrompt(prompt: ProximityPrompt)
 			notify(player, if owner ~= "" then ("This is %s's farm. Only the owner can use it."):format(owner) else "This farm has no owner.", "warning")
 			return
 		end
-		-- Phase 1: stations are placed but not functional yet.
+		local part = prompt.Parent
+		if not (part and part:IsA("BasePart") and withinReach(player, part)) then
+			return -- too far away: ignore silently (likely lag or an exploit attempt)
+		end
 		local station = prompt:GetAttribute("Station")
-		local info = Config.Stations[station]
-		notify(player, ((info and info.Label) or "This station") .. " opens in the next update!", "info")
+		if type(station) == "string" then
+			stationEvent:Fire(player, plot, station)
+		end
 	end)
 end
 

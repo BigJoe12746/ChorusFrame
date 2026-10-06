@@ -89,8 +89,9 @@ check(dist(charPos(alice), spawnPos(1)) < 3, "respawning puts Alice back on her 
 local aliceHivePrompt = plots.Plot1.Stations.Hive:FindFirstChild("StationPrompt", true)
 aliceHivePrompt.Triggered:Fire(bob)
 check(string.find(lastNote(bob), "Alice's farm") ~= nil, "Bob can't use Alice's hive")
+alice.Character:PivotTo(aliceHivePrompt.Parent.CFrame + M.Vector3.new(0, 3, -4))
 aliceHivePrompt.Triggered:Fire(alice)
-check(string.find(lastNote(alice), "next update") ~= nil, "Alice can use her own hive")
+check(string.find(lastNote(alice), "Alice's farm") == nil, "Alice can use her own hive")
 
 -- Leaving frees the plot and clears temporary objects
 local junk = M.Instance.new("Part")

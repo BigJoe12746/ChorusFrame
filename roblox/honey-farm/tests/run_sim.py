@@ -19,11 +19,13 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCRIPTS = [
     ("ReplicatedStorage.HoneyFarm.Config", "ModuleScript", "src/shared/Config.lua"),
     ("ReplicatedStorage.HoneyFarm.PlotAllocator", "ModuleScript", "src/shared/PlotAllocator.lua"),
+    ("ReplicatedStorage.HoneyFarm.FarmState", "ModuleScript", "src/shared/FarmState.lua"),
     ("ServerScriptService.HoneyFarm.MapBuilder", "ModuleScript", "src/server/MapBuilder.lua"),
     ("ServerScriptService.HoneyFarm.PlotService", "ModuleScript", "src/server/PlotService.lua"),
+    ("ServerScriptService.HoneyFarm.FarmService", "ModuleScript", "src/server/FarmService.lua"),
     ("ServerScriptService.HoneyFarm.Main", "Script", "src/server/Main.server.lua"),
 ]
-REMOTES = ["ReturnToFarm", "Notify"]
+REMOTES = ["ReturnToFarm", "Notify", "JarStarted"]
 
 
 def lua_str(s: str) -> str:
@@ -123,7 +125,17 @@ local function dumpParts(root)
 	end
 end
 local scenarioFn = assert(loadstring(SCENARIO, "=scenario"))
-setfenv(scenarioFn, setmetatable({ M = M, game = game, workspace = workspace, boot = boot, check = check, dumpParts = dumpParts }, { __index = _G }))
+local function tick(seconds, step)
+	step = step or 1 / 30
+	local hb = services.RunService.Heartbeat
+	local t = 0
+	while t < seconds - 1e-9 do
+		local dt = math.min(step, seconds - t)
+		hb:Fire(dt)
+		t += dt
+	end
+end
+setfenv(scenarioFn, setmetatable({ M = M, game = game, workspace = workspace, boot = boot, check = check, dumpParts = dumpParts, tick = tick, req = req }, { __index = _G }))
 scenarioFn()
 print(("RESULT %d passed, %d failed"):format(passed, failed))
 if failed > 0 then error("scenario failed") end

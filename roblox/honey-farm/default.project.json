@@ -12,7 +12,8 @@
       "Remotes": {
         "$className": "Folder",
         "ReturnToFarm": { "$className": "RemoteEvent" },
-        "Notify": { "$className": "RemoteEvent" }
+        "Notify": { "$className": "RemoteEvent" },
+        "JarStarted": { "$className": "RemoteEvent" }
       }
     },
     "ServerScriptService": {

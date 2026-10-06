@@ -64,13 +64,40 @@ Config.PlotAccents = {
 	Color3.fromRGB(255, 150, 80),
 }
 
--- Stations on every plot (Phase 1 = placement only; they become usable in later phases).
+-- Stations on every plot. The prompt works with keyboard (E) and touch (tap).
 Config.Stations = {
-	Hive = { Label = "🐝 Hive", Action = "Open Hive" },
+	Hive = { Label = "🐝 Hive", Action = "Collect Honey" },
 	FlowerPatch = { Label = "🌸 Flower Patch", Action = "Inspect" },
 	BeeShop = { Label = "🛒 Bee Shop", Action = "Shop" },
-	Bottling = { Label = "🍯 Bottling", Action = "Bottle Honey" },
+	Bottling = { Label = "🍯 Bottling", Action = "Deposit Honey" },
 	SellStand = { Label = "💰 Honey Stand", Action = "Collect Cash" },
+}
+Config.PromptDistance = 12 -- studs; the server also checks this (+ a little slack)
+
+-- Economy (Phase 2). Prices/rates live here so they're easy to rebalance. -----
+Config.Economy = {
+	StartCash = 25,
+	StartBees = { "Starter" }, -- tiers given to a new player
+	BackpackCapacity = 50, -- honey a player can carry
+	HiveCapacity = 50, -- honey the hive stores before bees stop adding
+	BottlingPerSecond = 1, -- honey -> jars per second
+	JarValue = 5, -- cash added to the stand's unclaimed balance per finished jar
+	JarTravelTime = 3, -- seconds a jar rides the conveyor before it counts
+	MaxJarsOnBelt = 12, -- visual limit; extra jars still count, they just queue up
+}
+
+-- Bee tiers. Phase 3 adds the rest (Clover, Daisy, ...).
+Config.Bees = {
+	Starter = { Name = "Starter Bee", HoneyPerSecond = 1 / 5, Scale = 0.35 },
+}
+Config.BeeOrder = { "Starter" }
+
+-- Bee flight (client visual only)
+Config.BeeFlight = {
+	Speed = 9, -- studs per second
+	HoverTime = 1.6, -- seconds spent at a flower / the hive
+	Bob = 0.6, -- vertical wobble in studs
+	YawOffset = math.pi / 2, -- the template model's "forward" is +X
 }
 
 return Config

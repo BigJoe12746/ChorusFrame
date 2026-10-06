@@ -314,6 +314,9 @@ function Instance.new(className)
 		raw.FireClient = function(_, player, ...)
 			table.insert(raw.fired, { player, ... })
 		end
+		raw.FireAllClients = function(_, ...)
+			table.insert(raw.fired, { "all", ... })
+		end
 	elseif className == "ProximityPrompt" then
 		raw.Triggered = Signal()
 		raw.Enabled = true
@@ -384,7 +387,39 @@ function Instance.Destroy(self)
 	self.Parent = nil
 end
 function Instance.Clone(self)
-	error("Clone not mocked")
+	local copy = Instance.new(rawget(self, "_props").ClassName)
+	for k, v in rawget(self, "_props") do
+		if k ~= "Parent" and k ~= "ChildAdded" and k ~= "DescendantAdded" then
+			rawget(copy, "_props")[k] = v
+		end
+	end
+	for k, v in rawget(self, "_attrs") do
+		rawget(copy, "_attrs")[k] = v
+	end
+	for _, c in rawget(self, "_children") do
+		local cc = Instance.Clone(c)
+		cc.Parent = copy
+	end
+	return copy
+end
+function Instance.GetPivot(self)
+	local raw = rawget(self, "_props")
+	if raw.ClassName == "Model" then
+		if raw.Pivot then
+			return raw.Pivot
+		end
+		if raw.PrimaryPart then
+			return raw.PrimaryPart.CFrame
+		end
+		return raw.WorldPivot or CF.new()
+	end
+	return raw.CFrame
+end
+function Instance.GetScale(self)
+	return rawget(self, "_props").Scale or 1
+end
+function Instance.ScaleTo(self, s)
+	rawget(self, "_props").Scale = s
 end
 function Instance.SetAttribute(self, k, v)
 	rawget(self, "_attrs")[k] = v
@@ -433,6 +468,8 @@ function M.newGame()
 	rawget(game, "_props").GetService = function(_, n)
 		return services[n]
 	end
+
+	rawget(services.RunService, "_props").Heartbeat = Signal()
 
 	-- Players service
 	local Players = services.Players
