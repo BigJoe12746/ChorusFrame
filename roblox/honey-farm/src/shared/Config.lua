@@ -239,6 +239,13 @@ Config.Sounds = {
 	BuzzVolume = 0.12,
 }
 
+-- Flood protection (Phase 7). A human can't press more than ~10 times a second; anything
+-- past these limits is dropped before it reaches the economy code.
+Config.Limits = {
+	RemotesPerSecond = 25, -- shop / upgrade requests per player
+	PromptsPerSecond = 25, -- station presses per player
+}
+
 -- Bee flight (client visual only)
 Config.BeeFlight = {
 	Speed = 9, -- studs per second

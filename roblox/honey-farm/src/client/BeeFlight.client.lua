@@ -109,14 +109,28 @@ plots.ChildAdded:Connect(function(plot)
 	task.spawn(watchPlot, plot)
 end)
 
+-- Performance: bees far from the camera update less often (or not at all), so six full
+-- farms of bees cost almost nothing when you're on your own plot.
+local NEAR, FAR = 90, 220
+local frame = 0
 local t = 0
 RunService.Heartbeat:Connect(function(dt)
 	t += dt
+	frame += 1
+	local cam = workspace.CurrentCamera
+	local camPos = if cam then cam.CFrame.Position else Vector3.zero
 	for model, f in flyers do
 		if not model.Parent then
 			flyers[model] = nil
 			continue
 		end
+		local d = (f.Hive.Position - camPos).Magnitude
+		if d > FAR then
+			continue -- off in the distance: frozen until you come closer
+		elseif d > NEAR and frame % 4 ~= 0 then
+			continue -- mid distance: 1/4 rate
+		end
+		local step = if d > NEAR then dt * 4 else dt
 		local pivot = model:GetPivot()
 		local pos = pivot.Position
 		local to = f.Target - pos
@@ -125,14 +139,14 @@ RunService.Heartbeat:Connect(function(dt)
 
 		if to.Magnitude < 1.2 then
 			-- hovering at the flower / hive
-			f.Hover -= dt
+			f.Hover -= step
 			model:PivotTo(pivot + bob)
 			if f.Hover <= 0 then
 				pickTarget(f)
 			end
 		else
-			local step = math.min(F.Speed * dt, to.Magnitude)
-			local newPos = pos + to.Unit * step + bob
+			local move = math.min(F.Speed * step, to.Magnitude)
+			local newPos = pos + to.Unit * move + bob
 			local look = if flat.Magnitude > 0.05 then CFrame.lookAt(newPos, newPos + flat.Unit) else CFrame.new(newPos) * pivot.Rotation
 			local tilt = CFrame.Angles(0, 0, math.sin(t * 6 + f.Phase) * 0.08)
 			model:PivotTo(look * tilt)

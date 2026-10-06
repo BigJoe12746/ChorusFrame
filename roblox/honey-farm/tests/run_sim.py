@@ -23,6 +23,7 @@ SCRIPTS = [
     ("ReplicatedStorage.HoneyFarm.BeeAppearance", "ModuleScript", "src/shared/BeeAppearance.lua"),
     ("ServerScriptService.HoneyFarm.MapBuilder", "ModuleScript", "src/server/MapBuilder.lua"),
     ("ServerScriptService.HoneyFarm.PlotService", "ModuleScript", "src/server/PlotService.lua"),
+    ("ServerScriptService.HoneyFarm.RateLimiter", "ModuleScript", "src/server/RateLimiter.lua"),
     ("ServerScriptService.HoneyFarm.UpgradeVisuals", "ModuleScript", "src/server/UpgradeVisuals.lua"),
     ("ServerScriptService.HoneyFarm.SaveService", "ModuleScript", "src/server/SaveService.lua"),
     ("ServerScriptService.HoneyFarm.FarmService", "ModuleScript", "src/server/FarmService.lua"),
@@ -45,6 +46,9 @@ def build_bundle(scenario: str) -> str:
     out.append(
         """
 local game, workspace, services = M.newGame()
+-- simulated clock: os.clock() inside game scripts advances only when the scenario ticks
+M.simTime = 1000
+local simOs = setmetatable({ clock = function() return M.simTime end }, { __index = os })
 local cache = {}
 local loading = {}
 local env
@@ -63,7 +67,7 @@ env = function(scriptInst)
 		game = game, workspace = workspace, script = scriptInst, require = req,
 		Instance = M.Instance, Vector3 = M.Vector3, Vector2 = M.Vector2, CFrame = M.CFrame,
 		Color3 = M.Color3, UDim = M.UDim, UDim2 = M.UDim2, Enum = M.Enum, Random = M.Random,
-		TweenInfo = M.TweenInfo, task = M.task,
+		TweenInfo = M.TweenInfo, task = M.task, os = simOs,
 		warn = function(...) print("[warn]", ...) end,
 	}, { __index = _G })
 end
@@ -135,6 +139,7 @@ local function tick(seconds, step)
 	local t = 0
 	while t < seconds - 1e-9 do
 		local dt = math.min(step, seconds - t)
+		M.simTime += dt
 		hb:Fire(dt)
 		t += dt
 	end

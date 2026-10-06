@@ -15,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("HoneyFarm")
 local Config = require(Shared:WaitForChild("Config"))
 local PlotAllocator = require(Shared:WaitForChild("PlotAllocator"))
+local RateLimiter = require(script.Parent:WaitForChild("RateLimiter"))
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local NotifyRemote = Remotes:WaitForChild("Notify") :: RemoteEvent
@@ -34,6 +35,7 @@ local plotsFolder: Folder
 local plotModels: { [number]: Model } = {}
 local allocator = PlotAllocator.new(Config.PlotCount)
 local lastReturn: { [Player]: number } = {}
+local promptLimiter = RateLimiter.new(Config.Limits.PromptsPerSecond, 1)
 
 local function notify(player: Player, text: string, kind: string?)
 	NotifyRemote:FireClient(player, text, kind or "info")
@@ -175,6 +177,7 @@ end
 
 local function onPlayerRemoving(player: Player)
 	lastReturn[player] = nil
+	promptLimiter:Forget(player)
 	local freedId, nextUserId = allocator:Release(player.UserId)
 	if not freedId then
 		return
@@ -234,6 +237,9 @@ end
 
 local function hookPrompt(prompt: ProximityPrompt)
 	prompt.Triggered:Connect(function(player)
+		if not promptLimiter:Allow(player, os.clock()) then
+			return -- flooding: a human can't press this fast
+		end
 		local plot = PlotService.GetPlotFromInstance(prompt)
 		if not plot then
 			return

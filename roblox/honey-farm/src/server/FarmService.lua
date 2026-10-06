@@ -28,6 +28,7 @@ local BeeAppearance = require(Shared:WaitForChild("BeeAppearance"))
 local PlotService = require(script.Parent:WaitForChild("PlotService"))
 local UpgradeVisuals = require(script.Parent:WaitForChild("UpgradeVisuals"))
 local SaveService = require(script.Parent:WaitForChild("SaveService"))
+local RateLimiter = require(script.Parent:WaitForChild("RateLimiter"))
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local NotifyRemote = Remotes:WaitForChild("Notify") :: RemoteEvent
@@ -52,6 +53,20 @@ type Farm = {
 }
 
 local farms: { [Player]: Farm } = {}
+local remoteLimiter = RateLimiter.new(Config.Limits.RemotesPerSecond, 1)
+local flooded: { [Player]: boolean } = {}
+
+-- True if this remote call may proceed; floods are dropped (one warning per player).
+local function allowRemote(player: Player): boolean
+	if remoteLimiter:Allow(player, os.clock()) then
+		return true
+	end
+	if not flooded[player] then
+		flooded[player] = true
+		warn(("[HoneyFarm] Dropping flooded requests from %s (%d+/s)"):format(player.Name, Config.Limits.RemotesPerSecond))
+	end
+	return false
+end
 
 local function notify(player: Player, text: string, kind: string?)
 	NotifyRemote:FireClient(player, text, kind or "info")
@@ -298,6 +313,9 @@ local function mergeBees(farm: Farm, idA: any, idB: any)
 end
 
 local function onShopAction(player: Player, action: any, a: any, b: any)
+	if not allowRemote(player) then
+		return
+	end
 	local farm = farms[player]
 	if not farm or farm.Busy then
 		return
@@ -336,6 +354,9 @@ local function formatValue(id: string, value: number): string
 end
 
 local function onUpgradeAction(player: Player, id: any)
+	if not allowRemote(player) then
+		return
+	end
 	local farm = farms[player]
 	if not farm or farm.Busy or type(id) ~= "string" or not Config.Upgrades[id] then
 		return
@@ -467,6 +488,8 @@ local function stopFarm(player: Player, plot: Model)
 	local farm = farms[player]
 	farms[player] = nil
 	loading[player] = nil
+	remoteLimiter:Forget(player)
+	flooded[player] = nil
 	if farm then
 		saveFarm(farm)
 	end

@@ -2,7 +2,7 @@
 
 A colourful multiplayer bee‑farming tycoon. Players own a garden plot, buy bees, make honey, bottle and sell it, merge bees, and expand their farm.
 
-**Status: Phases 1–6 are done (map and plots, the honey loop, the Bee Shop and merging, farm upgrades, saving and offline honey, interface and introduction).** Phase 7 is the roadmap below.
+**Status: all seven phases are done.** Map and plots, the honey loop, the Bee Shop and merging, farm upgrades, saving and offline honey, interface and introduction, and the multiplayer/quality pass. See **[TESTING.md](TESTING.md)** for exactly what was verified here and what still needs a Studio playtest.
 
 | Whole map (top‑down, generated from the real scripts) | One plot |
 |---|---|
@@ -150,6 +150,14 @@ Settings are in `Config.Save`: `StoreName` (change it to reset everyone), `Autos
 
 Keys: **H** My Farm, **U** Upgrades, **B** Bee collection, **Esc** closes any panel.
 
+## What Phase 7 includes: multiplayer and quality checks
+
+- **Server authority audit**: every money/honey/bee/upgrade change runs in `FarmService`; clients only read attributes; remotes carry no plot argument so they can only touch the sender's own farm; ownership, distance, price and capacity are all checked server‑side. Full table in [TESTING.md](TESTING.md#server-authority-audit-phase-7).
+- **Flood protection**: `RateLimiter` drops more than 25 remotes/s or 25 station presses/s per player before any economy code runs (`Config.Limits`). The economy was already atomic; this stops an exploiter from burning server time.
+- **Lightweight visuals**: bee flight is client‑only and now distance‑culled (frozen past 220 studs, ¼ rate from 90–220), jars are local parts capped at 12 per plot, attributes replicate only on change.
+- **Two‑player scenario** (`tests/phase7.scenario.luau`): cross‑ownership on all five stations, full storage, insufficient funds, 100‑press spam bursts on hive/shop/upgrades/merge with exact expected outcomes, per‑player limiting, leave and rejoin, independent offline rewards, and a queued 7th player loading his own save.
+- **Report**: [TESTING.md](TESTING.md) lists what was actually tested (with counts), the authority audit, performance notes, the Studio checklist and a release checklist.
+
 ### Hooks for later phases
 
 - `PlotService.GetPlot(player)`, `PlotService.IsOwner(player, instance)`, and the `PlotAssigned`/`PlotReleased` events.
@@ -164,7 +172,7 @@ Keys: **H** My Farm, **U** Upgrades, **B** Bee collection, **Esc** closes any pa
 default.project.json          how files map into the game
 HoneyFarm.rbxl                 built place file, ready to open
 src/shared/   → ReplicatedStorage.HoneyFarm   Config, PlotAllocator, FarmState, BeeAppearance
-src/server/   → ServerScriptService.HoneyFarm  Main, MapBuilder, PlotService, FarmService, UpgradeVisuals, SaveService
+src/server/   → ServerScriptService.HoneyFarm  Main, MapBuilder, PlotService, FarmService, UpgradeVisuals, SaveService, RateLimiter
 src/client/   → StarterPlayerScripts.HoneyFarm FarmClient, FarmHud, StationLabels, BeeFlight, ConveyorJars, BeeShop, MergeEffects,
                                                 Upgrades, WelcomeBack, Tutorial, Effects, CollectionBook, BeeSounds
 assets/BeeTemplate.rbxm → ReplicatedStorage.Assets.BeeTemplate
@@ -182,6 +190,8 @@ You can change all the sizes, colours and the plot count in `src/shared/Config.l
 | Plot assignment logic: separate plots, no double assignment, release, queue when full, rejoin | `luau tests/PlotAllocator.spec.luau` | 17/17 pass |
 | Economy logic: production rate, hive cap and lost honey, backpack cap, 1 jar/sec, $5 per jar, collecting twice never pays twice, a 3,000‑step conservation run with random frame times, shop prices and exact charges, 8‑slot cap, merge rules (same bee, missing bee, different tiers, top tier), ×2.5 production, discovery flags, upgrade levels/values/prices, maxed and unaffordable refusals, multiplier, faster bottling, bigger backpack, a 9th bee after the slot upgrade, base values without an upgrade table, save round‑trip (money, honey, bees with ids, upgrades, processing, discoveries), hostile data clamped, offline honey (rate × time, 8‑hour cap, hive‑room cap, credited once), introduction steps (no skipping, saved, clamped) | `luau tests/FarmState.spec.luau` | 98/98 pass |
 | Full Phase 1 scenario: the **real** server scripts run against a small mock of the Roblox engine. Builds the map, two players join, spawn on separate farms, use **My Farm** (including spam and visiting), respawn, owner‑only stations, leave and clear the plot, rejoin, a full server with a 7th player queued | `python3 tests/run_sim.py --luau <path to luau> --render out/` | 123/123 pass |
+| Full Phase 7 scenario (two players at once): see TESTING.md | `python3 tests/run_sim.py --luau <luau> --scenario tests/phase7.scenario.luau` | 37/37 pass |
+| Rate limiter: window, reset, per‑key buckets, a 100‑call burst passes exactly 25 | `luau tests/RateLimiter.spec.luau` | 8/8 pass |
 | Full Phase 6 scenario: steps point at real stations; built‑in sound ids; pressing other stations early doesn't skip; empty hive doesn't count; collect → deposit → cash → buy → merge each advance exactly one step with the matching Feedback event (kind, amount, station); finishing pays the bonus; finished stays finished; step saved and restored; collection data lists Starter + Clover; a second player starts at step 1 | `python3 tests/run_sim.py --luau <luau> --scenario tests/phase6.scenario.luau` | 32/32 pass |
 | Full Phase 5 scenario (in‑memory DataStore): new player loads empty; leaving saves everything with a timestamp; rejoin 2 h later restores progress, respawns bee models and upgrade visuals, credits offline honey (2 bees × 0.2/s × 7200 s = 2880, capped to the hive's free room) with one welcome card; rejoin 10 s later credits nothing; 30 h away counts as 8 h; autosave after 60 s; a load that fails all retries gives a temporary farm and never writes; one transient failure still loads; a newer save elsewhere is not overwritten; BindToClose saves everyone; unavailable DataStores → temporary progress, player told, nothing written | `python3 tests/run_sim.py --luau <luau> --scenario tests/phase5.scenario.luau` | 29/29 pass |
 | Full Phase 4 scenario: config sanity (prices per step, values rise); refused without cash and from the village; hive storage → capacity 120/250 with 1/2 mini hives and exact charges; bottling speed 2 → 2 jars/s and a tank module; production ×1.25 + pollen orb; backpack 100; 8/8 slots message → slot upgrade → 9th bee; two rapid presses = two levels at listed prices; maxed refused; garbage ids ignored; honey conservation with upgrades; other player can't upgrade your farm; leaving clears visuals; next owner starts at level 1 | `python3 tests/run_sim.py --luau <luau> --scenario tests/phase4.scenario.luau` | 40/40 pass |
@@ -238,5 +248,5 @@ Phase 6 (needs a real client):
 - [x] **4. Farm upgrades**: production, hive storage, backpack, bottling speed, bee slots
 - [x] **5. Saving and offline honey**: DataStore, autosave, offline earnings capped at 8 hours
 - [x] **6. Interface and introduction**: tutorial, collection book, effects and sounds
-- [ ] **7. Multiplayer and quality checks**: server authority, anti‑spam, two‑player tests
+- [x] **7. Multiplayer and quality checks**: server authority, anti‑spam, two‑player tests
 - Later: flower combos, Royal Jelly rebirths, quests, seasonal bees, hive skins, co‑op events
