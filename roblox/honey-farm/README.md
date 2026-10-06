@@ -2,7 +2,7 @@
 
 A colourful multiplayer bee‑farming tycoon. Players own a garden plot, buy bees, make honey, bottle and sell it, merge bees, and expand their farm.
 
-**Status: Phases 1–3 are done (map and plots, the honey loop, the Bee Shop and merging).** Phases 4–7 are the roadmap below.
+**Status: Phases 1–4 are done (map and plots, the honey loop, the Bee Shop and merging, farm upgrades).** Phases 5–7 are the roadmap below.
 
 | Whole map (top‑down, generated from the real scripts) | One plot |
 |---|---|
@@ -99,7 +99,23 @@ Every tier is your `BeeTemplate` recoloured by part role (head/stripes, dark str
 
 `BeeAppearance.Build` also re-pivots every bee so its head is "forward" and its wings are "up" (the template file is saved tilted for its thumbnail), which is why flight no longer needs a yaw offset.
 
-Hive capacity is still 50, so a Galaxy Bee fills it in a fraction of a second. That's expected for now: Phase 4 adds the hive-storage upgrade.
+## What Phase 4 includes: farm upgrades
+
+Press the **⬆ Upgrades** button (top‑right) or **U** anywhere on your own farm. Each row shows the current value, the next value and the price; maxed rows say MAX.
+
+| Upgrade | Levels (value) | Prices to reach the next level |
+|---|---|---|
+| 🐝 Bee Production | ×1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6.5, 8 | $120, 300, 750, 1.8k, 4k, 9k, 20k, 45k, 100k |
+| 🏠 Hive Storage | 50, 120, 250, 500, 1k, 2k, 4k, 8k, 16k, 32k honey | $80, 200, 500, 1.2k, 3k, 7k, 16k, 36k, 80k |
+| 🎒 Backpack | 50, 100, 200, 400, 800, 1.6k, 3.2k, 6.4k, 12.8k honey | $60, 150, 400, 1k, 2.5k, 6k, 14k, 32k |
+| 🍯 Bottling Speed | 1, 2, 3, 5, 8, 12, 20, 30, 50 jars/s | $100, 250, 600, 1.5k, 3.5k, 8k, 18k, 40k |
+| ➕ Bee Slots | 8, 10, 12, 14, 16, 18, 20 bees | $200, 600, 1.5k, 4k, 10k, 25k |
+
+All of it is the `Config.Upgrades` table in `src/shared/Config.lua`: `Levels` is the list of values (level 1 is free), `Prices[i]` is the cost of going from level i to i+1. Add or remove entries and the UI, server and visuals follow.
+
+**Visible on the farm** (`src/server/UpgradeVisuals.lua`, built into `Plot.Temp.Upgrades`): each Hive Storage level adds a mini hive to the hive yard and a gold band to the main hive; each Bottling Speed level adds a honey tank with a pipe beside the machine; Production levels add glowing pollen orbs over the flower patch; Bee Slot levels add landing boards to the hive.
+
+**Server rules**: you must own the plot and be standing on it; the price is taken from the same table the UI shows; maxed and unaffordable upgrades change nothing; each press buys exactly one level.
 
 ### Hooks for later phases
 
@@ -115,8 +131,8 @@ Hive capacity is still 50, so a Galaxy Bee fills it in a fraction of a second. T
 default.project.json          how files map into the game
 HoneyFarm.rbxl                 built place file, ready to open
 src/shared/   → ReplicatedStorage.HoneyFarm   Config, PlotAllocator, FarmState, BeeAppearance
-src/server/   → ServerScriptService.HoneyFarm  Main, MapBuilder, PlotService, FarmService
-src/client/   → StarterPlayerScripts.HoneyFarm FarmClient, FarmHud, StationLabels, BeeFlight, ConveyorJars, BeeShop, MergeEffects
+src/server/   → ServerScriptService.HoneyFarm  Main, MapBuilder, PlotService, FarmService, UpgradeVisuals
+src/client/   → StarterPlayerScripts.HoneyFarm FarmClient, FarmHud, StationLabels, BeeFlight, ConveyorJars, BeeShop, MergeEffects, Upgrades
 assets/BeeTemplate.rbxm → ReplicatedStorage.Assets.BeeTemplate
 tests/                          offline tests (see below)
 ```
@@ -130,8 +146,9 @@ You can change all the sizes, colours and the plot count in `src/shared/Config.l
 | Test | How | Result |
 |---|---|---|
 | Plot assignment logic: separate plots, no double assignment, release, queue when full, rejoin | `luau tests/PlotAllocator.spec.luau` | 17/17 pass |
-| Economy logic: production rate, hive cap and lost honey, backpack cap, 1 jar/sec, $5 per jar, collecting twice never pays twice, a 3,000‑step conservation run with random frame times, shop prices and exact charges, 8‑slot cap, merge rules (same bee, missing bee, different tiers, top tier), ×2.5 production, discovery flags | `luau tests/FarmState.spec.luau` | 50/50 pass |
+| Economy logic: production rate, hive cap and lost honey, backpack cap, 1 jar/sec, $5 per jar, collecting twice never pays twice, a 3,000‑step conservation run with random frame times, shop prices and exact charges, 8‑slot cap, merge rules (same bee, missing bee, different tiers, top tier), ×2.5 production, discovery flags, upgrade levels/values/prices, maxed and unaffordable refusals, multiplier, faster bottling, bigger backpack, a 9th bee after the slot upgrade, base values without an upgrade table | `luau tests/FarmState.spec.luau` | 65/65 pass |
 | Full Phase 1 scenario: the **real** server scripts run against a small mock of the Roblox engine. Builds the map, two players join, spawn on separate farms, use **My Farm** (including spam and visiting), respawn, owner‑only stations, leave and clear the plot, rejoin, a full server with a 7th player queued | `python3 tests/run_sim.py --luau <path to luau> --render out/` | 123/123 pass |
+| Full Phase 4 scenario: config sanity (prices per step, values rise); refused without cash and from the village; hive storage → capacity 120/250 with 1/2 mini hives and exact charges; bottling speed 2 → 2 jars/s and a tank module; production ×1.25 + pollen orb; backpack 100; 8/8 slots message → slot upgrade → 9th bee; two rapid presses = two levels at listed prices; maxed refused; garbage ids ignored; honey conservation with upgrades; other player can't upgrade your farm; leaving clears visuals; next owner starts at level 1 | `python3 tests/run_sim.py --luau <luau> --scenario tests/phase4.scenario.luau` | 40/40 pass |
 | Full Phase 3 scenario: all ten tiers build from a stand‑in of your template (role classification, accessory present, one head, scaled, unique look, no camera); E at the shop opens the UI; buy at exactly $25; refused with $0, from far away, and at 8 slots; ten rapid presses buy exactly 6 bees at the exact rising prices; merge two Starters → Clover (parents' models removed, new model spawned, production = 6×0.2 + 0.5, discovery event + message); refused merges change nothing (different tiers, same bee, missing bees, garbage args); second Clover isn't a discovery; two Royals can't merge; another player's buy never touches your farm; leaving clears everything | `python3 tests/run_sim.py --luau <luau> --scenario tests/phase3.scenario.luau` | 117/117 pass |
 | Full Phase 2 scenario: new player gets 25 Cash + a bee model; produce → collect → deposit → 50 jars → $250 → collect; empty hive, full hive, full backpack, double‑press deposit, double collect, press from across the map (ignored), visitor refused, two farms producing independently, leaving clears state, next owner starts fresh | `python3 tests/run_sim.py --luau <luau> --scenario tests/phase2.scenario.luau` | 41/41 pass |
 | Type check against the Roblox API definitions | `luau-lsp analyze` with Roblox definitions and a Rojo sourcemap | no errors |
@@ -159,12 +176,17 @@ Phase 3 (needs a real client):
 - [ ] The Bee Shop panel fits a phone screen, cards are easy to tap, the preview bee spins, and the panel closes when you walk away or press Esc.
 - [ ] The merge sparkle burst appears at the hive, the new bee pops in, and the "New bee discovered!" banner slides down.
 
+Phase 4 (needs a real client):
+- [ ] The Upgrades panel fits a phone screen and the ⬆ button doesn't collide with the Roblox top bar.
+- [ ] Mini hives sit on the "Future Hives" pad and tank modules on the "Future Machines" pad without clipping the fence or paths; the gold bands wrap the main hive at sensible heights.
+- [ ] HUD bars re-scale when capacity grows (e.g. hive 50 → 120).
+
 ## Roadmap
 
 - [x] **1. Map and player plots**
 - [x] **2. First playable honey loop**: Starter Bee, 25 Cash, hive storage, backpack (50), bottling at 1 jar/sec, conveyor, 5 Cash per jar, collect at the stand
 - [x] **3. Bee shop and merging**: 10 tiers (Starter, Clover, Daisy, Strawberry, Panda, Knight, Crystal, Storm, Galaxy, Royal); each merge is ×2.5 production
-- [ ] **4. Farm upgrades**: production, hive storage, backpack, bottling speed, bee slots
+- [x] **4. Farm upgrades**: production, hive storage, backpack, bottling speed, bee slots
 - [ ] **5. Saving and offline honey**: DataStore, autosave, offline earnings capped at 8 hours
 - [ ] **6. Interface and introduction**: tutorial, collection book, effects and sounds
 - [ ] **7. Multiplayer and quality checks**: server authority, anti‑spam, two‑player tests

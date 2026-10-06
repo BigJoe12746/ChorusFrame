@@ -5,11 +5,13 @@
 --   Player attributes: Cash, Carried, BackpackCapacity
 --   Plot attributes:   HiveStored, HiveCapacity, BottlingQueue, BottlingProgress, JarsOnBelt,
 --                      Unclaimed, ProductionRate, BeeCount, BeeSlots, BeePrice,
---                      Bees ("id:Tier,id:Tier"), Discovered ("Starter,Clover")
+--                      Bees ("id:Tier,id:Tier"), Discovered ("Starter,Clover"),
+--                      Upgrades ("Production:1,HiveStorage:2,..."), BottlingSpeed, ProductionMultiplier
 --   Remotes:  JarStarted(plotId, n)                   -> all clients animate jars
 --             OpenShop()                              -> the owner's client opens the shop UI
 --             ShopAction("Buy") / ("Merge", idA, idB) <- the owner's client
 --             BeeMerged(plotId, idA, idB, newId, tier, isNew) -> all clients play the merge effect
+--             UpgradeAction(id)                       <- the owner's client (must be standing on their plot)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,6 +21,7 @@ local Config = require(Shared:WaitForChild("Config"))
 local FarmState = require(Shared:WaitForChild("FarmState"))
 local BeeAppearance = require(Shared:WaitForChild("BeeAppearance"))
 local PlotService = require(script.Parent:WaitForChild("PlotService"))
+local UpgradeVisuals = require(script.Parent:WaitForChild("UpgradeVisuals"))
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local NotifyRemote = Remotes:WaitForChild("Notify") :: RemoteEvent
@@ -26,6 +29,7 @@ local JarRemote = Remotes:WaitForChild("JarStarted") :: RemoteEvent
 local OpenShopRemote = Remotes:WaitForChild("OpenShop") :: RemoteEvent
 local ShopActionRemote = Remotes:WaitForChild("ShopAction") :: RemoteEvent
 local BeeMergedRemote = Remotes:WaitForChild("BeeMerged") :: RemoteEvent
+local UpgradeRemote = Remotes:WaitForChild("UpgradeAction") :: RemoteEvent
 
 local FarmService = {}
 
@@ -76,6 +80,14 @@ local function encodeDiscovered(state: FarmState.State): string
 	return table.concat(parts, ",")
 end
 
+local function encodeUpgrades(state: FarmState.State): string
+	local parts = {}
+	for _, id in Config.Upgrades.Order do
+		table.insert(parts, id .. ":" .. state:UpgradeLevel(id))
+	end
+	return table.concat(parts, ",")
+end
+
 local function replicate(farm: Farm)
 	local s = farm.State
 	setAttr(farm, farm.Player, "Cash", s.Cash)
@@ -89,13 +101,16 @@ local function replicate(farm: Farm)
 	setAttr(farm, farm.Plot, "Unclaimed", s.Unclaimed)
 	setAttr(farm, farm.Plot, "ProductionRate", s:ProductionRate())
 	setAttr(farm, farm.Plot, "BeeCount", #s.Bees)
-	setAttr(farm, farm.Plot, "BeeSlots", Config.Economy.BeeSlots)
+	setAttr(farm, farm.Plot, "BeeSlots", s.BeeSlots)
+	setAttr(farm, farm.Plot, "BottlingSpeed", s.BottlingPerSecond)
+	setAttr(farm, farm.Plot, "ProductionMultiplier", s.ProductionMultiplier)
+	setAttr(farm, farm.Plot, "Upgrades", encodeUpgrades(s))
 	setAttr(farm, farm.Plot, "BeePrice", s:BeePrice())
 	setAttr(farm, farm.Plot, "Bees", encodeBees(s))
 	setAttr(farm, farm.Plot, "Discovered", encodeDiscovered(s))
 end
 
-local PLOT_KEYS = { "HiveStored", "HiveCapacity", "BottlingQueue", "BottlingProgress", "JarsOnBelt", "Unclaimed", "ProductionRate", "BeeCount", "BeeSlots", "BeePrice", "Bees", "Discovered" }
+local PLOT_KEYS = { "HiveStored", "HiveCapacity", "BottlingQueue", "BottlingProgress", "JarsOnBelt", "Unclaimed", "ProductionRate", "BeeCount", "BeeSlots", "BeePrice", "Bees", "Discovered", "BottlingSpeed", "ProductionMultiplier", "Upgrades" }
 local PLAYER_KEYS = { "Cash", "Carried", "BackpackCapacity" }
 
 ------------------------------------------------------------------------------
@@ -207,14 +222,14 @@ local function buyBee(farm: Farm)
 	local bee, reason = s:BuyBee()
 	if not bee then
 		if reason == "NoSlots" then
-			notify(farm.Player, ("All %d bee slots are full. Merge two bees to make room!"):format(Config.Economy.BeeSlots), "warning")
+			notify(farm.Player, ("All %d bee slots are full. Merge two bees, or buy the Bee Slots upgrade!"):format(s.BeeSlots), "warning")
 		else
 			notify(farm.Player, ("You need $%s for a Starter Bee (you have $%s)."):format(fmt(price), fmt(s.Cash)), "warning")
 		end
 		return
 	end
 	spawnBeeModel(farm, bee, true)
-	notify(farm.Player, ("Bought a Starter Bee for $%s! 🐝 (%d/%d slots)"):format(fmt(price), #s.Bees, Config.Economy.BeeSlots), "success")
+	notify(farm.Player, ("Bought a Starter Bee for $%s! 🐝 (%d/%d slots)"):format(fmt(price), #s.Bees, s.BeeSlots), "success")
 end
 
 local MERGE_MESSAGES = {
@@ -266,6 +281,51 @@ local function onShopAction(player: Player, action: any, a: any, b: any)
 end
 
 ------------------------------------------------------------------------------
+-- Upgrades (from the Upgrades panel; the player must be on their own plot)
+------------------------------------------------------------------------------
+
+local function onPlot(player: Player, plot: Model): boolean
+	local character = player.Character
+	if not character then
+		return false
+	end
+	local offset = plot:GetPivot():PointToObjectSpace(character:GetPivot().Position)
+	local half = Config.PlotSize / 2 + 8
+	return math.abs(offset.X) <= half and math.abs(offset.Z) <= half
+end
+
+local function formatValue(id: string, value: number): string
+	local u = Config.Upgrades[id]
+	return string.format(u.Format or "%g", value)
+end
+
+local function onUpgradeAction(player: Player, id: any)
+	local farm = farms[player]
+	if not farm or farm.Busy or type(id) ~= "string" or not Config.Upgrades[id] then
+		return
+	end
+	if not onPlot(player, farm.Plot) then
+		notify(player, "Go to your farm to buy upgrades.", "warning")
+		return
+	end
+	farm.Busy = true
+	local s = farm.State
+	local u = Config.Upgrades[id]
+	local nextValue, price = s:NextUpgrade(id)
+	local level, reason = s:BuyUpgrade(id)
+	if level then
+		UpgradeVisuals.Apply(farm.Plot, s)
+		notify(player, ("⬆ %s upgraded to %s for $%s!"):format(u.Name, formatValue(id, nextValue :: number), fmt(price :: number)), "success")
+	elseif reason == "Maxed" then
+		notify(player, ("%s is already at the maximum level."):format(u.Name), "info")
+	else
+		notify(player, ("You need $%s to upgrade %s (you have $%s)."):format(fmt(price or 0), u.Name, fmt(s.Cash)), "warning")
+	end
+	replicate(farm)
+	farm.Busy = false
+end
+
+------------------------------------------------------------------------------
 -- Lifecycle
 ------------------------------------------------------------------------------
 
@@ -276,7 +336,7 @@ local function startFarm(player: Player, plot: Model)
 	local farm: Farm = {
 		Player = player,
 		Plot = plot,
-		State = FarmState.new(Config.Economy, Config.Bees, Config.BeeOrder),
+		State = FarmState.new(Config.Economy, Config.Bees, Config.BeeOrder, Config.Upgrades),
 		Replicated = {},
 		Busy = false,
 	}
@@ -284,6 +344,7 @@ local function startFarm(player: Player, plot: Model)
 	for _, bee in farm.State.Bees do
 		spawnBeeModel(farm, bee)
 	end
+	UpgradeVisuals.Apply(plot, farm.State)
 	replicate(farm)
 end
 
@@ -332,6 +393,7 @@ function FarmService.Start()
 		end
 	end)
 	ShopActionRemote.OnServerEvent:Connect(onShopAction)
+	UpgradeRemote.OnServerEvent:Connect(onUpgradeAction)
 
 	-- players who already own a plot (e.g. script reloaded)
 	for _, player in Players:GetPlayers() do

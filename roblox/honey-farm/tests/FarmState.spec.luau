@@ -169,4 +169,58 @@ check(m:IsMaxTier("Royal") and not m:IsMaxTier("Starter"), "IsMaxTier")
 local _, againNew = m:MergeBees(m:AddBee("Clover").Id, m:AddBee("Clover").Id)
 check(againNew == false, "a second Daisy is not a new discovery")
 
+-- UPGRADES --------------------------------------------------------------------
+local UPG = {
+	Order = { "Production", "HiveStorage", "Backpack", "BottlingSpeed", "BeeSlots" },
+	Production = { Levels = { 1, 2, 4 }, Prices = { 100, 500 } },
+	HiveStorage = { Levels = { 50, 120, 250 }, Prices = { 80, 200 } },
+	Backpack = { Levels = { 50, 100 }, Prices = { 60 } },
+	BottlingSpeed = { Levels = { 1, 2, 5 }, Prices = { 100, 250 } },
+	BeeSlots = { Levels = { 8, 10 }, Prices = { 200 } },
+}
+local u = FarmState.new(ECO, BEES, ORDER, UPG)
+check(u:UpgradeLevel("HiveStorage") == 1 and u.HiveCapacity == 50 and u.BackpackCapacity == 50 and u.BottlingPerSecond == 1 and u.BeeSlots == 8 and u.ProductionMultiplier == 1, "level 1 everywhere = base values")
+local nv, np = u:NextUpgrade("HiveStorage")
+check(nv == 120 and np == 80, "next hive level shows value 120 for $80")
+local okU, whyU = u:CanBuyUpgrade("HiveStorage")
+check(okU == false and whyU == "NoCash", "can't afford with 25 cash")
+check(select(2, u:CanBuyUpgrade("Jetpack")) == "Unknown", "unknown upgrade id is rejected")
+u.Cash = 1000
+local lvl = u:BuyUpgrade("HiveStorage")
+check(lvl == 2 and u.Cash == 920 and u.HiveCapacity == 120, "bought hive storage: level 2, $80 charged, capacity 120")
+check(u:BuyUpgrade("HiveStorage") == 3 and u.Cash == 720 and u.HiveCapacity == 250, "level 3 for $200 -> capacity 250")
+local maxed, maxReason = u:BuyUpgrade("HiveStorage")
+check(maxed == nil and maxReason == "Maxed" and u.Cash == 720, "maxed upgrade can't be bought, no charge")
+check(u:NextUpgrade("HiveStorage") == nil, "no next level when maxed")
+-- production multiplier
+local base = u:ProductionRate()
+u:BuyUpgrade("Production")
+check(math.abs(u:ProductionRate() - base * 2) < 1e-9, "production x2 after the first production upgrade")
+-- bottling speed: 2 jars per second
+u:BuyUpgrade("BottlingSpeed")
+u.Carried = 10
+u:Deposit()
+local rr = ticks(u, 1.02)
+check(rr.JarsStarted == 2, "bottling speed 2 makes 2 jars in a second")
+-- backpack
+u:BuyUpgrade("Backpack")
+u.HiveStored = 100
+u.Carried = 0
+check(u:CollectHive() == 100, "bigger backpack carries 100")
+-- bee slots: 9th bee allowed after the upgrade
+u.Cash = 100000
+while #u.Bees < 8 do
+	u:BuyBee()
+end
+check(select(2, u:BuyBee()) == "NoSlots", "8 slots full")
+u:BuyUpgrade("BeeSlots")
+check(u.BeeSlots == 10 and u:BuyBee() ~= nil and #u.Bees == 9, "slot upgrade allows a 9th bee")
+-- shrinking capacity never happens, but stored honey is clamped to capacity if it did
+u.HiveStored = 999
+u:Recalculate()
+check(u.HiveStored == 250, "stored honey is clamped to capacity")
+-- without an upgrade table everything still works with base values
+local plain = FarmState.new(ECO, BEES, ORDER)
+check(plain.HiveCapacity == 50 and plain:UpgradeValue("HiveStorage") == nil and select(2, plain:BuyUpgrade("HiveStorage")) == "Unknown", "no upgrade table -> base values, purchases refused")
+
 print(("FarmState: %d checks passed"):format(passed))

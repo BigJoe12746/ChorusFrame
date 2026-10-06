@@ -23,10 +23,11 @@ SCRIPTS = [
     ("ReplicatedStorage.HoneyFarm.BeeAppearance", "ModuleScript", "src/shared/BeeAppearance.lua"),
     ("ServerScriptService.HoneyFarm.MapBuilder", "ModuleScript", "src/server/MapBuilder.lua"),
     ("ServerScriptService.HoneyFarm.PlotService", "ModuleScript", "src/server/PlotService.lua"),
+    ("ServerScriptService.HoneyFarm.UpgradeVisuals", "ModuleScript", "src/server/UpgradeVisuals.lua"),
     ("ServerScriptService.HoneyFarm.FarmService", "ModuleScript", "src/server/FarmService.lua"),
     ("ServerScriptService.HoneyFarm.Main", "Script", "src/server/Main.server.lua"),
 ]
-REMOTES = ["ReturnToFarm", "Notify", "JarStarted", "OpenShop", "ShopAction", "BeeMerged"]
+REMOTES = ["ReturnToFarm", "Notify", "JarStarted", "OpenShop", "ShopAction", "BeeMerged", "UpgradeAction"]
 
 
 def lua_str(s: str) -> str:

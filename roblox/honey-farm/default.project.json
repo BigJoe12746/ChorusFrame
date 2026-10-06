@@ -16,7 +16,8 @@
         "JarStarted": { "$className": "RemoteEvent" },
         "OpenShop": { "$className": "RemoteEvent" },
         "ShopAction": { "$className": "RemoteEvent" },
-        "BeeMerged": { "$className": "RemoteEvent" }
+        "BeeMerged": { "$className": "RemoteEvent" },
+        "UpgradeAction": { "$className": "RemoteEvent" }
       }
     },
     "ServerScriptService": {

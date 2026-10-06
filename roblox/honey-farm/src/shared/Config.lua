@@ -157,6 +157,52 @@ for i, tier in Config.BeeOrder do
 	bee.Scale = 0.35 + (i - 1) * 0.025
 end
 
+-- Farm upgrades (Phase 4). Levels[1] is the starting value (free); Prices[i] is the
+-- cost of going from level i to level i+1. Edit these two lists to rebalance.
+Config.Upgrades = {
+	Order = { "Production", "HiveStorage", "Backpack", "BottlingSpeed", "BeeSlots" },
+	Production = {
+		Name = "Bee Production",
+		Icon = "🐝",
+		Description = "Every bee makes more honey.",
+		Format = "x%.2g",
+		Levels = { 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6.5, 8 },
+		Prices = { 120, 300, 750, 1800, 4000, 9000, 20000, 45000, 100000 },
+	},
+	HiveStorage = {
+		Name = "Hive Storage",
+		Icon = "🏠",
+		Description = "The hive holds more honey before the bees stop.",
+		Format = "%d honey",
+		Levels = { 50, 120, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000 },
+		Prices = { 80, 200, 500, 1200, 3000, 7000, 16000, 36000, 80000 },
+	},
+	Backpack = {
+		Name = "Backpack",
+		Icon = "🎒",
+		Description = "Carry more honey per trip.",
+		Format = "%d honey",
+		Levels = { 50, 100, 200, 400, 800, 1600, 3200, 6400, 12800 },
+		Prices = { 60, 150, 400, 1000, 2500, 6000, 14000, 32000 },
+	},
+	BottlingSpeed = {
+		Name = "Bottling Speed",
+		Icon = "🍯",
+		Description = "The machine fills jars faster.",
+		Format = "%g jars/s",
+		Levels = { 1, 2, 3, 5, 8, 12, 20, 30, 50 },
+		Prices = { 100, 250, 600, 1500, 3500, 8000, 18000, 40000 },
+	},
+	BeeSlots = {
+		Name = "Bee Slots",
+		Icon = "➕",
+		Description = "Keep more bees on the farm at once.",
+		Format = "%d bees",
+		Levels = { 8, 10, 12, 14, 16, 18, 20 },
+		Prices = { 200, 600, 1500, 4000, 10000, 25000 },
+	},
+}
+
 -- Bee flight (client visual only)
 Config.BeeFlight = {
 	Speed = 9, -- studs per second

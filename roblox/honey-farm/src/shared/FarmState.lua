@@ -27,6 +27,7 @@ export type EconomyConfig = {
 }
 
 export type BeeConfig = { [string]: any } -- Config.Bees: tier -> { Name, HoneyPerSecond, Scale }
+export type UpgradeConfig = { [string]: any } -- Config.Upgrades: Order + id -> { Levels, Prices, ... }
 
 export type TickResult = {
 	Produced: number, -- whole honey added to the hive this tick
@@ -48,6 +49,10 @@ export type State = typeof(setmetatable(
 		BottlingAcc: number, -- progress (0..1) towards the next jar
 		Jars: { number }, -- seconds left before each jar on the belt arrives
 		Unclaimed: number,
+		BottlingPerSecond: number, -- derived from upgrades
+		BeeSlots: number, -- derived from upgrades
+		ProductionMultiplier: number, -- derived from upgrades
+		Upgrades: { [string]: number }, -- upgrade id -> level (1 = base)
 		NextBeeId: number,
 		BeesBought: number, -- shop purchases so far (drives the price)
 		Discovered: { [string]: boolean }, -- tiers this player has owned
@@ -55,11 +60,12 @@ export type State = typeof(setmetatable(
 		_eco: EconomyConfig,
 		_bees: BeeConfig,
 		_order: { string },
+		_upg: UpgradeConfig?,
 	},
 	FarmState
 ))
 
-function FarmState.new(eco: EconomyConfig, bees: BeeConfig, order: { string }): State
+function FarmState.new(eco: EconomyConfig, bees: BeeConfig, order: { string }, upgrades: UpgradeConfig?): State
 	local self = setmetatable({
 		Cash = eco.StartCash,
 		Carried = 0,
@@ -72,6 +78,10 @@ function FarmState.new(eco: EconomyConfig, bees: BeeConfig, order: { string }): 
 		BottlingAcc = 0,
 		Jars = {},
 		Unclaimed = 0,
+		BottlingPerSecond = eco.BottlingPerSecond,
+		BeeSlots = eco.BeeSlots,
+		ProductionMultiplier = 1,
+		Upgrades = {},
 		NextBeeId = 1,
 		BeesBought = 0,
 		Discovered = {},
@@ -79,11 +89,90 @@ function FarmState.new(eco: EconomyConfig, bees: BeeConfig, order: { string }): 
 		_eco = eco,
 		_bees = bees,
 		_order = order,
+		_upg = upgrades,
 	}, FarmState)
+	if upgrades then
+		for _, id in upgrades.Order do
+			self.Upgrades[id] = 1
+		end
+	end
+	self:Recalculate()
 	for _, tier in eco.StartBees do
 		self:AddBee(tier)
 	end
 	return self
+end
+
+------------------------------------------------------------------------------
+-- Upgrades
+------------------------------------------------------------------------------
+
+function FarmState.UpgradeLevel(self: State, id: string): number
+	return self.Upgrades[id] or 1
+end
+
+-- Current value of an upgrade (e.g. hive capacity in honey).
+function FarmState.UpgradeValue(self: State, id: string): number?
+	local u = self._upg and self._upg[id]
+	if not u then
+		return nil
+	end
+	return u.Levels[self:UpgradeLevel(id)]
+end
+
+-- The next level's value and price, or nil when maxed out.
+function FarmState.NextUpgrade(self: State, id: string): (number?, number?)
+	local u = self._upg and self._upg[id]
+	if not u then
+		return nil, nil
+	end
+	local level = self:UpgradeLevel(id)
+	local value = u.Levels[level + 1]
+	local price = u.Prices[level]
+	if value == nil or price == nil then
+		return nil, nil
+	end
+	return value, price
+end
+
+-- Re-derives capacities from upgrade levels (base values when there's no upgrade table).
+function FarmState.Recalculate(self: State)
+	local eco = self._eco
+	local hive = self:UpgradeValue("HiveStorage") or eco.HiveCapacity
+	self.HiveCapacity = hive
+	self.HiveStored = math.min(self.HiveStored, hive)
+	self.BackpackCapacity = self:UpgradeValue("Backpack") or eco.BackpackCapacity
+	self.BottlingPerSecond = self:UpgradeValue("BottlingSpeed") or eco.BottlingPerSecond
+	self.BeeSlots = self:UpgradeValue("BeeSlots") or eco.BeeSlots
+	self.ProductionMultiplier = self:UpgradeValue("Production") or 1
+end
+
+-- Returns ok, reason ("Unknown" | "Maxed" | "NoCash").
+function FarmState.CanBuyUpgrade(self: State, id: string): (boolean, string?)
+	if not (self._upg and self._upg[id]) then
+		return false, "Unknown"
+	end
+	local _, price = self:NextUpgrade(id)
+	if not price then
+		return false, "Maxed"
+	end
+	if self.Cash < price then
+		return false, "NoCash"
+	end
+	return true, nil
+end
+
+-- Buys the next level. Returns the new level (or nil, reason).
+function FarmState.BuyUpgrade(self: State, id: string): (number?, string?)
+	local ok, reason = self:CanBuyUpgrade(id)
+	if not ok then
+		return nil, reason
+	end
+	local _, price = self:NextUpgrade(id)
+	self.Cash -= price :: number
+	self.Upgrades[id] = self:UpgradeLevel(id) + 1
+	self:Recalculate()
+	return self.Upgrades[id], nil
 end
 
 -- Adds a bee (no cost, no slot check). Returns the bee and whether the tier is new to this player.
@@ -130,7 +219,7 @@ function FarmState.BeePrice(self: State): number
 end
 
 function FarmState.FreeSlots(self: State): number
-	return math.max(0, self._eco.BeeSlots - #self.Bees)
+	return math.max(0, self.BeeSlots - #self.Bees)
 end
 
 -- Returns ok, reason ("NoSlots" | "NoCash").
@@ -204,7 +293,7 @@ function FarmState.ProductionRate(self: State): number
 	for _, bee in self.Bees do
 		rate += self._bees[bee.Tier].HoneyPerSecond
 	end
-	return rate
+	return rate * self.ProductionMultiplier
 end
 
 -- Advance the simulation by dt seconds.
@@ -230,7 +319,7 @@ function FarmState.Tick(self: State, dt: number): TickResult
 
 	-- Bottling queue -> jars
 	if self.BottlingQueue > 0 then
-		self.BottlingAcc += self._eco.BottlingPerSecond * dt
+		self.BottlingAcc += self.BottlingPerSecond * dt
 		while self.BottlingAcc >= 1 and self.BottlingQueue > 0 do
 			self.BottlingAcc -= 1
 			self.BottlingQueue -= 1

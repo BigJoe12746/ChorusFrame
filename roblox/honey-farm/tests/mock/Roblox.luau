@@ -145,6 +145,13 @@ end
 function CF.PointToWorldSpace(cf, v)
 	return cf * v
 end
+function CF.PointToObjectSpace(cf, v)
+	local d = v - cf.p
+	return V3.new(d:Dot(cf.rx), d:Dot(cf.ry), d:Dot(cf.rz))
+end
+function CF.VectorToObjectSpace(cf, v)
+	return V3.new(v:Dot(cf.rx), v:Dot(cf.ry), v:Dot(cf.rz))
+end
 CF.identity = CF.new()
 M.CFrame = CF
 
