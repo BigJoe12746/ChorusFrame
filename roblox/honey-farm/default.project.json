@@ -13,7 +13,10 @@
         "$className": "Folder",
         "ReturnToFarm": { "$className": "RemoteEvent" },
         "Notify": { "$className": "RemoteEvent" },
-        "JarStarted": { "$className": "RemoteEvent" }
+        "JarStarted": { "$className": "RemoteEvent" },
+        "OpenShop": { "$className": "RemoteEvent" },
+        "ShopAction": { "$className": "RemoteEvent" },
+        "BeeMerged": { "$className": "RemoteEvent" }
       }
     },
     "ServerScriptService": {

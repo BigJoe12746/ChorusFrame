@@ -81,6 +81,25 @@ local function watchPlot(plot: Instance)
 	temp.ChildRemoved:Connect(function(m)
 		flyers[m :: Model] = nil
 	end)
+	-- a merge replaces bee models; a freshly spawned bee pops in from nothing
+	temp.ChildAdded:Connect(function(m)
+		if m:IsA("Model") and m:GetAttribute("Bee") and m:GetAttribute("PopIn") then
+			local target = m:GetScale()
+			m:ScaleTo(math.max(0.05, target * 0.1))
+			local t0 = os.clock()
+			local conn
+			conn = RunService.Heartbeat:Connect(function()
+				local a = math.min(1, (os.clock() - t0) / 0.45)
+				local ease = 1 - (1 - a) ^ 3
+				if m.Parent then
+					m:ScaleTo(math.max(0.05, target * (0.1 + 0.9 * ease)))
+				end
+				if a >= 1 or not m.Parent then
+					conn:Disconnect()
+				end
+			end)
+		end
+	end)
 end
 
 for _, plot in plots:GetChildren() do
@@ -90,7 +109,6 @@ plots.ChildAdded:Connect(function(plot)
 	task.spawn(watchPlot, plot)
 end)
 
-local yaw = CFrame.Angles(0, F.YawOffset, 0)
 local t = 0
 RunService.Heartbeat:Connect(function(dt)
 	t += dt
@@ -117,7 +135,7 @@ RunService.Heartbeat:Connect(function(dt)
 			local newPos = pos + to.Unit * step + bob
 			local look = if flat.Magnitude > 0.05 then CFrame.lookAt(newPos, newPos + flat.Unit) else CFrame.new(newPos) * pivot.Rotation
 			local tilt = CFrame.Angles(0, 0, math.sin(t * 6 + f.Phase) * 0.08)
-			model:PivotTo(look * yaw * tilt)
+			model:PivotTo(look * tilt)
 		end
 	end
 end)

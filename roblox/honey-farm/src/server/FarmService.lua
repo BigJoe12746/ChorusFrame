@@ -1,11 +1,15 @@
 -- FarmService (ModuleScript)
--- Runs the honey loop for every owned plot. All economy changes happen here on the server;
--- clients only read the attributes this module writes.
+-- Runs the honey loop, the bee shop and merging for every owned plot. All economy
+-- changes happen here on the server; clients only read the attributes this module writes.
 --
 --   Player attributes: Cash, Carried, BackpackCapacity
---   Plot attributes:   HiveStored, HiveCapacity, BottlingQueue, BottlingProgress,
---                      JarsOnBelt, Unclaimed, ProductionRate, BeeCount
---   Remotes:           JarStarted(plotId)  -> clients animate a jar down the conveyor
+--   Plot attributes:   HiveStored, HiveCapacity, BottlingQueue, BottlingProgress, JarsOnBelt,
+--                      Unclaimed, ProductionRate, BeeCount, BeeSlots, BeePrice,
+--                      Bees ("id:Tier,id:Tier"), Discovered ("Starter,Clover")
+--   Remotes:  JarStarted(plotId, n)                   -> all clients animate jars
+--             OpenShop()                              -> the owner's client opens the shop UI
+--             ShopAction("Buy") / ("Merge", idA, idB) <- the owner's client
+--             BeeMerged(plotId, idA, idB, newId, tier, isNew) -> all clients play the merge effect
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,11 +17,15 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("HoneyFarm")
 local Config = require(Shared:WaitForChild("Config"))
 local FarmState = require(Shared:WaitForChild("FarmState"))
+local BeeAppearance = require(Shared:WaitForChild("BeeAppearance"))
 local PlotService = require(script.Parent:WaitForChild("PlotService"))
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local NotifyRemote = Remotes:WaitForChild("Notify") :: RemoteEvent
 local JarRemote = Remotes:WaitForChild("JarStarted") :: RemoteEvent
+local OpenShopRemote = Remotes:WaitForChild("OpenShop") :: RemoteEvent
+local ShopActionRemote = Remotes:WaitForChild("ShopAction") :: RemoteEvent
+local BeeMergedRemote = Remotes:WaitForChild("BeeMerged") :: RemoteEvent
 
 local FarmService = {}
 
@@ -26,12 +34,17 @@ type Farm = {
 	Plot: Model,
 	State: FarmState.State,
 	Replicated: { [string]: any },
+	Busy: boolean, -- a shop action is being processed (blocks double submits)
 }
 
 local farms: { [Player]: Farm } = {}
 
 local function notify(player: Player, text: string, kind: string?)
 	NotifyRemote:FireClient(player, text, kind or "info")
+end
+
+local function fmt(n: number): string
+	return tostring(math.floor(n + 0.5))
 end
 
 ------------------------------------------------------------------------------
@@ -43,6 +56,24 @@ local function setAttr(farm: Farm, target: Instance, key: string, value: any)
 		farm.Replicated[key] = value
 		target:SetAttribute(key, value)
 	end
+end
+
+local function encodeBees(state: FarmState.State): string
+	local parts = {}
+	for _, bee in state.Bees do
+		table.insert(parts, bee.Id .. ":" .. bee.Tier)
+	end
+	return table.concat(parts, ",")
+end
+
+local function encodeDiscovered(state: FarmState.State): string
+	local parts = {}
+	for _, tier in Config.BeeOrder do
+		if state.Discovered[tier] then
+			table.insert(parts, tier)
+		end
+	end
+	return table.concat(parts, ",")
 end
 
 local function replicate(farm: Farm)
@@ -58,9 +89,13 @@ local function replicate(farm: Farm)
 	setAttr(farm, farm.Plot, "Unclaimed", s.Unclaimed)
 	setAttr(farm, farm.Plot, "ProductionRate", s:ProductionRate())
 	setAttr(farm, farm.Plot, "BeeCount", #s.Bees)
+	setAttr(farm, farm.Plot, "BeeSlots", Config.Economy.BeeSlots)
+	setAttr(farm, farm.Plot, "BeePrice", s:BeePrice())
+	setAttr(farm, farm.Plot, "Bees", encodeBees(s))
+	setAttr(farm, farm.Plot, "Discovered", encodeDiscovered(s))
 end
 
-local PLOT_KEYS = { "HiveStored", "HiveCapacity", "BottlingQueue", "BottlingProgress", "JarsOnBelt", "Unclaimed", "ProductionRate", "BeeCount" }
+local PLOT_KEYS = { "HiveStored", "HiveCapacity", "BottlingQueue", "BottlingProgress", "JarsOnBelt", "Unclaimed", "ProductionRate", "BeeCount", "BeeSlots", "BeePrice", "Bees", "Discovered" }
 local PLAYER_KEYS = { "Cash", "Carried", "BackpackCapacity" }
 
 ------------------------------------------------------------------------------
@@ -73,57 +108,49 @@ local function beeTemplate(): Model?
 	return if t and t:IsA("Model") then t else nil
 end
 
-local function spawnBeeModel(farm: Farm, index: number, tier: string)
+local function fallbackBee(tier: string): Model
+	local model = Instance.new("Model")
+	local body = Instance.new("Part")
+	body.Shape = Enum.PartType.Ball
+	body.Size = Vector3.new(2, 2, 2.6)
+	body.Color = Color3.fromHex(Config.Bees[tier].Look.Body)
+	body.Anchored = true
+	body.CanCollide = false
+	body.Parent = model
+	model.PrimaryPart = body
+	model:SetAttribute("Bee", true)
+	model:SetAttribute("Tier", tier)
+	return model
+end
+
+local function spawnBeeModel(farm: Farm, bee: FarmState.Bee, popIn: boolean?)
 	local temp = farm.Plot:FindFirstChild("Temp")
 	local exit = farm.Plot:FindFirstChild("BeeExit", true) :: BasePart?
 	if not temp or not exit then
 		return
 	end
-	local info = Config.Bees[tier]
 	local template = beeTemplate()
-	local model: Model
-	if template then
-		model = template:Clone()
-		local cam = model:FindFirstChildOfClass("Camera")
-		if cam then
-			cam:Destroy()
-		end
-		for _, d in model:GetDescendants() do
-			if d:IsA("BasePart") then
-				d.Anchored = true
-				d.CanCollide = false
-				d.CanQuery = false
-				d.CanTouch = false
-			end
-		end
-		model:ScaleTo(model:GetScale() * (info.Scale or 0.35))
-	else
-		-- fallback so the game still works without the asset
-		model = Instance.new("Model")
-		local body = Instance.new("Part")
-		body.Shape = Enum.PartType.Ball
-		body.Size = Vector3.new(2, 2, 2.6)
-		body.Color = Color3.fromRGB(255, 200, 40)
-		body.Anchored = true
-		body.CanCollide = false
-		body.Parent = model
-		model.PrimaryPart = body
+	local model = if template then BeeAppearance.Build(template, bee.Tier) else fallbackBee(bee.Tier)
+	model.Name = ("Bee%d"):format(bee.Id)
+	model:SetAttribute("BeeId", bee.Id)
+	if popIn then
+		model:SetAttribute("PopIn", true)
 	end
-	model.Name = ("Bee%d"):format(index)
-	model:SetAttribute("Bee", true)
-	model:SetAttribute("Tier", tier)
-	model:SetAttribute("BeeIndex", index)
-	model:PivotTo(exit.CFrame * CFrame.new(0, 0, -(index - 1) * 1.5))
+	model:PivotTo(exit.CFrame * CFrame.new(0, 0, -(bee.Id % 4) * 1.2))
 	model.Parent = temp
 end
 
-------------------------------------------------------------------------------
--- Station actions
-------------------------------------------------------------------------------
-
-local function fmt(n: number): string
-	return tostring(math.floor(n + 0.5))
+local function removeBeeModel(farm: Farm, id: number)
+	local temp = farm.Plot:FindFirstChild("Temp")
+	local model = temp and temp:FindFirstChild(("Bee%d"):format(id))
+	if model then
+		model:Destroy()
+	end
 end
+
+------------------------------------------------------------------------------
+-- Station actions (E / tap at a station)
+------------------------------------------------------------------------------
 
 local actions: { [string]: (Farm) -> () } = {}
 
@@ -167,7 +194,75 @@ function actions.FlowerPatch(farm: Farm)
 end
 
 function actions.BeeShop(farm: Farm)
-	notify(farm.Player, "The Bee Shop opens in the next update! 🛒", "info")
+	OpenShopRemote:FireClient(farm.Player)
+end
+
+------------------------------------------------------------------------------
+-- Shop actions (from the shop UI)
+------------------------------------------------------------------------------
+
+local function buyBee(farm: Farm)
+	local s = farm.State
+	local price = s:BeePrice()
+	local bee, reason = s:BuyBee()
+	if not bee then
+		if reason == "NoSlots" then
+			notify(farm.Player, ("All %d bee slots are full. Merge two bees to make room!"):format(Config.Economy.BeeSlots), "warning")
+		else
+			notify(farm.Player, ("You need $%s for a Starter Bee (you have $%s)."):format(fmt(price), fmt(s.Cash)), "warning")
+		end
+		return
+	end
+	spawnBeeModel(farm, bee, true)
+	notify(farm.Player, ("Bought a Starter Bee for $%s! 🐝 (%d/%d slots)"):format(fmt(price), #s.Bees, Config.Economy.BeeSlots), "success")
+end
+
+local MERGE_MESSAGES = {
+	SameBee = "Pick two different bees to merge.",
+	NotFound = "One of those bees isn't on your farm any more.",
+	DifferentTier = "Only two bees of the same tier can merge.",
+	MaxTier = "Royal Bees are already the top tier and can't be merged.",
+}
+
+local function mergeBees(farm: Farm, idA: any, idB: any)
+	if type(idA) ~= "number" or type(idB) ~= "number" then
+		return
+	end
+	local s = farm.State
+	local bee, isNew, reason = s:MergeBees(idA, idB)
+	if not bee then
+		notify(farm.Player, MERGE_MESSAGES[reason] or "Those bees can't merge.", "warning")
+		return
+	end
+	removeBeeModel(farm, idA)
+	removeBeeModel(farm, idB)
+	spawnBeeModel(farm, bee, true)
+	BeeMergedRemote:FireAllClients(farm.Plot:GetAttribute("PlotId"), idA, idB, bee.Id, bee.Tier, isNew)
+	local info = Config.Bees[bee.Tier]
+	if isNew then
+		notify(farm.Player, ("✨ New bee discovered: %s! It makes %.1f 🍯/s."):format(info.Name, info.HoneyPerSecond), "success")
+	else
+		notify(farm.Player, ("Merged into a %s (%.1f 🍯/s)."):format(info.Name, info.HoneyPerSecond), "success")
+	end
+end
+
+local function onShopAction(player: Player, action: any, a: any, b: any)
+	local farm = farms[player]
+	if not farm or farm.Busy then
+		return
+	end
+	if not PlotService.IsNearStation(player, farm.Plot, "BeeShop") then
+		notify(player, "Walk up to your Bee Shop to trade.", "warning")
+		return
+	end
+	farm.Busy = true
+	if action == "Buy" then
+		buyBee(farm)
+	elseif action == "Merge" then
+		mergeBees(farm, a, b)
+	end
+	replicate(farm)
+	farm.Busy = false
 end
 
 ------------------------------------------------------------------------------
@@ -181,12 +276,13 @@ local function startFarm(player: Player, plot: Model)
 	local farm: Farm = {
 		Player = player,
 		Plot = plot,
-		State = FarmState.new(Config.Economy, Config.Bees),
+		State = FarmState.new(Config.Economy, Config.Bees, Config.BeeOrder),
 		Replicated = {},
+		Busy = false,
 	}
 	farms[player] = farm
-	for i, bee in farm.State.Bees do
-		spawnBeeModel(farm, i, bee.Tier)
+	for _, bee in farm.State.Bees do
+		spawnBeeModel(farm, bee)
 	end
 	replicate(farm)
 end
@@ -207,7 +303,7 @@ end
 
 -- Advances every farm. Called from Heartbeat; tests call it directly.
 function FarmService.Tick(dt: number)
-	for player, farm in farms do
+	for _, farm in farms do
 		local result = farm.State:Tick(dt)
 		if result.JarsStarted > 0 then
 			JarRemote:FireAllClients(farm.Plot:GetAttribute("PlotId"), result.JarsStarted)
@@ -235,6 +331,7 @@ function FarmService.Start()
 			replicate(farm)
 		end
 	end)
+	ShopActionRemote.OnServerEvent:Connect(onShopAction)
 
 	-- players who already own a plot (e.g. script reloaded)
 	for _, player in Players:GetPlayers() do

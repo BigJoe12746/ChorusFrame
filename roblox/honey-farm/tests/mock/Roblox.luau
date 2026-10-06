@@ -81,8 +81,14 @@ CF.__index = function(cf, k)
 		return -cf.rz
 	elseif k == "RightVector" then
 		return cf.rx
-	elseif k == "UpVector" then
+	elseif k == "UpVector" or k == "YVector" then
 		return cf.ry
+	elseif k == "XVector" then
+		return cf.rx
+	elseif k == "ZVector" then
+		return cf.rz
+	elseif k == "Rotation" then
+		return mk(V3.zero, cf.rx, cf.ry, cf.rz)
 	elseif k == "X" then
 		return cf.p.X
 	elseif k == "Y" then
@@ -117,6 +123,9 @@ function CF.lookAt(pos, target)
 	local right = look:Cross(V3.yAxis).Unit
 	local up = right:Cross(look)
 	return mk(pos, right, up, -look)
+end
+function CF.fromMatrix(pos, vx, vy, vz)
+	return mk(pos, vx, vy, vz or vx:Cross(vy))
 end
 CF.__mul = function(a, b)
 	if b.__type == "Vector3" then

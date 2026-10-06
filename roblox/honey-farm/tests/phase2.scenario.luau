@@ -142,6 +142,12 @@ check(cara:GetAttribute("PlotId") == 1 and cara:GetAttribute("Cash") == 25, "Car
 check(plot1:GetAttribute("HiveStored") == 0, "plot 1 hive is empty for Cara")
 check(plot1.Temp:FindFirstChild("Bee1") ~= nil, "Cara gets her own bee model")
 
--- Shop is still a placeholder in Phase 2
+-- Pressing E at the Bee Shop opens the shop UI on the owner's client
 use(cara, plot1, "BeeShop")
-check(has(lastNote(cara), "next update"), "Bee Shop says it opens next update")
+local opened = false
+for _, f in Remotes.OpenShop.fired do
+	if f[1] == cara then
+		opened = true
+	end
+end
+check(opened, "Bee Shop opens the shop UI for its owner")

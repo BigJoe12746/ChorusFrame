@@ -223,6 +223,15 @@ local function withinReach(player: Player, part: BasePart): boolean
 	return distance <= Config.PromptDistance + 10 -- slack for lag / big characters
 end
 
+-- Is the player close enough to one of their plot's stations to use it?
+function PlotService.IsNearStation(player: Player, plot: Model, station: string): boolean
+	local stations = plot:FindFirstChild("Stations")
+	local model = stations and stations:FindFirstChild(station)
+	local prompt = model and model:FindFirstChild("StationPrompt", true)
+	local part = prompt and prompt.Parent
+	return part ~= nil and part:IsA("BasePart") and withinReach(player, part)
+end
+
 local function hookPrompt(prompt: ProximityPrompt)
 	prompt.Triggered:Connect(function(player)
 		local plot = PlotService.GetPlotFromInstance(prompt)

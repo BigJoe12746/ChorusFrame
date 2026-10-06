@@ -2,7 +2,7 @@
 
 A colourful multiplayer bee‑farming tycoon. Players own a garden plot, buy bees, make honey, bottle and sell it, merge bees, and expand their farm.
 
-**Status: Phase 1 (map and plots) and Phase 2 (the honey loop) are done.** Phases 3–7 are the roadmap below.
+**Status: Phases 1–3 are done (map and plots, the honey loop, the Bee Shop and merging).** Phases 4–7 are the roadmap below.
 
 | Whole map (top‑down, generated from the real scripts) | One plot |
 |---|---|
@@ -67,7 +67,39 @@ All rates and sizes are in `Config.Economy` (`src/shared/Config.lua`). The econo
 
 Hive capacity is 50 to start, so the hive fills in about 4 minutes with one bee and honey made while it's full is lost. That's intentional pressure to come back and collect; Phase 4 upgrades raise it.
 
-The Bee Shop still says "opens in the next update". That's Phase 3.
+## What Phase 3 includes: Bee Shop and merging
+
+| Requirement | Where |
+|---|---|
+| Shop sells Starter Bees; price starts at $25 and rises 25% per purchase (25, 31, 39, 49, 61, 76, 95…) | `FarmState.BeePrice`, `Config.Economy.BeePriceGrowth` |
+| 8 active bee slots per player | `Config.Economy.BeeSlots` |
+| Shop shows price, slots used, and every bee's production rate | `BeeShop.client.lua` |
+| Tap two owned bees of the same tier → preview of the result (name, rate, spinning 3D model) → **Merge!** | `BeeShop.client.lua` preview panel, `FarmState.MergePreview` |
+| The two bees become one bee of the next tier making 2.5× the honey | `FarmState.MergeBees`, `Config.Economy.MergeMultiplier` |
+| Merge animation (sparkle burst at the hive, the new bee pops in) and a discovery banner the first time you make a tier | `MergeEffects.client.lua`, `BeeFlight` pop-in |
+| Royal Bee is the top tier and can't be merged | `FarmState.NextTier` returns nil |
+| Ten tiers with distinct looks, all built from your one bee model | `Config.Bees`, `BeeAppearance.lua` |
+
+### The ten tiers
+
+Every tier is your `BeeTemplate` recoloured by part role (head/stripes, dark stripes, wings, eyes, antennae) plus a built-in-parts accessory, so you can recognise them by shape, not just colour. Production is ×2.5 per tier; size grows a little per tier.
+
+| # | Tier | Honey/s | What makes it recognisable |
+|---|---|---|---|
+| 1 | Starter Bee | 0.2 | Your original yellow-and-navy bee |
+| 2 | Clover Bee | 0.5 | Green body, three-leaf clover sprouting from its head |
+| 3 | Daisy Bee | 1.25 | White with golden stripes, a daisy flower hat |
+| 4 | Strawberry Bee | 3.1 | Red with green stripes, seed dots and a leafy cap |
+| 5 | Panda Bee | 7.8 | White and black, round ears and eye patches |
+| 6 | Knight Bee | 19.5 | Steel body, helmet with visor slit and a red plume |
+| 7 | Crystal Bee | 48.8 | See-through glass body, glowing cyan shards on its back, glows |
+| 8 | Storm Bee | 122 | Dark grey with neon-yellow stripes, a thundercloud and lightning bolts |
+| 9 | Galaxy Bee | 305 | Deep purple, neon magenta stripes, a tilted ring of stars |
+| 10 | Royal Bee | 763 | Gold metal, purple stripes, a jewelled crown and a red cape |
+
+`BeeAppearance.Build` also re-pivots every bee so its head is "forward" and its wings are "up" (the template file is saved tilted for its thumbnail), which is why flight no longer needs a yaw offset.
+
+Hive capacity is still 50, so a Galaxy Bee fills it in a fraction of a second. That's expected for now: Phase 4 adds the hive-storage upgrade.
 
 ### Hooks for later phases
 
@@ -82,9 +114,9 @@ The Bee Shop still says "opens in the next update". That's Phase 3.
 ```
 default.project.json          how files map into the game
 HoneyFarm.rbxl                 built place file, ready to open
-src/shared/   → ReplicatedStorage.HoneyFarm   Config, PlotAllocator, FarmState
+src/shared/   → ReplicatedStorage.HoneyFarm   Config, PlotAllocator, FarmState, BeeAppearance
 src/server/   → ServerScriptService.HoneyFarm  Main, MapBuilder, PlotService, FarmService
-src/client/   → StarterPlayerScripts.HoneyFarm FarmClient, FarmHud, StationLabels, BeeFlight, ConveyorJars
+src/client/   → StarterPlayerScripts.HoneyFarm FarmClient, FarmHud, StationLabels, BeeFlight, ConveyorJars, BeeShop, MergeEffects
 assets/BeeTemplate.rbxm → ReplicatedStorage.Assets.BeeTemplate
 tests/                          offline tests (see below)
 ```
@@ -98,8 +130,9 @@ You can change all the sizes, colours and the plot count in `src/shared/Config.l
 | Test | How | Result |
 |---|---|---|
 | Plot assignment logic: separate plots, no double assignment, release, queue when full, rejoin | `luau tests/PlotAllocator.spec.luau` | 17/17 pass |
-| Economy logic: production rate, hive cap and lost honey, backpack cap, 1 jar/sec, $5 per jar, collecting twice never pays twice, and a 3,000‑step conservation run with random frame times (every honey is in the loop or already paid out) | `luau tests/FarmState.spec.luau` | 27/27 pass |
+| Economy logic: production rate, hive cap and lost honey, backpack cap, 1 jar/sec, $5 per jar, collecting twice never pays twice, a 3,000‑step conservation run with random frame times, shop prices and exact charges, 8‑slot cap, merge rules (same bee, missing bee, different tiers, top tier), ×2.5 production, discovery flags | `luau tests/FarmState.spec.luau` | 50/50 pass |
 | Full Phase 1 scenario: the **real** server scripts run against a small mock of the Roblox engine. Builds the map, two players join, spawn on separate farms, use **My Farm** (including spam and visiting), respawn, owner‑only stations, leave and clear the plot, rejoin, a full server with a 7th player queued | `python3 tests/run_sim.py --luau <path to luau> --render out/` | 123/123 pass |
+| Full Phase 3 scenario: all ten tiers build from a stand‑in of your template (role classification, accessory present, one head, scaled, unique look, no camera); E at the shop opens the UI; buy at exactly $25; refused with $0, from far away, and at 8 slots; ten rapid presses buy exactly 6 bees at the exact rising prices; merge two Starters → Clover (parents' models removed, new model spawned, production = 6×0.2 + 0.5, discovery event + message); refused merges change nothing (different tiers, same bee, missing bees, garbage args); second Clover isn't a discovery; two Royals can't merge; another player's buy never touches your farm; leaving clears everything | `python3 tests/run_sim.py --luau <luau> --scenario tests/phase3.scenario.luau` | 117/117 pass |
 | Full Phase 2 scenario: new player gets 25 Cash + a bee model; produce → collect → deposit → 50 jars → $250 → collect; empty hive, full hive, full backpack, double‑press deposit, double collect, press from across the map (ignored), visitor refused, two farms producing independently, leaving clears state, next owner starts fresh | `python3 tests/run_sim.py --luau <luau> --scenario tests/phase2.scenario.luau` | 41/41 pass |
 | Type check against the Roblox API definitions | `luau-lsp analyze` with Roblox definitions and a Rojo sourcemap | no errors |
 | Place file builds | `rojo build` | ok |
@@ -120,11 +153,17 @@ Phase 2 (needs a real client, the mock has no rendering):
 - [ ] Collect at the stand: the Cash number pops. Numbers in the HUD, the labels and the chat messages all agree.
 - [ ] Try it on a phone-sized viewport: the stats panel (top‑left) doesn't cover the thumbstick.
 
+Phase 3 (needs a real client):
+- [ ] Each of the ten tiers looks right and distinct. Merge up a few (or in Studio's command bar, give yourself bees: `require(game.ServerScriptService.HoneyFarm.FarmService).GetState(game.Players.YourName):AddBee("Galaxy")`). If an accessory floats off the bee, the template's part layout differs from my decoded copy; the offsets are all at the top of `BeeAppearance.lua`.
+- [ ] Bees fly head‑first with wings up. If not, the forward/up axes in `BeeAppearance.Build` ("Canonical pivot") need swapping.
+- [ ] The Bee Shop panel fits a phone screen, cards are easy to tap, the preview bee spins, and the panel closes when you walk away or press Esc.
+- [ ] The merge sparkle burst appears at the hive, the new bee pops in, and the "New bee discovered!" banner slides down.
+
 ## Roadmap
 
 - [x] **1. Map and player plots**
 - [x] **2. First playable honey loop**: Starter Bee, 25 Cash, hive storage, backpack (50), bottling at 1 jar/sec, conveyor, 5 Cash per jar, collect at the stand
-- [ ] **3. Bee shop and merging**: 10 tiers (Starter, Clover, Daisy, Strawberry, Panda, Knight, Crystal, Storm, Galaxy, Royal); each merge is ×2.5 production
+- [x] **3. Bee shop and merging**: 10 tiers (Starter, Clover, Daisy, Strawberry, Panda, Knight, Crystal, Storm, Galaxy, Royal); each merge is ×2.5 production
 - [ ] **4. Farm upgrades**: production, hive storage, backpack, bottling speed, bee slots
 - [ ] **5. Saving and offline honey**: DataStore, autosave, offline earnings capped at 8 hours
 - [ ] **6. Interface and introduction**: tutorial, collection book, effects and sounds
