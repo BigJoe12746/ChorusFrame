@@ -9,6 +9,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage:WaitForChild("HoneyFarm"):WaitForChild("Config"))
+local PropLibrary = require(script.Parent:WaitForChild("PropLibrary"))
 local C = Config.Colors
 
 local MapBuilder = {}
@@ -125,6 +126,11 @@ end
 
 -- Oversized cartoon flower standing at ground position `pos`.
 local function flower(parent: Instance, pos: Vector3, height: number, petal: Color3, collide: boolean?)
+	-- a Creator Store flower in ReplicatedStorage.Props replaces the block-built one
+	local prop = PropLibrary.Place(parent, "Flower", CFrame.new(pos) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0), height)
+	if prop then
+		return prop
+	end
 	local m = model(parent, "Flower")
 	local s = height / 8
 	cyl(m, "Stem", height, 0.8 * s, CFrame.new(pos + Vector3.new(0, height / 2, 0)), C.Stem, { CanCollide = collide == true })
@@ -149,6 +155,10 @@ local function flower(parent: Instance, pos: Vector3, height: number, petal: Col
 end
 
 local function tree(parent: Instance, pos: Vector3, scale: number)
+	local prop = PropLibrary.Place(parent, "Tree", CFrame.new(pos) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0), 19 * scale)
+	if prop then
+		return prop
+	end
 	local m = model(parent, "Tree")
 	cyl(m, "Trunk", 10 * scale, 3 * scale, CFrame.new(pos + Vector3.new(0, 5 * scale, 0)), C.DarkWood)
 	local greens = { Color3.fromRGB(80, 170, 70), Color3.fromRGB(100, 190, 80), Color3.fromRGB(70, 150, 60) }
@@ -179,6 +189,15 @@ end
 
 -- Round cartoon cottage at ground cf (front door faces cf.LookVector).
 local function cottage(parent: Instance, cf: CFrame, roof: Color3, title: string)
+	local prop = PropLibrary.Place(parent, "Cottage", cf, 22, title)
+	if prop then
+		local anyPart = prop:FindFirstChildWhichIsA("BasePart", true)
+		if anyPart then
+			local _, size = prop:GetBoundingBox()
+			billboard(anyPart, title, size.Y + 3, 90)
+		end
+		return prop
+	end
 	local m = model(parent, title)
 	local body = cyl(m, "Body", 11, 16, cf * CFrame.new(0, 5.5, 0), C.Cream)
 	cyl(m, "RoofRim", 1.2, 19, cf * CFrame.new(0, 11.4, 0), roof)
@@ -206,16 +225,24 @@ local function buildVillage(map: Instance)
 	cyl(v, "Plaza", 1, Config.SquareRadius * 2, CFrame.new(0, -0.2, 0), C.Plaza, { Material = Enum.Material.Pebble })
 	cyl(v, "PlazaRing", 0.9, Config.SquareRadius * 2 + 4, CFrame.new(0, -0.3, 0), C.Wood, { Material = Enum.Material.Wood })
 
-	-- Honey fountain
-	local f = model(v, "HoneyFountain")
-	cyl(f, "Base", 2.4, 22, CFrame.new(0, 1.2, 0), C.Stone, { Material = Enum.Material.Cobblestone })
-	cyl(f, "Pool", 0.4, 19, CFrame.new(0, 2.3, 0), C.Honey, { Material = Enum.Material.Glass, Transparency = 0.2, CanCollide = false })
-	cyl(f, "Pillar", 7, 3, CFrame.new(0, 5, 0), C.Stone)
-	cyl(f, "Bowl", 1.2, 10, CFrame.new(0, 8.6, 0), C.Stone)
-	ball(f, "HoneyPot", 6, CFrame.new(0, 11.5, 0), C.DeepHoney)
-	cyl(f, "PotLid", 1, 4, CFrame.new(0, 14.6, 0), C.Wood)
-	local drip = cyl(f, "Drip", 0.6, 9.4, CFrame.new(0, 9.3, 0), C.Honey, { Material = Enum.Material.Neon, Transparency = 0.3, CanCollide = false })
-	billboard(drip, "🍯 " .. Config.GameName, 9, 140)
+	-- Honey fountain (or a Creator Store fountain from ReplicatedStorage.Props)
+	local fountainProp = PropLibrary.Place(v, "Fountain", CFrame.new(0, 0, 0), 16, "HoneyFountain")
+	if fountainProp then
+		local anyPart = fountainProp:FindFirstChildWhichIsA("BasePart", true)
+		if anyPart then
+			billboard(anyPart, "🍯 " .. Config.GameName, 19, 140)
+		end
+	else
+		local f = model(v, "HoneyFountain")
+		cyl(f, "Base", 2.4, 22, CFrame.new(0, 1.2, 0), C.Stone, { Material = Enum.Material.Cobblestone })
+		cyl(f, "Pool", 0.4, 19, CFrame.new(0, 2.3, 0), C.Honey, { Material = Enum.Material.Glass, Transparency = 0.2, CanCollide = false })
+		cyl(f, "Pillar", 7, 3, CFrame.new(0, 5, 0), C.Stone)
+		cyl(f, "Bowl", 1.2, 10, CFrame.new(0, 8.6, 0), C.Stone)
+		ball(f, "HoneyPot", 6, CFrame.new(0, 11.5, 0), C.DeepHoney)
+		cyl(f, "PotLid", 1, 4, CFrame.new(0, 14.6, 0), C.Wood)
+		local drip = cyl(f, "Drip", 0.6, 9.4, CFrame.new(0, 9.3, 0), C.Honey, { Material = Enum.Material.Neon, Transparency = 0.3, CanCollide = false })
+		billboard(drip, "🍯 " .. Config.GameName, 9, 140)
+	end
 
 	-- Neutral spawn (players are sent to their own farm right after spawning)
 	local spawn = Instance.new("SpawnLocation")
@@ -307,13 +334,17 @@ end
 
 local function buildHive(parent: Instance, cf: CFrame)
 	local m = stationModel(parent, "Hive")
+	-- the Base plate stays in every case: it carries the prompt and the label
 	local base = cyl(m, "Base", 1, 18, cf * CFrame.new(0, 0.5, 0), C.Wood, { Material = Enum.Material.WoodPlanks })
-	for i = 0, 4 do
-		cyl(m, "Layer", 2.4, 14 - i * 2.2, cf * CFrame.new(0, 2.2 + i * 2.2, 0), i % 2 == 0 and C.Honey or C.DeepHoney)
+	local prop = PropLibrary.Place(m, "Hive", cf * CFrame.new(0, 1, 0), 12, "HiveModel")
+	if not prop then
+		for i = 0, 4 do
+			cyl(m, "Layer", 2.4, 14 - i * 2.2, cf * CFrame.new(0, 2.2 + i * 2.2, 0), i % 2 == 0 and C.Honey or C.DeepHoney)
+		end
+		ball(m, "Top", 4, cf * CFrame.new(0, 12.6, 0), C.DeepHoney)
+		P(m, { Name = "Entrance", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.6, 2.8, 2.8), CFrame = cf * CFrame.new(0, 3.4, -6.4) * CFrame.Angles(0, math.pi / 2, 0), Color = Color3.fromRGB(60, 35, 15), CanCollide = false })
+		P(m, { Name = "LandingBoard", Size = Vector3.new(4, 0.4, 2), CFrame = cf * CFrame.new(0, 2, -7.4), Color = C.Wood })
 	end
-	ball(m, "Top", 4, cf * CFrame.new(0, 12.6, 0), C.DeepHoney)
-	P(m, { Name = "Entrance", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.6, 2.8, 2.8), CFrame = cf * CFrame.new(0, 3.4, -6.4) * CFrame.Angles(0, math.pi / 2, 0), Color = Color3.fromRGB(60, 35, 15), CanCollide = false })
-	P(m, { Name = "LandingBoard", Size = Vector3.new(4, 0.4, 2), CFrame = cf * CFrame.new(0, 2, -7.4), Color = C.Wood })
 	local anchor = P(m, { Name = "BeeExit", Size = Vector3.one, CFrame = cf * CFrame.new(0, 3.4, -8), Transparency = 1, CanCollide = false, CanQuery = false })
 	anchor:SetAttribute("Purpose", "Where bees leave/enter the hive (Phase 2)")
 	m.PrimaryPart = base

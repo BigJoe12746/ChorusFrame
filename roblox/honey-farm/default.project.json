@@ -9,6 +9,9 @@
         "$className": "Folder",
         "BeeTemplate": { "$path": "assets/BeeTemplate.rbxm" }
       },
+      "Props": {
+        "$className": "Folder"
+      },
       "Remotes": {
         "$className": "Folder",
         "ReturnToFarm": { "$className": "RemoteEvent" },

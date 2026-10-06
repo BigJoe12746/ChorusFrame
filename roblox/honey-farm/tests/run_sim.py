@@ -21,6 +21,7 @@ SCRIPTS = [
     ("ReplicatedStorage.HoneyFarm.PlotAllocator", "ModuleScript", "src/shared/PlotAllocator.lua"),
     ("ReplicatedStorage.HoneyFarm.FarmState", "ModuleScript", "src/shared/FarmState.lua"),
     ("ReplicatedStorage.HoneyFarm.BeeAppearance", "ModuleScript", "src/shared/BeeAppearance.lua"),
+    ("ServerScriptService.HoneyFarm.PropLibrary", "ModuleScript", "src/server/PropLibrary.lua"),
     ("ServerScriptService.HoneyFarm.MapBuilder", "ModuleScript", "src/server/MapBuilder.lua"),
     ("ServerScriptService.HoneyFarm.PlotService", "ModuleScript", "src/server/PlotService.lua"),
     ("ServerScriptService.HoneyFarm.RateLimiter", "ModuleScript", "src/server/RateLimiter.lua"),
@@ -96,6 +97,7 @@ end
     out.append(
         """
 local remotes = M.Instance.new("Folder"); remotes.Name = "Remotes"; remotes.Parent = services.ReplicatedStorage
+local propsFolder = M.Instance.new("Folder"); propsFolder.Name = "Props"; propsFolder.Parent = services.ReplicatedStorage
 """
     )
     for r in REMOTES:

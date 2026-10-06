@@ -139,6 +139,16 @@ end
 CF.__sub = function(a, v)
 	return mk(a.p - v, a.rx, a.ry, a.rz)
 end
+function CF.Inverse(cf)
+	-- transpose of the rotation, position = -R^T p
+	local rx, ry, rz = cf.rx, cf.ry, cf.rz
+	local nrx = V3.new(rx.X, ry.X, rz.X)
+	local nry = V3.new(rx.Y, ry.Y, rz.Y)
+	local nrz = V3.new(rx.Z, ry.Z, rz.Z)
+	local p = cf.p
+	local np = V3.new(-(nrx.X * p.X + nry.X * p.Y + nrz.X * p.Z), -(nrx.Y * p.X + nry.Y * p.Y + nrz.Y * p.Z), -(nrx.Z * p.X + nry.Z * p.Y + nrz.Z * p.Z))
+	return mk(np, nrx, nry, nrz)
+end
 function CF.VectorToWorldSpace(cf, v)
 	return rot(cf, v)
 end
@@ -250,6 +260,7 @@ local ISA = {
 	TextLabel = { TextLabel = true },
 	Camera = { Camera = true },
 	Humanoid = { Humanoid = true },
+	LuaSourceContainer = { Script = true, LocalScript = true, ModuleScript = true },
 }
 
 local Instance = {}
@@ -463,7 +474,60 @@ function Instance.IsDescendantOf(self, other)
 	return false
 end
 function Instance.PivotTo(self, cf)
-	rawget(self, "_props").Pivot = cf
+	local raw = rawget(self, "_props")
+	if raw.ClassName ~= "Model" then
+		raw.CFrame = cf
+		raw.Position = cf.Position
+		return
+	end
+	-- like Roblox: move every part by the same transform the pivot moves by
+	local old = Instance.GetPivot(self)
+	local delta = cf * CF.Inverse(old)
+	for _, d in Instance.GetDescendants(self) do
+		local dr = rawget(d, "_props")
+		if BASEPARTS[dr.ClassName] and dr.CFrame then
+			dr.CFrame = delta * dr.CFrame
+			dr.Position = dr.CFrame.Position
+		end
+	end
+	raw.Pivot = cf
+end
+-- Axis-aligned box around all parts (ignores part rotation), scaled about the pivot.
+function Instance.GetBoundingBox(self)
+	local scale = rawget(self, "_props").Scale or 1
+	local pivot = Instance.GetPivot(self).Position
+	local minV, maxV
+	for _, d in Instance.GetDescendants(self) do
+		local dr = rawget(d, "_props")
+		if BASEPARTS[dr.ClassName] and dr.CFrame then
+			local pos = pivot + (dr.CFrame.Position - pivot) * scale
+			local half = dr.Size * (scale / 2)
+			local lo, hi = pos - half, pos + half
+			if not minV then
+				minV, maxV = lo, hi
+			else
+				minV = V3.new(math.min(minV.X, lo.X), math.min(minV.Y, lo.Y), math.min(minV.Z, lo.Z))
+				maxV = V3.new(math.max(maxV.X, hi.X), math.max(maxV.Y, hi.Y), math.max(maxV.Z, hi.Z))
+			end
+		end
+	end
+	if not minV then
+		return CF.new(), V3.zero
+	end
+	return CF.new((minV + maxV) / 2), maxV - minV
+end
+function Instance.GetExtentsSize(self)
+	local _, size = Instance.GetBoundingBox(self)
+	return size
+end
+function Instance.FindFirstChildWhichIsA(self, class, recursive)
+	local list = if recursive then Instance.GetDescendants(self) else rawget(self, "_children")
+	for _, c in list do
+		if Instance.IsA(c, class) then
+			return c
+		end
+	end
+	return nil
 end
 
 ------------------------------------------------------------------------------

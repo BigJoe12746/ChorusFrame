@@ -6,6 +6,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("HoneyFarm"):WaitForChild("Config"))
+local PropLibrary = require(script.Parent:WaitForChild("PropLibrary"))
 local C = Config.Colors
 
 local UpgradeVisuals = {}
@@ -38,6 +39,11 @@ end
 
 -- Small beehive standing on `cf` (ground).
 local function miniHive(parent: Instance, cf: CFrame, level: number)
+	-- a "MiniHive" prop, or the main "Hive" prop shrunk down, replaces the block version
+	local prop = PropLibrary.Place(parent, if PropLibrary.Has("MiniHive") then "MiniHive" else "Hive", cf, 7, "MiniHive")
+	if prop then
+		return
+	end
 	local m = Instance.new("Model")
 	m.Name = "MiniHive"
 	cyl(m, cf * CFrame.new(0, 0.3, 0), 0.6, 6.5, C.Wood, { Material = Enum.Material.WoodPlanks, CanCollide = true })

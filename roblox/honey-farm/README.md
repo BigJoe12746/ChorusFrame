@@ -166,13 +166,29 @@ Keys: **H** My Farm, **U** Upgrades, **B** Bee collection, **Esc** closes any pa
 - Marker parts: `Hive/BeeExit`, `FlowerPatch/FlowerSpots/Spot1‑9`, `Bottling/DepositPoint`, `Conveyor/ConveyorStart`/`ConveyorEnd`.
 - `ReplicatedStorage.Assets.BeeTemplate` is your original bee model: the Starter Bee, the shop display bee, and the base for the 10 tiers.
 
+## Using real models from the Creator Store (instead of the block scenery)
+
+The flowers, trees, cottages, fountain and hives are built from basic parts so the game works out of the box. To make them look proper, drop models from the Creator Store into **`ReplicatedStorage.Props`** and the map uses them automatically. No code changes.
+
+1. In Studio, open the **Toolbox** (View → Toolbox) → **Creator Store** → **Models**. Search for things like `low poly flower`, `cartoon tree`, `low poly house`, `fountain`, `beehive`. Pick models with lots of likes and a known creator.
+2. Click one to insert it into the workspace. Look at it, then **rename it** to the kind it replaces: `Flower`, `Tree`, `Cottage`, `Fountain`, `Hive` or `MiniHive`. For several looks of the same kind, name them `Flower`, `Flower2`, `Flower3`…: the map picks one at random for each spot.
+3. Drag the model into **ReplicatedStorage → Props**.
+4. If `Workspace.HoneyFarmMap` exists (you baked the map earlier), delete it. Press **Play**: the map rebuilds with your props.
+
+What the game does with each prop: clones it, **removes any scripts hidden inside** (free models sometimes carry malicious code), anchors it, scales it to the height of the spot it fills (flowers 5–18 studs, trees ~19–34, cottages 22, fountain 16, hive 12, mini hives 7), and stands it on the ground facing the right way. Optional attributes on a prop: `HeightScale` (e.g. 1.3 for a taller tree), `KeepSize = true` (don't rescale), `CanCollide` (force on/off).
+
+Kinds you don't add keep the block version, so you can replace one thing at a time. The bees stay yours either way: they're built from your `BeeTemplate`.
+
+I can't browse the Creator Store from here, so I haven't picked specific models for you. The honest check once you've added some: do they sit on the ground, face the path, and look the right size? If one floats or sinks, its pivot is odd; set `KeepSize` or adjust `HeightScale` on that prop.
+
 ## Project layout (Rojo)
 
 ```
 default.project.json          how files map into the game
 HoneyFarm.rbxl                 built place file, ready to open
 src/shared/   → ReplicatedStorage.HoneyFarm   Config, PlotAllocator, FarmState, BeeAppearance
-src/server/   → ServerScriptService.HoneyFarm  Main, MapBuilder, PlotService, FarmService, UpgradeVisuals, SaveService, RateLimiter
+src/server/   → ServerScriptService.HoneyFarm  Main, MapBuilder, PlotService, FarmService, UpgradeVisuals, SaveService, RateLimiter, PropLibrary
+ReplicatedStorage.Props                         empty folder: drop Creator Store models here (see above)
 src/client/   → StarterPlayerScripts.HoneyFarm FarmClient, FarmHud, StationLabels, BeeFlight, ConveyorJars, BeeShop, MergeEffects,
                                                 Upgrades, WelcomeBack, Tutorial, Effects, CollectionBook, BeeSounds
 assets/BeeTemplate.rbxm → ReplicatedStorage.Assets.BeeTemplate
@@ -191,6 +207,7 @@ You can change all the sizes, colours and the plot count in `src/shared/Config.l
 | Economy logic: production rate, hive cap and lost honey, backpack cap, 1 jar/sec, $5 per jar, collecting twice never pays twice, a 3,000‑step conservation run with random frame times, shop prices and exact charges, 8‑slot cap, merge rules (same bee, missing bee, different tiers, top tier), ×2.5 production, discovery flags, upgrade levels/values/prices, maxed and unaffordable refusals, multiplier, faster bottling, bigger backpack, a 9th bee after the slot upgrade, base values without an upgrade table, save round‑trip (money, honey, bees with ids, upgrades, processing, discoveries), hostile data clamped, offline honey (rate × time, 8‑hour cap, hive‑room cap, credited once), introduction steps (no skipping, saved, clamped) | `luau tests/FarmState.spec.luau` | 98/98 pass |
 | Full Phase 1 scenario: the **real** server scripts run against a small mock of the Roblox engine. Builds the map, two players join, spawn on separate farms, use **My Farm** (including spam and visiting), respawn, owner‑only stations, leave and clear the plot, rejoin, a full server with a 7th player queued | `python3 tests/run_sim.py --luau <path to luau> --render out/` | 123/123 pass |
 | Full Phase 7 scenario (two players at once): see TESTING.md | `python3 tests/run_sim.py --luau <luau> --scenario tests/phase7.scenario.luau` | 37/37 pass |
+| Props: Creator Store stand‑ins replace flowers/hive/cottages, scripts stripped, scaled to each slot, standing on the ground, variants mixed, originals untouched, missing kinds fall back to block versions, mini hives reuse the Hive prop | `python3 tests/run_sim.py --luau <luau> --scenario tests/props.scenario.luau` | 57/57 pass |
 | Rate limiter: window, reset, per‑key buckets, a 100‑call burst passes exactly 25 | `luau tests/RateLimiter.spec.luau` | 8/8 pass |
 | Full Phase 6 scenario: steps point at real stations; built‑in sound ids; pressing other stations early doesn't skip; empty hive doesn't count; collect → deposit → cash → buy → merge each advance exactly one step with the matching Feedback event (kind, amount, station); finishing pays the bonus; finished stays finished; step saved and restored; collection data lists Starter + Clover; a second player starts at step 1 | `python3 tests/run_sim.py --luau <luau> --scenario tests/phase6.scenario.luau` | 32/32 pass |
 | Full Phase 5 scenario (in‑memory DataStore): new player loads empty; leaving saves everything with a timestamp; rejoin 2 h later restores progress, respawns bee models and upgrade visuals, credits offline honey (2 bees × 0.2/s × 7200 s = 2880, capped to the hive's free room) with one welcome card; rejoin 10 s later credits nothing; 30 h away counts as 8 h; autosave after 60 s; a load that fails all retries gives a temporary farm and never writes; one transient failure still loads; a newer save elsewhere is not overwritten; BindToClose saves everyone; unavailable DataStores → temporary progress, player told, nothing written | `python3 tests/run_sim.py --luau <luau> --scenario tests/phase5.scenario.luau` | 29/29 pass |
