@@ -1,8 +1,9 @@
 -- UpgradeVisuals (ModuleScript)
--- Shows a player's upgrade levels on their plot: extra hives appear in the hive yard,
--- extra tanks and pipes grow beside the bottling machine, the flower patch gets glowing
--- pollen, and gold bands wrap the main hive. Everything is built into Plot.Temp.Upgrades,
--- which PlotService clears when the owner leaves.
+-- Shows a player's upgrade levels on their plot: a blocky hive tree grows in the hive yard
+-- with one branch (and one hanging hive) per Hive Storage level, extra tanks and pipes grow
+-- beside the bottling machine, the flower patch gets glowing pollen, and gold bands wrap the
+-- main hive. Everything is built into Plot.Temp.Upgrades, which PlotService clears when the
+-- owner leaves.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("HoneyFarm"):WaitForChild("Config"))
@@ -36,7 +37,98 @@ local function cyl(parent: Instance, cf: CFrame, h: number, d: number, color: Co
 	return part(parent, props)
 end
 
--- Small beehive standing on `cf` (ground).
+------------------------------------------------------------------------------
+-- Hive tree: a block-built tree (cube trunk, cube branches, cube leaf clumps in the
+-- studded style) that stands on the hive yard pad. The trunk gains a block and a branch
+-- every Hive Storage level; each branch carries a hive hanging from its tip.
+------------------------------------------------------------------------------
+
+local BLOCK = 3 -- trunk / leaf cube size
+local BRANCH_BLOCK = 2
+local TRUNK_BASE_BLOCKS = 5 -- trunk blocks below the first branch
+local BRANCH_REACH = 3 -- branch cubes out from the trunk
+local ROPE = 1.5 -- gap between the branch tip and the hive's top
+local HANGING_HIVE_HEIGHT = 7
+local LEAF_COLORS = { Color3.fromRGB(70, 160, 70), Color3.fromRGB(96, 190, 82), Color3.fromRGB(58, 138, 62) }
+local TRUNK_COLOR = Color3.fromRGB(96, 62, 36)
+local BRANCH_COLOR = Color3.fromRGB(120, 78, 46)
+
+local function cube(parent: Instance, cf: CFrame, size: number, color: Color3, name: string, collide: boolean?)
+	return part(parent, { Name = name, Size = Vector3.one * size, CFrame = cf, Color = color, CanCollide = collide == true })
+end
+
+-- Height (studs above the pad) of branch `i` (1 = lowest).
+local function branchHeight(i: number): number
+	return (TRUNK_BASE_BLOCKS + i) * BLOCK - BLOCK / 2
+end
+
+-- Yaw of branch `i`: golden-angle spread so branches fan around the trunk and never stack.
+local function branchYaw(i: number): number
+	return i * 2.39996 + 0.6
+end
+
+-- Ground CFrame the hanging hive is built on: straight below branch `i`'s tip.
+local function hangingHiveCFrame(padCF: CFrame, i: number): CFrame
+	local tipY = branchHeight(i) - BRANCH_BLOCK / 2
+	local reach = BRANCH_BLOCK * (BRANCH_REACH + 0.5)
+	local groundY = tipY - ROPE - HANGING_HIVE_HEIGHT
+	return padCF * CFrame.Angles(0, branchYaw(i), 0) * CFrame.new(0, groundY, -reach) * CFrame.Angles(0, (i % 3) * 0.3, 0)
+end
+
+-- Builds the tree for `branches` hives. Returns nil when there is nothing to show.
+local function hiveTree(parent: Instance, padCF: CFrame, branches: number): Model?
+	if branches < 1 then
+		return nil
+	end
+	local m = Instance.new("Model")
+	m.Name = "HiveTree"
+	m:SetAttribute("Branches", branches)
+	local trunkBlocks = TRUNK_BASE_BLOCKS + branches + 1
+	-- roots: a ring of half-sunk cubes so the trunk reads as planted, not placed
+	for k = 0, 3 do
+		local a = k * math.pi / 2 + math.pi / 4
+		cube(m, padCF * CFrame.new(math.cos(a) * BLOCK, BLOCK / 4, math.sin(a) * BLOCK), BLOCK * 0.8, TRUNK_COLOR, "Root", true)
+	end
+	for b = 1, trunkBlocks do
+		cube(m, padCF * CFrame.new(0, (b - 0.5) * BLOCK, 0), BLOCK, TRUNK_COLOR, "Trunk", true)
+	end
+	-- crown: a block canopy on top that gets a little wider as the tree grows
+	local crownY = trunkBlocks * BLOCK
+	local crownRadius = math.min(2, 1 + math.floor(branches / 4))
+	local leafIndex = 0
+	for dx = -crownRadius, crownRadius do
+		for dz = -crownRadius, crownRadius do
+			for dy = 0, 1 do
+				local corner = math.abs(dx) == crownRadius and math.abs(dz) == crownRadius
+				if not (corner and dy == 1) then
+					leafIndex += 1
+					cube(m, padCF * CFrame.new(dx * BLOCK, crownY + (dy + 0.5) * BLOCK, dz * BLOCK), BLOCK, LEAF_COLORS[leafIndex % #LEAF_COLORS + 1], "Leaf")
+				end
+			end
+		end
+	end
+	cube(m, padCF * CFrame.new(0, crownY + 2.5 * BLOCK, 0), BLOCK, LEAF_COLORS[1], "Leaf")
+	-- branches
+	for i = 1, branches do
+		local y = branchHeight(i)
+		local rot = padCF * CFrame.Angles(0, branchYaw(i), 0)
+		for r = 1, BRANCH_REACH do
+			cube(m, rot * CFrame.new(0, y, -(BLOCK / 2 + (r - 0.5) * BRANCH_BLOCK)), BRANCH_BLOCK, BRANCH_COLOR, "Branch")
+		end
+		local tipZ = -(BLOCK / 2 + BRANCH_REACH * BRANCH_BLOCK)
+		-- leaf clump around the branch tip
+		for _, o in { { 0, BRANCH_BLOCK, 0 }, { BRANCH_BLOCK, 0, 0 }, { -BRANCH_BLOCK, 0, 0 }, { 0, 0, -BRANCH_BLOCK }, { 0, BRANCH_BLOCK, -BRANCH_BLOCK } } do
+			leafIndex += 1
+			cube(m, rot * CFrame.new(o[1], y + o[2], tipZ + o[3]), BRANCH_BLOCK, LEAF_COLORS[leafIndex % #LEAF_COLORS + 1], "Leaf")
+		end
+		-- rope from the tip down to the hive
+		part(m, { Name = "Rope", Size = Vector3.new(0.3, ROPE, 0.3), CFrame = rot * CFrame.new(0, y - BRANCH_BLOCK / 2 - ROPE / 2, tipZ + BRANCH_BLOCK / 2), Color = Color3.fromRGB(205, 170, 110) })
+	end
+	m.Parent = parent
+	return m
+end
+
+-- Small beehive standing on `cf` (ground); hung from the hive tree it dangles under a branch.
 local function miniHive(parent: Instance, cf: CFrame, level: number)
 	-- a "MiniHive" prop, or the main "Hive" prop shrunk down, replaces the block version
 	local prop = if PropLibrary.Has("MiniHive") then PropLibrary.Place(parent, "MiniHive", cf, 7, "MiniHive") else PropLibrary.PlaceLevel(parent, "Hive", 1, cf, 7, "MiniHive")
@@ -113,16 +205,18 @@ function UpgradeVisuals.Apply(plot: Model, state: any)
 	local folder = Instance.new("Folder")
 	folder.Name = "Upgrades"
 
-	-- Hive storage: one mini hive per level above 1 in the hive yard, plus gold bands on the main hive
+	-- Hive storage: a block tree grows in the hive yard with one branch per level above 1,
+	-- a hive hanging from each branch, plus gold bands on the main hive
 	local hiveLevel = state:UpgradeLevel("HiveStorage")
 	applyHiveModel(plot, hiveLevel)
 	local usingHiveProp = PropLibrary.Has("Hive")
 	local hivePad = plot:FindFirstChild("HiveExpansion", true) :: BasePart?
 	if hivePad then
-		local slots = { { -7, -5 }, { 0, -5 }, { 7, -5 }, { -7, 4 }, { 0, 4 }, { 7, 4 }, { -3.5, -0.5 }, { 3.5, -0.5 }, { -9, -0.5 } }
-		for i = 1, math.min(hiveLevel - 1, #slots) do
-			local o = slots[i]
-			miniHive(folder, hivePad.CFrame * CFrame.new(o[1], 0.1, o[2]) * CFrame.Angles(0, (i % 3) * 0.3, 0), i)
+		local branches = math.max(0, hiveLevel - 1)
+		local padCF = hivePad.CFrame * CFrame.new(0, hivePad.Size.Y / 2, 0)
+		hiveTree(folder, padCF, branches)
+		for i = 1, branches do
+			miniHive(folder, hangingHiveCFrame(padCF, i), i)
 		end
 	end
 	local mainHive = plot:FindFirstChild("Hive", true)

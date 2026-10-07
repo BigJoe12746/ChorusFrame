@@ -83,10 +83,48 @@ check(levels(plot1).HiveStorage == 2 and plot1:GetAttribute("HiveCapacity") == 1
 check(s.Cash == 5000 - 80, "$80 charged")
 check(has(lastNote(alice), "Hive Storage upgraded to 120 honey"), "upgrade message shows the new value")
 local v = visuals(plot1)
-check(v.MiniHive == 1, "one mini hive appears in the hive yard")
+check(v.MiniHive == 1, "one hive appears in the hive yard")
+-- the hive yard grows a block tree; hives hang from its branches instead of standing on the pad
+local function treeStats(plot)
+	local tree = plot.Temp.Upgrades:FindFirstChild("HiveTree")
+	local out = { Trunk = 0, Branch = 0, Leaf = 0, Rope = 0, Root = 0, top = 0 }
+	if tree then
+		for _, d in tree:GetChildren() do
+			out[d.Name] = (out[d.Name] or 0) + 1
+			out.top = math.max(out.top, d.Position.Y + d.Size.Y / 2)
+		end
+	end
+	return tree, out
+end
+local pad = plot1:FindFirstChild("HiveExpansion", true)
+local padTop = pad.Position.Y + pad.Size.Y / 2
+local tree, t2 = treeStats(plot1)
+check(tree ~= nil and tree:GetAttribute("Branches") == 1 and t2.Branch == 3 and t2.Rope == 1, "level 2: a hive tree with one branch and one rope")
+check(t2.Trunk >= 6 and t2.Leaf > 5 and t2.Root == 4, "the tree has a block trunk, a leaf crown and roots")
+local function hivesHang(plot)
+	local ok, lowest = true, math.huge
+	for _, d in plot.Temp.Upgrades:GetChildren() do
+		if d.Name == "MiniHive" then
+			local cf, size = d:GetBoundingBox()
+			local bottom = cf.Position.Y - size.Y / 2
+			lowest = math.min(lowest, bottom)
+			-- hanging: clearly above the pad, and below the tree top
+			if bottom < padTop + 3 then
+				ok = false
+			end
+		end
+	end
+	return ok, lowest
+end
+local hang2, low2 = hivesHang(plot1)
+check(hang2 and low2 < t2.top, "the hive hangs in the air under its branch, not on the pad")
 upgrade(alice, "HiveStorage")
 local hp = Config.Upgrades.HiveStorage.Prices
-check(plot1:GetAttribute("HiveCapacity") == 250 and visuals(plot1).MiniHive == 2 and s.Cash == 5000 - hp[1] - hp[2], ("level 3: capacity 250, two mini hives, $%d charged"):format(hp[2]))
+check(plot1:GetAttribute("HiveCapacity") == 250 and visuals(plot1).MiniHive == 2 and s.Cash == 5000 - hp[1] - hp[2], ("level 3: capacity 250, two hanging hives, $%d charged"):format(hp[2]))
+local tree3, t3 = treeStats(plot1)
+check(tree3:GetAttribute("Branches") == 2 and t3.Branch == 6 and t3.Rope == 2 and t3.Trunk == t2.Trunk + 1 and t3.top > t2.top, "level 3: the tree gains a trunk block and a second branch")
+local hang3 = hivesHang(plot1)
+check(hang3 and visuals(plot1).HiveTree == 1, "both hives hang from the one tree")
 
 -- bottling speed: tanks appear and jars really come out faster
 upgrade(alice, "BottlingSpeed")

@@ -37,7 +37,7 @@ If `Workspace.HoneyFarmMap` already exists, the game keeps it and does **not** r
 - `Plots` → `Plot1`…`Plot6` (100×100 studs each, gate facing the plaza). Inside each:
   - `Ground`, `Fences`, `Gate` (with `OwnerSign`), `SpawnPoint`, `WelcomeMat`
   - `Stations` → `Hive` (with `HivePressurePlate`), `FlowerPatch`, `BeeShop`, `Bottling` (with `Conveyor` and `BottlingPressurePlate`), `SellStand` (with `SellPressurePlate`)
-  - `Expansion` → `HiveExpansion` pad (mini hives appear here as players upgrade), `MachineExpansion` pad (extra tanks appear here)
+  - `Expansion` → `HiveExpansion` pad (a block hive tree grows here as players upgrade Hive Storage, with hives hanging from its branches; leave the pad clear), `MachineExpansion` pad (extra tanks appear here)
   - `Temp` — **runtime only**; wiped whenever the owner leaves. Never put permanent things here.
 - `Scenery` — trees and giant flowers between plots.
 
@@ -50,6 +50,7 @@ If `Workspace.HoneyFarmMap` already exists, the game keeps it and does **not** r
    - The game clones them, strips any scripts, anchors them, **scales them to the spot** (trees ~19–34 studs tall, cottages 22, hive 12, mini hives 7) and stands them on the ground facing the right way. Pivot/size don't matter; set a `YawOffset` attribute (degrees) if a model's front isn't its +Z face.
    - Flowers are built from petal blocks in the stud style on purpose; edit them in `MapBuilder` through Claude if the look should change.
    - Upgraded hive looks: `Hive` (level 1), `Hive2`, `Hive3`… are swapped in as the player upgrades Hive Storage. Make each one look richer than the last (more tiers, gold trim, a chimney, flags).
+   - `MiniHive` is the hive that hangs from the hive tree's branches (scaled to 7 studs, hung by its top), so a rounder, nest-like hive suits it.
    - Optional attributes on a prop: `HeightScale` (number), `KeepSize` (true = don't rescale), `CanCollide` (bool).
 2. **Decorate the baked map.** Bake it (command above), then add lamp posts, signs, crates, bushes, paths detail, terrain touches, lighting, skybox, anywhere in `Workspace.HoneyFarmMap`. Keep walkways clear.
 3. **Re-skin stations** by adding parts around them. Fine to add roofs, flags, barrels, honeycomb textures to the hive, pipes to the bottling machine, awnings to the stands.
