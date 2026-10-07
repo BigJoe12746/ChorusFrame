@@ -11,6 +11,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("HoneyFarm")
 local Config = require(Shared:WaitForChild("Config"))
@@ -30,6 +31,8 @@ PlotService.PlotAssigned = assignedEvent.Event
 PlotService.PlotReleased = releasedEvent.Event
 -- (player, plot, stationName) — only fires after ownership and distance have been checked
 PlotService.StationTriggered = stationEvent.Event
+local touchCooldowns: { [BasePart]: { [Player]: number } } = {}
+local TOUCH_COOLDOWN = 2
 
 local plotsFolder: Folder
 local plotModels: { [number]: Model } = {}
@@ -260,6 +263,70 @@ local function hookPrompt(prompt: ProximityPrompt)
 	end)
 end
 
+local function hookStationPlate(plate: BasePart)
+	-- Press-down squash (attribute-gated): the plate dips and pops back when a step
+	-- registers on it. Rest pose is captured once at hook time; the debounce keeps
+	-- repeated Touched events from stacking tweens mid-animation.
+	local squashDebounce = false
+	local restCf, restSize = plate.CFrame, plate.Size
+	local function playSquash()
+		if not plate:GetAttribute("SquashOnPress") or squashDebounce then
+			return
+		end
+		squashDebounce = true
+		local press = TweenService:Create(
+			plate,
+			TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+			{
+				Size = Vector3.new(restSize.X * 1.05, math.max(0.05, restSize.Y * 0.35), restSize.Z * 1.05),
+				CFrame = restCf - Vector3.new(0, restSize.Y * 0.3, 0),
+			}
+		)
+		local release = TweenService:Create(
+			plate,
+			TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+			{ Size = restSize, CFrame = restCf }
+		)
+		press.Completed:Connect(function()
+			task.wait(0.12)
+			release.Completed:Connect(function()
+				squashDebounce = false
+			end)
+			release:Play()
+		end)
+		press:Play()
+	end
+	plate.Touched:Connect(function(otherPart)
+		local character = otherPart:FindFirstAncestorOfClass("Model")
+		local player = character and Players:GetPlayerFromCharacter(character)
+		if not player or not player.Character or not character:IsDescendantOf(workspace) then
+			return
+		end
+		local plot = PlotService.GetPlotFromInstance(plate)
+		if not plot then
+			return
+		end
+		if plot:GetAttribute("OwnerUserId") ~= player.UserId then
+			return
+		end
+		local now = os.clock()
+		local playerCooldowns = touchCooldowns[plate]
+		if not playerCooldowns then
+			playerCooldowns = {}
+			touchCooldowns[plate] = playerCooldowns
+		end
+		if now - (playerCooldowns[player] or 0) < TOUCH_COOLDOWN then
+			return
+		end
+		playerCooldowns[player] = now
+		local station = plate:GetAttribute("StationTouch")
+		if type(station) == "string" then
+			playSquash()
+			stationEvent:Fire(player, plot, station)
+		end
+	end)
+end
+
 ------------------------------------------------------------------------------
 
 function PlotService.Start(map: Model)
@@ -278,6 +345,8 @@ function PlotService.Start(map: Model)
 	for _, d in plotsFolder:GetDescendants() do
 		if d:IsA("ProximityPrompt") and d:GetAttribute("OwnerOnly") then
 			hookPrompt(d)
+		elseif d:IsA("BasePart") and type(d:GetAttribute("StationTouch")) == "string" then
+			hookStationPlate(d)
 		end
 	end
 

@@ -7,6 +7,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage:WaitForChild("HoneyFarm"):WaitForChild("Config"))
 local PropLibrary = require(script.Parent:WaitForChild("PropLibrary"))
+local StudStyle = require(ReplicatedStorage:WaitForChild("HoneyFarm"):WaitForChild("StudStyle"))
 local C = Config.Colors
 
 local UpgradeVisuals = {}
@@ -19,12 +20,10 @@ local function part(parent: Instance, props: { [string]: any }): BasePart
 	p.CanCollide = false
 	p.CanQuery = false
 	p.CanTouch = false
-	p.TopSurface = Enum.SurfaceType.Smooth
-	p.BottomSurface = Enum.SurfaceType.Smooth
-	p.Material = Enum.Material.SmoothPlastic
 	for k, v in props do
 		(p :: any)[k] = v
 	end
+	StudStyle.Apply(p)
 	p.Parent = parent
 	return p
 end

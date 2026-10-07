@@ -37,11 +37,9 @@ end
 local function prompt(plot, station)
 	return plot.Stations[station]:FindFirstChild("StationPrompt", true)
 end
--- walk the player's character next to a station and press its prompt
+-- walk the player's character to a station and use it (plate or prompt)
 local function use(player, plot, station)
-	local p = prompt(plot, station)
-	player.Character:PivotTo(p.Parent.CFrame + M.Vector3.new(0, 3, -4))
-	p.Triggered:Fire(player)
+	return useStation(player, plot, station)
 end
 
 -- Alice joins: 25 cash, one Starter Bee
@@ -63,10 +61,10 @@ tick(5.1)
 check(plot1:GetAttribute("HiveStored") == 1, "1 honey in the hive after 5 s")
 use(alice, plot1, "Hive")
 check(alice:GetAttribute("Carried") == 1 and plot1:GetAttribute("HiveStored") == 0, "collect moves 1 honey to the backpack")
-check(has(lastNote(alice), "+1"), "collect message")
+check(has(lastNote(alice), "1 honey"), "collect message")
 use(alice, plot1, "Hive")
 check(alice:GetAttribute("Carried") == 1, "collecting an empty hive changes nothing")
-check(has(lastNote(alice), "empty"), "empty hive message")
+check(has(lastNote(alice), "Nothing to collect"), "empty hive message")
 
 -- Fill the hive to the cap and check full-storage handling
 tick(300)
@@ -79,13 +77,11 @@ use(alice, plot1, "Hive")
 check(alice:GetAttribute("Carried") == 50 and plot1:GetAttribute("HiveStored") == 1, "backpack fills to 50; 1 honey stays in the hive")
 use(alice, plot1, "Hive")
 check(alice:GetAttribute("Carried") == 50 and plot1:GetAttribute("HiveStored") == 1, "full backpack: nothing moves")
-check(has(lastNote(alice), "backpack is full"), "full backpack message")
+check(has(lastNote(alice), "backpack full"), "full backpack message")
 
 -- Rapid double press on bottling: only one deposit
-local p = prompt(plot1, "Bottling")
-alice.Character:PivotTo(p.Parent.CFrame + M.Vector3.new(0, 3, -4))
-p.Triggered:Fire(alice)
-p.Triggered:Fire(alice)
+use(alice, plot1, "Bottling")
+use(alice, plot1, "Bottling")
 check(alice:GetAttribute("Carried") == 0 and plot1:GetAttribute("BottlingQueue") == 50, "deposit moves 50 honey to bottling exactly once")
 
 -- Bottling: 1 jar per second; jar animations are broadcast
@@ -108,23 +104,24 @@ use(alice, plot1, "SellStand")
 check(alice:GetAttribute("Cash") == 275, "collecting again does not pay twice")
 
 -- Conservation: everything produced is in the loop or already paid
-local paid = s.Totals.Earned / Config.Economy.JarValue
+local paid = (s.Totals.Earned - Config.Economy.StartCash) / Config.Economy.JarValue -- Earned includes the $25 start
 check(s.Totals.Produced == s:HoneyInSystem() + paid, "no honey counted twice (produced == in loop + paid)")
-check(s.Cash == Config.Economy.StartCash + s.Totals.Earned, "cash == start + jars x 5")
+check(s.Cash == s.Totals.Earned - s.Totals.Spent, "cash == everything earned - everything spent")
 
--- Distance check: pressing from across the map does nothing
-local before = alice:GetAttribute("Carried")
+-- Distance check: pressing the shop prompt from across the map does nothing
+local before = alice:GetAttribute("Cash")
 alice.Character:PivotTo(M.CFrame.new(0, 3, 0)) -- village
-prompt(plot1, "Hive").Triggered:Fire(alice)
-check(alice:GetAttribute("Carried") == before, "station press from far away is ignored")
+prompt(plot1, "BeeShop").Triggered:Fire(alice)
+check(#Remotes.OpenShop.fired == 0, "station press from far away is ignored")
+check(alice:GetAttribute("Cash") == before, "(and changes nothing)")
 
 -- Bob can't use Alice's stations, and has his own independent farm
 local bob = M.newPlayer(game, 2002, "Bob")
 bob.spawnCharacter()
 local plot2 = plots.Plot2
+local aliceCashBefore = alice:GetAttribute("Cash")
 use(bob, plot1, "SellStand")
-check(has(lastNote(bob), "Alice's farm"), "Bob is refused at Alice's stand")
-check(bob:GetAttribute("Cash") == 25, "Bob's cash is untouched")
+check(bob:GetAttribute("Cash") == 25 and alice:GetAttribute("Cash") == aliceCashBefore, "Bob is ignored at Alice's stand plate; nobody's cash changes")
 local hive1Before = plot1:GetAttribute("HiveStored")
 tick(5.1)
 check(plot2:GetAttribute("HiveStored") == 1 and plot1:GetAttribute("HiveStored") == hive1Before + 1, "both farms produce independently")

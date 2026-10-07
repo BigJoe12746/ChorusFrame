@@ -43,16 +43,20 @@ local button = Instance.new("TextButton")
 button.Name = "MyFarmButton"
 button.AnchorPoint = Vector2.new(0.5, 0)
 button.Position = UDim2.new(0.5, 0, 0, 6)
-button.Size = UDim2.fromOffset(180, 54)
+button.Size = UDim2.fromOffset(190, 62)
 button.BackgroundColor3 = C.Honey
 button.AutoButtonColor = true
 button.Font = Enum.Font.FredokaOne
-button.TextColor3 = C.Text
-button.TextSize = 26
+button.TextColor3 = Color3.new(1, 1, 1)
+button.TextScaled = true
 button.Text = "🏡 My Farm"
 button.Parent = gui
 corner(button, 16)
-stroke(button, C.Text, 3)
+stroke(button, Color3.new(0, 0, 0), 4)
+local glyph = Instance.new("UIStroke")
+glyph.Color = Color3.new(0, 0, 0)
+glyph.Thickness = 2.5
+glyph.Parent = button
 
 local hint = Instance.new("TextLabel")
 hint.Name = "KeyHint"

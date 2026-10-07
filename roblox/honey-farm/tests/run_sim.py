@@ -22,6 +22,7 @@ SCRIPTS = [
     ("ReplicatedStorage.HoneyFarm.FarmState", "ModuleScript", "src/shared/FarmState.lua"),
     ("ReplicatedStorage.HoneyFarm.BeeAppearance", "ModuleScript", "src/shared/BeeAppearance.lua"),
     ("ReplicatedStorage.HoneyFarm.VariantBees", "ModuleScript", "src/shared/VariantBees.lua"),
+    ("ReplicatedStorage.HoneyFarm.StudStyle", "ModuleScript", "src/shared/StudStyle.lua"),
     ("ServerScriptService.HoneyFarm.PropLibrary", "ModuleScript", "src/server/PropLibrary.lua"),
     ("ServerScriptService.HoneyFarm.MapBuilder", "ModuleScript", "src/server/MapBuilder.lua"),
     ("ServerScriptService.HoneyFarm.PlotService", "ModuleScript", "src/server/PlotService.lua"),
@@ -29,9 +30,10 @@ SCRIPTS = [
     ("ServerScriptService.HoneyFarm.UpgradeVisuals", "ModuleScript", "src/server/UpgradeVisuals.lua"),
     ("ServerScriptService.HoneyFarm.SaveService", "ModuleScript", "src/server/SaveService.lua"),
     ("ServerScriptService.HoneyFarm.FarmService", "ModuleScript", "src/server/FarmService.lua"),
+    ("ServerScriptService.HoneyFarm.LeaderboardService", "ModuleScript", "src/server/LeaderboardService.lua"),
     ("ServerScriptService.HoneyFarm.Main", "Script", "src/server/Main.server.lua"),
 ]
-REMOTES = ["ReturnToFarm", "Notify", "JarStarted", "OpenShop", "ShopAction", "BeeMerged", "UpgradeAction", "WelcomeBack", "Feedback", "EggHatched", "RebirthAction"]
+REMOTES = ["ReturnToFarm", "Notify", "JarStarted", "OpenShop", "ShopAction", "BeeMerged", "UpgradeAction", "WelcomeBack", "Feedback", "EggHatched", "RebirthAction", "RobuxShop"]
 
 
 def lua_str(s: str) -> str:
@@ -47,6 +49,7 @@ def build_bundle(scenario: str) -> str:
     out = ["local M = (function()\n", mock, "\nend)()\n"]
     out.append(
         """
+M.mainThread = coroutine.running()
 local game, workspace, services = M.newGame()
 -- simulated clock: os.clock() inside game scripts advances only when the scenario ticks
 M.simTime = 1000
@@ -137,6 +140,27 @@ local function dumpParts(root)
 	end
 end
 local scenarioFn = assert(loadstring(SCENARIO, "=scenario"))
+-- Walk `player` to a station of `plot` and use it: E-prompt stations fire their prompt,
+-- plate stations (Hive, Bottling, SellStand) fire Touched with a character part. Plates have a
+-- 2 s per-player cooldown on os.clock, so the sim clock is bumped after each plate press
+-- (production is unaffected: only Heartbeat ticks make honey).
+local PLATES = { Hive = "HivePressurePlate", Bottling = "BottlingPressurePlate", SellStand = "SellPressurePlate" }
+local function useStation(player, plot, station)
+	local model = plot.Stations[station]
+	local plateName = PLATES[station]
+	local plate = plateName and model:FindFirstChild(plateName, true)
+	if plate then
+		player.Character:PivotTo(plate.CFrame + M.Vector3.new(0, 3, 0))
+		plate.Touched:Fire(player.Character.HumanoidRootPart)
+		M.simTime += 2.1
+		return "plate"
+	end
+	local prompt = model:FindFirstChild("StationPrompt", true)
+	player.Character:PivotTo(prompt.Parent.CFrame + M.Vector3.new(0, 3, -4))
+	prompt.Triggered:Fire(player)
+	return "prompt"
+end
+
 local function tick(seconds, step)
 	step = step or 1 / 30
 	local hb = services.RunService.Heartbeat
@@ -144,11 +168,12 @@ local function tick(seconds, step)
 	while t < seconds - 1e-9 do
 		local dt = math.min(step, seconds - t)
 		M.simTime += dt
+		M.resumeSleepers(M.simTime)
 		hb:Fire(dt)
 		t += dt
 	end
 end
-setfenv(scenarioFn, setmetatable({ M = M, game = game, workspace = workspace, boot = boot, check = check, dumpParts = dumpParts, tick = tick, req = req }, { __index = _G }))
+setfenv(scenarioFn, setmetatable({ M = M, game = game, workspace = workspace, boot = boot, check = check, dumpParts = dumpParts, tick = tick, req = req, useStation = useStation }, { __index = _G }))
 scenarioFn()
 print(("RESULT %d passed, %d failed"):format(passed, failed))
 if failed > 0 then error("scenario failed") end

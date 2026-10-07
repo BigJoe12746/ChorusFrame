@@ -104,11 +104,11 @@ for i = 1, 3000 do
 	end
 end
 local jarsDone = c.Totals.Jars
-local jarsArrived = (c.Totals.Earned) / ECO.JarValue
+local jarsArrived = (c.Totals.Earned - ECO.StartCash) / ECO.JarValue -- Earned includes the $25 start
 check(produced == c.Totals.Produced, "tick results match totals")
 check(produced == c:HoneyInSystem() + jarsArrived, "every honey is either in the loop or already paid out")
 check(jarsDone == #c.Jars + jarsArrived, "every jar is on the belt or paid")
-check(c.Cash + c.Unclaimed == ECO.StartCash + c.Totals.Earned, "cash matches jars x 5")
+check(c.Cash + c.Unclaimed == c.Totals.Earned - c.Totals.Spent, "cash matches everything earned (start cash counts as earned) minus spent")
 check(c.Cash % 5 == 0, "cash only moves in whole jar values")
 
 -- zero / negative dt is a no-op
@@ -235,7 +235,7 @@ sv.BottlingAcc = 0.5
 sv.Jars = { 1.5, 2.5 }
 sv.Unclaimed = 45
 local data = sv:Serialize(1700000000)
-check(data.SavedAt == 1700000000 and data.Version == 1, "save carries a timestamp and version")
+check(data.SavedAt == 1700000000 and data.Version == 3, "save carries a timestamp and version")
 check(data.Cash == 1154 and data.Carried == 7 and data.HiveStored == 33 and data.Unclaimed == 45, "save holds cash, carried, hive, unclaimed")
 check(#data.Bees == 2 and data.Bees[2].Tier == "Clover" and data.Upgrades.HiveStorage == 2, "save holds bees and upgrade levels")
 check(data.BottlingQueue == 4 and #data.Jars == 2 and data.BottlingAcc == 0.5, "save holds the processing inventory")
@@ -318,7 +318,7 @@ local EGGS = {
 local REBIRTH = { RequiresTier = "Royal", JellyPerRebirth = 1, BonusPerJelly = 0.25, KeepVariants = true }
 local X = { Variants = VARIANTS, Eggs = EGGS, Rebirth = REBIRTH, ShinyChance = 0.05, ShinyMultiplier = 1.5 }
 
-local e = FarmState.new(ECO, BEES, ORDER, UPG, X)
+local e = FarmState.new(ECO, BEES, ORDER, UPG, nil, nil, X)
 local odds = e:EggOdds("Basic")
 check(#odds == 3 and math.abs(odds[1].Chance - 0.6) < 1e-9 and math.abs(odds[3].Chance - 0.1) < 1e-9, "egg odds are weights normalised to 100%")
 check(select(2, e:CanBuyEgg("Basic")) == "NoCash", "can't afford an egg with $25")
@@ -348,7 +348,7 @@ check(select(2, e:CanBuyEgg("Basic")) == "NoSlots" and e:HatchEgg("Basic", 0, 0)
 check(e.Cash == 9600, "exactly 4 eggs charged")
 
 -- shiny merges
-local sh2 = FarmState.new(ECO, BEES, ORDER, UPG, X)
+local sh2 = FarmState.new(ECO, BEES, ORDER, UPG, nil, nil, X)
 sh2.Cash = 100000
 sh2:BuyBee()
 local normal = sh2:MergeBees(1, 2, 0.5) -- roll above 5%
@@ -364,9 +364,11 @@ local daisyS = sh2:MergeBees(normal.Id, shiny.Id, 0.99) -- one shiny parent, bad
 check(daisyS ~= nil and daisyS.Tier == "Daisy" and daisyS.Shiny == true, "a shiny parent always gives a shiny child")
 check(sh2:MergeBees(99, 98) == nil, "merge without a roll still works for bad ids")
 
--- rebirth
-local rb = FarmState.new(ECO, BEES, ORDER, UPG, X)
-check(select(2, rb:CanRebirth()) == "NeedsTier" and rb:Rebirth() == nil, "can't rebirth without a Royal Bee")
+-- rebirth (cash-cost reset: x1.75 production per rebirth; egg bees survive)
+local RB = { BaseCost = 500, CostGrowth = 1.8, ProductionMultiplier = 1.75 }
+local rb = FarmState.new(ECO, BEES, ORDER, UPG, RB.ProductionMultiplier, nil, X)
+check(FarmState.RebirthCost(0, RB) == 500 and FarmState.RebirthCost(1, RB) == 900, "rebirth costs $500, then $900")
+check(rb:Rebirth(RB) == false and rb.Rebirths == 0, "can't rebirth with $25")
 rb.Cash = 5000
 rb:BuyUpgrade("HiveStorage")
 rb.HiveStored = 40
@@ -374,27 +376,24 @@ rb.Carried = 10
 rb.Unclaimed = 55
 local keep = rb:AddBee("Variant", 4) -- Cosmic Bee stays
 rb:AddBee("Royal")
-local rateBefore = rb:ProductionRate()
-check(rb:CanRebirth() == true, "owning a Royal Bee unlocks rebirth")
-local jelly = rb:Rebirth()
-check(jelly == 1 and rb.RoyalJelly == 1 and rb.Rebirths == 1, "rebirth grants 1 Royal Jelly")
+check(rb:Rebirth(RB) == true and rb.Rebirths == 1, "rebirth with enough cash")
 check(rb.Cash == 25 and rb.HiveStored == 0 and rb.Carried == 0 and rb.Unclaimed == 0 and rb.BottlingQueue == 0, "cash and honey reset")
 check(rb:UpgradeLevel("HiveStorage") == 1 and rb.HiveCapacity == 50, "upgrades reset")
 check(#rb.Bees == 2 and rb.Bees[1].Id == keep.Id and rb.Bees[1].Variant == 4 and rb.Bees[2].Tier == "Starter", "egg bee kept, ladder bees replaced by a fresh Starter")
 check(rb.Discovered.Royal == true and rb.Discovered.V4 == true, "collection is kept")
-check(math.abs(rb:JellyMultiplier() - 1.25) < 1e-9 and math.abs(rb:ProductionRate() - (900 + 0.2) * 1.25) < 1e-6, "all bees now make x1.25")
-rb:AddBee("Royal")
-rb:Rebirth()
-check(rb.RoyalJelly == 2 and math.abs(rb:JellyMultiplier() - 1.5) < 1e-9, "second rebirth stacks to x1.5")
-check(rateBefore > 0, "(sanity) had production before")
+check(math.abs(rb.RebirthMultiplier - 1.75) < 1e-9 and math.abs(rb:ProductionRate() - (900 + 0.2) * 1.75) < 1e-6, "all bees now make x1.75")
+check(rb.Totals.RebirthSpent == 500 and rb.TutorialStep == 999, "cost recorded; introduction skipped after a rebirth")
+rb.Cash = 100000
+rb:Rebirth(RB)
+check(rb.Rebirths == 2 and math.abs(rb.RebirthMultiplier - 1.75 ^ 2) < 1e-9 and rb.Totals.RebirthSpent == 1400, "second rebirth stacks (x3.06) and cost $900")
 
 -- save round trip with variants, shiny and jelly
 local sv2 = rb:Serialize(5)
-check(sv2.RoyalJelly == 2 and sv2.Bees[1].Variant == 4, "save holds jelly and variant ids")
-local back2 = FarmState.Deserialize(sv2, ECO, BEES, ORDER, UPG, X)
-check(back2.RoyalJelly == 2 and back2.Bees[1].Variant == 4 and back2.Discovered.V4 == true and back2:JellyMultiplier() == 1.5, "restore: jelly, variant bee, collection")
+check(sv2.Rebirths == 2 and sv2.Bees[1].Variant == 4, "save holds rebirths and variant ids")
+local back2 = FarmState.Deserialize(sv2, ECO, BEES, ORDER, UPG, RB.ProductionMultiplier, nil, X)
+check(back2.Rebirths == 2 and back2.Bees[1].Variant == 4 and back2.Discovered.V4 == true and math.abs(back2.RebirthMultiplier - 1.75 ^ 2) < 1e-9, "restore: rebirths, variant bee, collection")
 local sShiny = sh2:Serialize(6)
-local backShiny = FarmState.Deserialize(sShiny, ECO, BEES, ORDER, UPG, X)
+local backShiny = FarmState.Deserialize(sShiny, ECO, BEES, ORDER, UPG, nil, nil, X)
 local foundShiny = false
 for _, bee in backShiny.Bees do
 	if bee.Shiny then
@@ -402,10 +401,10 @@ for _, bee in backShiny.Bees do
 	end
 end
 check(foundShiny and backShiny.Discovered["Clover*"] == true, "restore: shiny flag and shiny discovery")
-local badV = FarmState.Deserialize({ Bees = { { Id = 1, Tier = "Variant", Variant = 999 }, { Id = 2, Tier = "Variant", Variant = 1 } }, Discovered = { "V999", "V1", "Clover*" } }, ECO, BEES, ORDER, UPG, X)
+local badV = FarmState.Deserialize({ Bees = { { Id = 1, Tier = "Variant", Variant = 999 }, { Id = 2, Tier = "Variant", Variant = 1 } }, Discovered = { "V999", "V1", "Clover*" } }, ECO, BEES, ORDER, UPG, nil, nil, X)
 check(#badV.Bees == 1 and badV.Bees[1].Variant == 1 and badV.Discovered.V999 == nil and badV.Discovered["Clover*"] == true, "unknown variant dropped, known kept")
 -- no extras: everything degrades gracefully
 local plain2 = FarmState.new(ECO, BEES, ORDER, UPG)
-check(select(2, plain2:CanBuyEgg("Basic")) == "Unknown" and select(2, plain2:CanRebirth()) == "Unknown" and plain2:JellyMultiplier() == 1, "without egg/rebirth config nothing breaks")
+check(select(2, plain2:CanBuyEgg("Basic")) == "Unknown" and plain2.RebirthMultiplier == 1, "without egg config nothing breaks")
 
 print(("FarmState: %d checks passed"):format(passed))

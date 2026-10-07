@@ -29,13 +29,14 @@ local function fakeProp(name, w, h, d, withScripts)
 end
 
 local props = ReplicatedStorage.Props
-fakeProp("Flower", 3, 10, 3, true).Parent = props -- 10 tall; slots want 5–18
-fakeProp("Flower2", 6, 2, 6, false).Parent = props -- variant
+fakeProp("Tree", 3, 10, 3, true).Parent = props -- 10 tall; slots want ~19–34
+fakeProp("Tree2", 6, 2, 6, false).Parent = props -- variant
+-- (flowers are block-built by design now: Lemonade judged mesh flowers looked sloppy at patch heights)
 fakeProp("Hive", 8, 30, 8, true).Parent = props -- way too big; must shrink to 12
 fakeProp("Hive2", 8, 20, 8, false).Parent = props -- upgraded looks for Hive Storage level 2 and 3+
 fakeProp("Hive3", 8, 10, 8, false).Parent = props
 fakeProp("Cottage", 20, 40, 20, false).Parent = props
--- no Tree / Fountain prop: those must fall back to the block versions
+-- no Fountain: the plaza centre stays open by design; cottages/hive/trees are props
 
 -- Hand-made bee models: a store bee renamed "Clover Bee" (with a hidden script) and a "Panda Bee"
 local beeModels = ReplicatedStorage.BeeModels
@@ -80,34 +81,41 @@ local function scripts(model)
 	return n
 end
 
--- flowers in the flower patch use the props
-local patch = plots.Plot1.Stations.FlowerPatch
-local flowers = {}
-for _, c in patch:GetChildren() do
+-- scenery trees use the props (random variant each)
+local trees = {}
+for _, c in map.Scenery:GetChildren() do
 	if c:IsA("Model") and c:GetAttribute("Prop") then
-		table.insert(flowers, c)
+		table.insert(trees, c)
 	end
 end
-check(#flowers == 9, "all 9 flower-patch flowers are props (" .. #flowers .. ")")
+check(#trees >= 20, "scenery trees are props (" .. #trees .. ")")
 local variants = {}
-for _, f in flowers do
-	variants[f:GetAttribute("Prop")] = true
-	check(scripts(f) == 0, "prop clone has no scripts (" .. f:GetAttribute("Prop") .. ")")
-	local cf, size = f:GetBoundingBox()
-	check(size.Y >= 4.9 and size.Y <= 7.6, ("flower scaled to its slot height (%.2f)"):format(size.Y))
+for _, t in trees do
+	variants[t:GetAttribute("Prop")] = true
+	check(scripts(t) == 0, "prop clone has no scripts (" .. t:GetAttribute("Prop") .. ")")
+	local cf, size = t:GetBoundingBox()
+	check(size.Y >= 18.9 and size.Y <= 34.3, ("tree scaled to its slot height (%.2f)"):format(size.Y))
 	local bottom = cf.Position.Y - size.Y / 2
-	check(math.abs(bottom - 1) < 0.05, ("flower stands on the soil (bottom y=%.2f)"):format(bottom))
-	check(f:FindFirstChild("Trunk") and f.Trunk.Anchored == true and f.Trunk.CanCollide == false, "flower parts anchored, non-colliding")
+	check(math.abs(bottom) < 0.05, ("tree stands on the ground (bottom y=%.2f)"):format(bottom))
+	check(t:FindFirstChild("Trunk") and t.Trunk.Anchored == true and t.Trunk.CanCollide == true, "tree parts anchored, colliding")
 end
-check(variants.Flower and variants.Flower2, "both flower variants get used")
-check(props.Flower:FindFirstChild("FreeModelVirus", true) ~= nil, "the original prop in Props is left untouched")
+check(variants.Tree and variants.Tree2, "both tree variants get used")
+check(props.Tree:FindFirstChild("FreeModelVirus", true) ~= nil, "the original prop in Props is left untouched")
+-- the flower patch is block-built by design (12 studded flowers)
+local blockFlowers = 0
+for _, c in plots.Plot1.Stations.FlowerPatch:GetChildren() do
+	if c:IsA("Model") and c.Name:match("^Flower") and not c:GetAttribute("Prop") then
+		blockFlowers += 1
+	end
+end
+check(blockFlowers == 12, "flower patch keeps 12 block-built flowers (" .. blockFlowers .. ")")
 
 -- hive: prop replaces the block layers, functional parts remain
 local hive = plots.Plot1.Stations.Hive
 local hiveProp = hive:FindFirstChild("HiveModel")
 check(hiveProp ~= nil and hiveProp:GetAttribute("Prop") == "Hive", "hive uses the Hive prop")
 check(hive:FindFirstChild("Layer") == nil and hive:FindFirstChild("Top") == nil, "block hive layers not built")
-check(hive:FindFirstChild("Base") ~= nil and hive.Base:FindFirstChild("StationPrompt") ~= nil and hive:FindFirstChild("BeeExit") ~= nil, "prompt, label base and bee exit still exist")
+check(hive:FindFirstChild("Base") ~= nil and hive:FindFirstChild("HivePressurePlate", true) ~= nil and hive:FindFirstChild("BeeExit") ~= nil, "label base, pressure plate and bee exit still exist")
 local hcf, hsize = hiveProp:GetBoundingBox()
 check(math.abs(hsize.Y - 12) < 0.05, ("hive prop shrunk from 30 to 12 tall (%.2f)"):format(hsize.Y))
 check(math.abs((hcf.Position.Y - hsize.Y / 2) - 1) < 0.05, "hive prop sits on top of the base plate")
@@ -125,18 +133,8 @@ end
 check(cottages == 6, "six cottages are props")
 check(village:FindFirstChild("Bakery") ~= nil, "cottage keeps its title as the model name")
 
--- fallbacks: no Tree / Fountain prop -> block versions
-local trees, blockTrees = 0, 0
-for _, c in map.Scenery:GetChildren() do
-	if c.Name == "Tree" then
-		trees += 1
-		if c:FindFirstChild("Trunk") and c:FindFirstChild("Crown") then
-			blockTrees += 1
-		end
-	end
-end
-check(trees > 0 and trees == blockTrees, "trees fall back to the block version")
-check(village.HoneyFountain:FindFirstChild("HoneyPot") ~= nil, "fountain falls back to the block version")
+-- no fountain in the plaza by design
+check(village:FindFirstChild("HoneyFountain") == nil, "plaza centre stays open (no fountain)")
 
 -- hand-made bee models replace generated ones, by name
 local BeeAppearance = req(ReplicatedStorage.HoneyFarm.BeeAppearance)

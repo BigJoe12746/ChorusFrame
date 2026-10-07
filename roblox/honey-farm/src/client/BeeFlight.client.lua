@@ -84,19 +84,39 @@ local function watchPlot(plot: Instance)
 	-- a merge replaces bee models; a freshly spawned bee pops in from nothing
 	temp.ChildAdded:Connect(function(m)
 		if m:IsA("Model") and m:GetAttribute("Bee") and m:GetAttribute("PopIn") then
-			local target = m:GetScale()
-			m:ScaleTo(math.max(0.05, target * 0.1))
-			local t0 = os.clock()
-			local conn
-			conn = RunService.Heartbeat:Connect(function()
-				local a = math.min(1, (os.clock() - t0) / 0.45)
-				local ease = 1 - (1 - a) ^ 3
-				if m.Parent then
-					m:ScaleTo(math.max(0.05, target * (0.1 + 0.9 * ease)))
+			task.spawn(function()
+				-- replication delivers the Model before its parts; scaling before every
+				-- part has arrived poisons the engine's size cache and leaves the bee huge
+				local last = -1
+				local stable = 0
+				while stable < 0.15 and m.Parent do
+					local n = #m:GetDescendants()
+					if n == last and n > 0 then
+						stable += task.wait()
+					else
+						last = n
+						stable = 0
+						task.wait()
+					end
 				end
-				if a >= 1 or not m.Parent then
-					conn:Disconnect()
+				if not m.Parent then
+					return
 				end
+				local info = Config.Bees[m:GetAttribute("Tier")]
+				local target = if info then info.Scale else m:GetScale()
+				m:ScaleTo(math.max(0.05, target * 0.1))
+				local t0 = os.clock()
+				local conn
+				conn = RunService.Heartbeat:Connect(function()
+					local a = math.min(1, (os.clock() - t0) / 0.45)
+					local ease = 1 - (1 - a) ^ 3
+					if m.Parent then
+						m:ScaleTo(math.max(0.05, target * (0.1 + 0.9 * ease)))
+					end
+					if a >= 1 or not m.Parent then
+						conn:Disconnect()
+					end
+				end)
 			end)
 		end
 	end)

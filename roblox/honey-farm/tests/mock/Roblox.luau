@@ -352,6 +352,7 @@ function Instance.new(className)
 		raw.CFrame = CF.new()
 		raw.Transparency = 0
 		raw.CanCollide = true
+		raw.Touched = Signal()
 	end
 	raw.ChildAdded = rawget(self, "_childAdded")
 	raw.DescendantAdded = rawget(self, "_descAdded")
@@ -520,6 +521,26 @@ function Instance.GetExtentsSize(self)
 	local _, size = Instance.GetBoundingBox(self)
 	return size
 end
+function Instance.FindFirstAncestorOfClass(self, class)
+	local p = rawget(self, "_props").Parent
+	while p do
+		if rawget(p, "_props").ClassName == class then
+			return p
+		end
+		p = rawget(p, "_props").Parent
+	end
+	return nil
+end
+function Instance.FindFirstAncestorWhichIsA(self, class)
+	local p = rawget(self, "_props").Parent
+	while p do
+		if Instance.IsA(p, class) then
+			return p
+		end
+		p = rawget(p, "_props").Parent
+	end
+	return nil
+end
 function Instance.FindFirstChildWhichIsA(self, class, recursive)
 	local list = if recursive then Instance.GetDescendants(self) else rawget(self, "_children")
 	for _, c in list do
@@ -539,7 +560,7 @@ function M.newGame()
 	workspace.Name = "Workspace"
 	workspace.Parent = game
 	local services = {}
-	for _, name in { "ReplicatedStorage", "ServerScriptService", "Players", "TweenService", "UserInputService", "RunService", "DataStoreService" } do
+	for _, name in { "ReplicatedStorage", "ServerScriptService", "Players", "TweenService", "UserInputService", "RunService", "DataStoreService", "MarketplaceService", "Debris", "SoundService" } do
 		local s = Instance.new(name)
 		s.Name = name
 		s.Parent = game
@@ -550,6 +571,22 @@ function M.newGame()
 	end
 
 	rawget(services.RunService, "_props").Heartbeat = Signal()
+	-- TweenService:Create returns a fake tween that applies its goals immediately on Play
+	rawget(services.TweenService, "_props").Create = function(_, inst, _info, goals)
+		local completed = Signal()
+		return {
+			Completed = completed,
+			Play = function()
+				for k, v in goals do
+					inst[k] = v
+				end
+				completed:Fire()
+			end,
+			Cancel = function() end,
+		}
+	end
+	rawget(services.MarketplaceService, "_props").PromptProductPurchase = function() end
+	rawget(services.Debris, "_props").AddItem = function() end
 	rawget(services.RunService, "_props").IsStudio = function()
 		return true
 	end
@@ -571,33 +608,99 @@ function M.newGame()
 		end
 		return out
 	end
-	local store = {}
-	function store:GetAsync(key)
-		ds.calls += 1
-		if ds.failNext > 0 then
-			ds.failNext -= 1
-			error("DataStore request failed (simulated)")
+	-- One store object per name so each keeps its own keyspace. Failure injection
+	-- (failNext / calls) only applies to the game's save store (ds.failStore, default
+	-- Config.Save.StoreName) so leaderboard profile traffic never eats a test's
+	-- injected failures.
+	ds.failStore = "HoneyFarm_v1"
+	ds.stores = {}
+	local function makeStore(name)
+		local store = {}
+		local function maybeFail()
+			if name ~= ds.failStore then
+				return
+			end
+			ds.calls += 1
+			if ds.failNext > 0 then
+				ds.failNext -= 1
+				error("DataStore request failed (simulated)")
+			end
 		end
-		return deepcopy(ds.data[key])
+		local function bucket()
+			if name == ds.failStore then
+				return ds.data
+			end
+			ds.stores[name] = ds.stores[name] or {}
+			return ds.stores[name]
+		end
+		function store:GetAsync(key)
+			maybeFail()
+			return deepcopy(bucket()[key])
+		end
+		function store:SetAsync(key, value)
+			maybeFail()
+			bucket()[key] = deepcopy(value)
+		end
+		function store:UpdateAsync(key, fn)
+			maybeFail()
+			local b = bucket()
+			local new = fn(deepcopy(b[key]))
+			if new ~= nil then
+				b[key] = deepcopy(new)
+			end
+			return deepcopy(b[key])
+		end
+		return store
 	end
-	function store:UpdateAsync(key, fn)
-		ds.calls += 1
-		if ds.failNext > 0 then
-			ds.failNext -= 1
-			error("DataStore request failed (simulated)")
-		end
-		local new = fn(deepcopy(ds.data[key]))
-		if new ~= nil then
-			ds.data[key] = deepcopy(new)
-		end
-		return deepcopy(ds.data[key])
-	end
+	local storeObjects = {}
 	rawget(services.DataStoreService, "_props").GetDataStore = function(_, name)
 		if ds.unavailable then
 			error("DataStore API access is not enabled (simulated Studio)")
 		end
 		ds.name = name
-		return store
+		ds.names = ds.names or {}
+		ds.names[name] = true
+		storeObjects[name] = storeObjects[name] or makeStore(name)
+		return storeObjects[name]
+	end
+	-- Ordered stores for leaderboards: SetAsync + GetSortedAsync(pages)
+	ds.ordered = {}
+	rawget(services.DataStoreService, "_props").GetOrderedDataStore = function(_, name)
+		if ds.unavailable then
+			error("DataStore API access is not enabled (simulated Studio)")
+		end
+		local data = ds.ordered[name] or {}
+		ds.ordered[name] = data
+		local os = {}
+		function os:SetAsync(key, value)
+			data[key] = value
+		end
+		function os:GetAsync(key)
+			return data[key]
+		end
+		function os:GetSortedAsync(ascending, pageSize)
+			local rows = {}
+			for k, v in data do
+				table.insert(rows, { key = k, value = v })
+			end
+			table.sort(rows, function(a, b)
+				if ascending then
+					return a.value < b.value
+				end
+				return a.value > b.value
+			end)
+			while #rows > (pageSize or 50) do
+				table.remove(rows)
+			end
+			return {
+				GetCurrentPage = function()
+					return rows
+				end,
+				IsFinished = true,
+				AdvanceToNextPageAsync = function() end,
+			}
+		end
+		return os
 	end
 
 	-- Players service
@@ -612,6 +715,14 @@ function M.newGame()
 	PP.GetPlayerByUserId = function(_, id)
 		for _, p in PP.list do
 			if p.UserId == id then
+				return p
+			end
+		end
+		return nil
+	end
+	PP.GetPlayerFromCharacter = function(_, character)
+		for _, p in PP.list do
+			if p.Character == character then
 				return p
 			end
 		end
@@ -663,18 +774,58 @@ function M.removePlayer(game, p)
 	p.Parent = nil
 end
 
--- Synchronous task library (good enough for logic tests)
+-- task library: spawned functions run in coroutines; task.wait inside one parks it until the
+-- simulated clock (advanced by the scenario's tick()) reaches its wake time. At top level,
+-- task.wait returns immediately.
+M.simTime = M.simTime or 0
+local sleepers = {}
+local function run(co, ...)
+	local ok, err = coroutine.resume(co, ...)
+	if not ok then
+		error(err, 0)
+	end
+end
 M.task = {
 	spawn = function(f, ...)
-		f(...)
+		run(coroutine.create(f), ...)
 	end,
 	defer = function(f, ...)
-		f(...)
+		run(coroutine.create(f), ...)
 	end,
-	delay = function() end,
-	wait = function()
-		return 0
+	delay = function(seconds, f, ...)
+		local args = table.pack(...)
+		local co = coroutine.create(function()
+			coroutine.yield()
+			f(table.unpack(args, 1, args.n))
+		end)
+		coroutine.resume(co)
+		table.insert(sleepers, { co = co, wake = (M.simTime or 0) + (seconds or 0) })
+	end,
+	wait = function(seconds)
+		local co, isMain = coroutine.running()
+		-- the luau CLI runs the whole script inside a coroutine, so the scenario's own thread
+		-- counts as "main" too: waits there return at once instead of parking the test
+		if isMain or co == M.mainThread or not coroutine.isyieldable() then
+			return seconds or 0
+		end
+		table.insert(sleepers, { co = co, wake = (M.simTime or 0) + (seconds or 0) })
+		coroutine.yield()
+		return seconds or 0
 	end,
 }
+function M.resumeSleepers(now)
+	local due = {}
+	local i = 1
+	while i <= #sleepers do
+		if sleepers[i].wake <= now then
+			table.insert(due, table.remove(sleepers, i))
+		else
+			i += 1
+		end
+	end
+	for _, s in due do
+		run(s.co)
+	end
+end
 
 return M

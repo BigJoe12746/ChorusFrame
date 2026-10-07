@@ -69,7 +69,7 @@ local function rootPosition(): Vector3?
 	return root and (root :: BasePart).Position
 end
 
-local function floatingText(position: Vector3, text: string, color: Color3)
+local function floatingText(position: Vector3, text: string, color: Color3, size: UDim2?)
 	local anchor = Instance.new("Part")
 	anchor.Size = Vector3.one * 0.2
 	anchor.Transparency = 1
@@ -79,7 +79,7 @@ local function floatingText(position: Vector3, text: string, color: Color3)
 	anchor.CFrame = CFrame.new(position)
 	anchor.Parent = fx
 	local bb = Instance.new("BillboardGui")
-	bb.Size = UDim2.fromOffset(200, 50)
+	bb.Size = size or UDim2.fromOffset(200, 50)
 	bb.AlwaysOnTop = true
 	bb.Parent = anchor
 	local label = Instance.new("TextLabel")
@@ -159,21 +159,43 @@ FeedbackRemote.OnClientEvent:Connect(function(kind: string, amount: number, stat
 		if me then
 			stream(at, me + Vector3.new(0, 1, 0), math.clamp(amount, 4, 14))
 		end
-		floatingText(at, ("+%d 🍯"):format(amount), C.Honey)
+		floatingText(at, ("+%s 🍯"):format(Config.Progression.FormattedNumber(amount)), C.Honey)
 		play("Collect", rng:NextNumber(0.95, 1.1))
 	elseif kind == "Deposit" then
 		if me then
 			stream(me + Vector3.new(0, 1, 0), at, math.clamp(amount, 4, 14))
 		end
-		floatingText(at, ("%d 🍯 → jars"):format(amount), C.Cream)
+		floatingText(at, ("%s 🍯 → jars"):format(Config.Progression.FormattedNumber(amount)), C.Cream)
 		play("Deposit")
 	elseif kind == "Cash" then
 		burst(at, math.clamp(math.floor(amount / 5), 4, 18), Color3.fromRGB(255, 215, 60), 0.7, Enum.PartType.Cylinder, Enum.Material.Metal)
-		floatingText(at, ("+$%d"):format(amount), Color3.fromRGB(120, 230, 120))
+		if station == "SellStand" then
+			-- stand payout: big gold text above the sign board so it reads across the plaza
+			floatingText(at + Vector3.new(0, 5.5, 0), ("+$%s"):format(Config.Progression.FormattedNumber(amount)), Color3.fromRGB(255, 215, 60), UDim2.fromOffset(340, 90))
+		else
+			floatingText(at, ("+$%s"):format(Config.Progression.FormattedNumber(amount)), Color3.fromRGB(120, 230, 120))
+		end
 		play("Cash", 1.15)
+	elseif kind == "Upgrade" then
+		-- Cash-earned -> upgrade purchase: coin burst where the player stands
+		-- (station slot holds the upgrade id here, so spawn at the character).
+		local root = rootPosition()
+		if not root then
+			return
+		end
+		burst(root, math.clamp(8 + math.floor(amount / 25), 8, 20), Color3.fromRGB(255, 215, 60), 0.7, Enum.PartType.Cylinder, Enum.Material.Metal)
+		floatingText(root + Vector3.new(0, 0.9, 0), "UPGRADED!", Color3.fromRGB(120, 230, 120))
+		floatingText(root - Vector3.new(0, 0.9, 0), ("-$%s"):format(Config.Progression.FormattedNumber(amount)), Color3.fromRGB(255, 150, 130))
+		play("Cash", 1.25)
+		task.delay(0.06, function()
+			play("Merge", 1.15)
+		end)
 	elseif kind == "Buy" then
-		floatingText(at, ("-$%d  🐝"):format(amount), Color3.fromRGB(255, 180, 180))
+		floatingText(at, ("-$%s  🐝"):format(Config.Progression.FormattedNumber(amount)), Color3.fromRGB(255, 180, 180))
 		play("Click")
+	elseif kind == "Deny" then
+		-- server rejected a purchase (outgrown cash between click and server, slots full, rebirth short)
+		play("Deny", 0.55)
 	end
 end)
 

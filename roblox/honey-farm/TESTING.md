@@ -16,8 +16,10 @@ Run everything from `roblox/honey-farm`:
 luau tests/PlotAllocator.spec.luau
 luau tests/FarmState.spec.luau
 luau tests/RateLimiter.spec.luau
-python3 tests/run_sim.py --luau <path to luau> --scenario tests/phaseN.scenario.luau   # N = 1..7
+python3 tests/run_sim.py --luau <path to luau> --scenario tests/phaseN.scenario.luau   # N = 1..8, or props
 ```
+
+Pressing a station in a scenario means firing the plate's `Touched` signal for the Hive, Bottling and Stand (Lemonade's pressure plates) or the prompt for the Bee Shop; the mock's `task` library is coroutine based with a simulated clock, so retry back-offs and cooldowns really elapse when a scenario ticks.
 
 Plus `luau-lsp analyze` against the Roblox API definitions (type check) and `rojo build` (the place file builds).
 
@@ -28,20 +30,21 @@ Plus `luau-lsp analyze` against the Roblox API definitions (type check) and `roj
 | Module | Checks | Covers |
 |---|---|---|
 | `PlotAllocator` | 17 | separate plots, no double assignment, release and reuse, queue when full, hand‑over, rejoin |
-| `FarmState` | 134 | production rate, hive cap + lost honey, backpack cap, 1 jar/s, $5/jar, double‑collect never pays twice, 3,000‑step conservation run with random frame times, shop prices and exact charges, 8‑slot cap, merge rules (same bee, missing bee, different tier, top tier), ×2.5 production, discoveries, upgrade levels/values/prices, maxed/unaffordable refusals, multiplier, faster bottling, bigger backpack, 9th bee after the slot upgrade, save round‑trip, hostile save data clamped, offline honey (rate × time, 8‑h cap, hive‑room cap, credited once), introduction steps can't skip and are saved |
+| `FarmState` | 134 | production rate, hive cap + lost honey, backpack cap, 1 jar/s, $5/jar, double‑collect never pays twice, 3,000‑step conservation run with random frame times, shop prices and exact charges, 8‑slot cap, merge rules (same bee, missing bee, different tier, top tier of 50), ×2.5 production, discoveries, upgrade levels/values/prices, maxed/unaffordable refusals, multiplier, faster bottling, bigger backpack, 9th bee after the slot upgrade, save round‑trip, hostile save data clamped, offline honey (rate × time, 8‑h cap, hive‑room cap, credited once), introduction steps can't skip and are saved, egg odds and scripted hatches, shiny rolls, cash rebirth cost/reset/keeps/×1.75 stacking |
 | `RateLimiter` | 8 | window, reset, per‑key buckets, 100‑call burst passes exactly 25 |
 
 ### Scenarios through the real server scripts
 
 | Scenario | Checks | Covers |
 |---|---|---|
-| Phase 1 | 123 | map built with 6 plots and all stations; two players get separate plots and spawn on them; owner sign shows name + avatar; My Farm (incl. spam and visiting); respawn goes home; owner‑only stations; leaving clears the plot; rejoin; 7th player queued |
+| Phase 1 | 124 | map built with 6 plots and all stations; two players get separate plots and spawn on them; owner sign shows name + avatar; My Farm (incl. spam and visiting); respawn goes home; owner‑only stations; leaving clears the plot; rejoin; 7th player queued |
 | Phase 2 | 41 | 25 Cash + bee model; produce → collect → deposit → 50 jars → $250 → collect; empty hive, full hive, full backpack, double‑press deposit, double collect, press from across the map ignored, visitor refused, two farms independent, leaving clears, next owner starts fresh |
-| Phase 3 | 117 | all ten tiers build from a stand‑in of the template (roles, accessory, one head, scale, unique look); shop opens from the prompt; buy at $25; refused with $0 / far away / 8 slots; rapid presses buy exactly 6 at the exact rising prices; merge → Clover (models swapped, production, discovery event); bad merges change nothing; second Clover not a discovery; Royals can't merge; another player's buy never touches your farm |
-| Phase 4 | 40 | config sanity; refused without cash and off‑plot; hive storage 120/250 with mini hives and exact charges; bottling 2 jars/s and a tank; production ×1.25 + pollen orb; backpack; slot upgrade → 9th bee; two presses = two levels; maxed refused; garbage ids ignored; conservation with upgrades; other player can't upgrade your farm; next owner at level 1 |
+| Phase 3 | 357 | all 50 tiers build from a stand‑in of the template (roles, accessory, one head, scale, unique look); shop opens from the prompt; buy at $25; refused with $0 / far away / 8 slots; rapid presses buy exactly 6 at the exact rising prices; merge → Clover (models swapped, production, discovery event); bad merges change nothing; second Clover not a discovery; Royals can't merge; another player's buy never touches your farm |
+| Phase 4 | 42 | config sanity; refused without cash and off‑plot; hive storage 120/250 with mini hives and exact charges; bottling 2 jars/s and a tank; production ×1.25 + pollen orb; backpack; slot upgrade → 9th bee; two presses = two levels; maxed refused; garbage ids ignored; conservation with upgrades; other player can't upgrade your farm; next owner at level 1 |
 | Phase 5 | 29 | new player loads empty; leave saves with timestamp; rejoin 2 h later restores everything and credits offline honey capped by hive room, once; 30 h counts as 8 h; autosave; failed load → temporary farm, never written; transient failure still loads; newer save elsewhere not overwritten; BindToClose saves everyone; unavailable DataStores reported and write nothing |
 | Phase 6 | 32 | steps point at real stations; built‑in sound ids; early presses don't skip; each real action advances one step with the matching Feedback event; bonus pays once; finished stays finished; saved and restored; second player has their own |
-| Phase 8 | 50 | eggs with scripted dice (odds → kind → variant), egg bees build and can't merge, shiny merges and inheritance, Royal Jelly rebirth (requirements, reset, keeps, multiplier), everything saved and restored |
+| Phase 8 | 50 | eggs with scripted dice (odds → kind → variant), egg bees build and can't merge, shiny merges and inheritance, cash rebirth (cost, reset, keeps egg bees, ×1.75 multiplier), everything saved and restored |
+| Props | 173 | Creator Store stand-ins for trees/cottages/hive, scripts stripped, scaled and grounded, per-level `Hive2`/`Hive3` swap with Hive Storage and reset on release, block flowers and no fountain by design, hive base has a pressure plate |
 | Phase 7 | 37 | **two players at once**: Bob refused at all five of Alice's stations with nothing changed on either farm; remotes can only hit the sender's farm; both hives cap and count lost honey; full backpack; insufficient funds for bee and upgrade; 100 hive presses move only the honey that exists; 100 Buy presses → 8 slots, exactly 7 purchases charged; 100 Upgrade presses with $300 → exactly the two affordable levels, cash never negative; limiter is per player; 30 merge presses on one pair = one merge; conservation on both farms; both saved and restored independently; offline rewards use each farm's own away time and rate; a queued 7th player gets the freed plot and loads *his own* save |
 
 ### Static checks
@@ -57,7 +60,7 @@ Everything that changes money, honey, bees or upgrades runs in `FarmService` on 
 |---|---|
 | Client fakes cash / honey | Attributes are set by the server; client‑side attribute writes don't replicate. All HUD numbers are read‑only mirrors. |
 | Using another player's station | `PlotService.hookPrompt` checks `OwnerUserId` before firing `StationTriggered`; `FarmService` re‑checks `farm.Plot == plot`. |
-| Pressing from across the map | Server distance check against the station part (`Config.PromptDistance` + slack). Roblox also enforces `MaxActivationDistance` client‑side. |
+| Pressing from across the map | Server distance check against the station part (`Config.PromptDistance` + slack). Roblox also enforces `MaxActivationDistance` client‑side. Pressure plates only fire for the touching player's own character, with a 2 s per-player cooldown per plate. |
 | Shop / upgrade remotes with a spoofed plot | The remotes take **no plot argument**; they can only act on the sender's own farm. Shop requires being at *your* shop; upgrades require standing on *your* plot. |
 | Wrong price / free items | Prices come from `FarmState` + `Config` on the server; the client only displays them. |
 | Over capacity | Every transfer is `min(available, room)` inside `FarmState`; capacities derive from server‑side upgrade levels. |
@@ -78,10 +81,14 @@ Everything that changes money, honey, bees or upgrades runs in `FarmService` on 
 
 Things that need eyes, ears, a phone, or a real DataStore:
 
-**Phase 8**
+**Phase 8 and the Lemonade merge**
 - [ ] Egg odds in the shop read clearly; hatching feels good (wobble, crack, card); the 50 egg bees look distinct and sit well on the farm (they use only colours/materials, no accessories).
 - [ ] Shiny bees are visibly special (neon stripes + sparkles).
-- [ ] The Jelly panel's two‑tap confirm prevents accidental rebirths on a phone.
+- [ ] The Rebirth panel's cost and ×1.75 text match the HUD, and a rebirth can't be triggered by accident on a phone.
+- [ ] Pressure plates trigger reliably when walking over them (not only when standing still) and the hive plate flash is visible but not annoying.
+- [ ] Tiers 11–50 look distinct enough in the shop and collection book (they are recolours only).
+- [ ] Robux shop: after creating Developer Products on the site and pasting their ids into `Config.Shop`, a test purchase in Studio grants the cash once. Until then the buttons read SOON and nothing is sold.
+- [ ] Leaderboards in the village fill in after a save (they need DataStore access) and refresh on the interval.
 
 **Looks**
 - [ ] The map reads as bright and cartoonish; paths are walkable; nothing blocks a gate or a path.
@@ -117,5 +124,6 @@ Things that need eyes, ears, a phone, or a real DataStore:
 1. Game Settings → Places → **Server size 6** (one plot each; a 7th player waits and is told so).
 2. Game Settings → Security → **Enable Studio Access to API Services** (for saving in Studio).
 3. Decide `Config.Save.StoreName`: changing it later wipes everyone's progress (useful for a pre‑launch reset).
-4. Optionally paste a bee‑buzz asset into `Config.Sounds.Buzz`.
-5. Playtest the Studio list above with two clients, once on a phone‑sized viewport.
+4. Create the five Developer Products (Creator Dashboard → Monetization) and paste their ids into `Config.Shop[*].ProductId`; leave 0 to keep the shop in SOON mode.
+5. Optionally paste a bee‑buzz asset into `Config.Sounds.Buzz`.
+6. Playtest the Studio list above with two clients, once on a phone‑sized viewport.

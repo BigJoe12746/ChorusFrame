@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage:WaitForChild("HoneyFarm"):WaitForChild("Config"))
 local PropLibrary = require(script.Parent:WaitForChild("PropLibrary"))
+local StudStyle = require(ReplicatedStorage:WaitForChild("HoneyFarm"):WaitForChild("StudStyle"))
 local C = Config.Colors
 
 local MapBuilder = {}
@@ -26,12 +27,12 @@ local rng = Random.new(20261006) -- fixed seed: same map every time
 local function P(parent: Instance, props: { [string]: any }): BasePart
 	local p = Instance.new("Part")
 	p.Anchored = true
-	p.TopSurface = SMOOTH
-	p.BottomSurface = SMOOTH
-	p.Material = Enum.Material.SmoothPlastic
 	for k, v in props do
 		(p :: any)[k] = v
 	end
+	-- Classic studded-blocky look: bright plastic with square studs on every flat face.
+	-- Glass, neon and transparent parts keep their own look (windows, jars, triggers, glow).
+	StudStyle.Apply(p)
 	p.Parent = parent
 	return p
 end
@@ -72,10 +73,10 @@ local function model(parent: Instance, name: string): Model
 	return m
 end
 
-local function billboard(adornee: BasePart, text: string, height: number, maxDistance: number?)
+local function billboard(adornee: BasePart, text: string, height: number, maxDistance: number?, pixel: Vector2?)
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "Label"
-	gui.Size = UDim2.fromOffset(200, 50)
+	gui.Size = UDim2.fromOffset(if pixel then pixel.X else 200, if pixel then pixel.Y else 50)
 	gui.StudsOffsetWorldSpace = Vector3.new(0, height, 0)
 	gui.MaxDistance = maxDistance or 70
 	gui.LightInfluence = 0
@@ -120,33 +121,54 @@ local function signBoard(parent: Instance, name: string, size: Vector3, cf: CFra
 	return board
 end
 
+-- Real surface studs (see StudStyle) replace the old image overlay, so no texture call is
+-- needed to tie the paths to the blocky-cartoon look of the UI.
+
 ------------------------------------------------------------------------------
 -- Decorations
 ------------------------------------------------------------------------------
 
--- Oversized cartoon flower standing at ground position `pos`.
+-- Block-built cartoon flower standing at ground position `pos`.
+-- Straight studded cubes only: a leaning mesh flower reads as sloppy, and petals made
+-- of cylinders sink into the ground at the heights the patch uses.
 local function flower(parent: Instance, pos: Vector3, height: number, petal: Color3, collide: boolean?)
-	-- a Creator Store flower in ReplicatedStorage.Props replaces the block-built one
-	local prop = PropLibrary.Place(parent, "Flower", CFrame.new(pos) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0), height)
-	if prop then
-		return prop
-	end
 	local m = model(parent, "Flower")
 	local s = height / 8
-	cyl(m, "Stem", height, 0.8 * s, CFrame.new(pos + Vector3.new(0, height / 2, 0)), C.Stem, { CanCollide = collide == true })
+	local stemW = math.max(0.9, 1.1 * s)
+	P(m, {
+		Name = "Stem",
+		Size = Vector3.new(stemW, height, stemW),
+		CFrame = CFrame.new(pos + Vector3.new(0, height / 2, 0)),
+		Color = C.Stem,
+		Material = Enum.Material.Grass,
+		CanCollide = collide == true,
+	})
 	local top = pos + Vector3.new(0, height, 0)
-	local tilt = CFrame.Angles(math.rad(rng:NextNumber(-12, 12)), rng:NextNumber(0, math.pi * 2), 0)
-	local head = CFrame.new(top) * tilt
-	for i = 1, 6 do
-		local a = i / 6 * math.pi * 2
-		cyl(m, "Petal", 0.5 * s, 3 * s, head * CFrame.new(math.cos(a) * 1.8 * s, 0, math.sin(a) * 1.8 * s), petal, { CanCollide = false })
+	local yaw = CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
+	local head = CFrame.new(top) * yaw
+	local petalSize = Vector3.new(2.6 * s, 0.7 * s, 1.5 * s)
+	for i = 1, 4 do
+		local a = (i - 1) / 4 * math.pi * 2
+		local _petalPart = P(m, {
+			Name = "Petal",
+			Size = petalSize,
+			CFrame = head * CFrame.new(math.cos(a) * 1.5 * s, 0.35 * s, math.sin(a) * 1.5 * s) * CFrame.Angles(0, -a, 0),
+			Color = petal,
+			CanCollide = false,
+		})
 	end
-	ball(m, "Center", 2.4 * s, head * CFrame.new(0, 0.3 * s, 0), C.Honey, { CanCollide = false })
+	local _center = P(m, {
+		Name = "Center",
+		Size = Vector3.new(1.8 * s, 0.9 * s, 1.8 * s),
+		CFrame = head * CFrame.new(0, 0.75 * s, 0),
+		Color = C.Honey,
+		CanCollide = false,
+	})
 	for _, side in { -1, 1 } do
 		P(m, {
 			Name = "Leaf",
-			Size = Vector3.new(2.6 * s, 0.3 * s, 1.2 * s),
-			CFrame = CFrame.new(pos + Vector3.new(side * 1.3 * s, height * 0.35, 0)) * CFrame.Angles(0, 0, side * math.rad(25)),
+			Size = Vector3.new(2.2 * s, 0.35 * s, 1.1 * s),
+			CFrame = CFrame.new(pos + Vector3.new(side * 1.4 * s, height * 0.32, 0)) * CFrame.Angles(0, 0, side * math.rad(18)),
 			Color = C.Leaf,
 			CanCollide = false,
 		})
@@ -225,24 +247,8 @@ local function buildVillage(map: Instance)
 	cyl(v, "Plaza", 1, Config.SquareRadius * 2, CFrame.new(0, -0.2, 0), C.Plaza, { Material = Enum.Material.Pebble })
 	cyl(v, "PlazaRing", 0.9, Config.SquareRadius * 2 + 4, CFrame.new(0, -0.3, 0), C.Wood, { Material = Enum.Material.Wood })
 
-	-- Honey fountain (or a Creator Store fountain from ReplicatedStorage.Props)
-	local fountainProp = PropLibrary.Place(v, "Fountain", CFrame.new(0, 0, 0), 16, "HoneyFountain")
-	if fountainProp then
-		local anyPart = fountainProp:FindFirstChildWhichIsA("BasePart", true)
-		if anyPart then
-			billboard(anyPart, "🍯 " .. Config.GameName, 19, 140)
-		end
-	else
-		local f = model(v, "HoneyFountain")
-		cyl(f, "Base", 2.4, 22, CFrame.new(0, 1.2, 0), C.Stone, { Material = Enum.Material.Cobblestone })
-		cyl(f, "Pool", 0.4, 19, CFrame.new(0, 2.3, 0), C.Honey, { Material = Enum.Material.Glass, Transparency = 0.2, CanCollide = false })
-		cyl(f, "Pillar", 7, 3, CFrame.new(0, 5, 0), C.Stone)
-		cyl(f, "Bowl", 1.2, 10, CFrame.new(0, 8.6, 0), C.Stone)
-		ball(f, "HoneyPot", 6, CFrame.new(0, 11.5, 0), C.DeepHoney)
-		cyl(f, "PotLid", 1, 4, CFrame.new(0, 14.6, 0), C.Wood)
-		local drip = cyl(f, "Drip", 0.6, 9.4, CFrame.new(0, 9.3, 0), C.Honey, { Material = Enum.Material.Neon, Transparency = 0.3, CanCollide = false })
-		billboard(drip, "🍯 " .. Config.GameName, 9, 140)
-	end
+	-- No fountain: the plaza centre stays open. The water-fountain prop (studded stone mixed
+	-- with smooth unions and blue water) read as clutter, so it was cleaned out.
 
 	-- Neutral spawn (players are sent to their own farm right after spawning)
 	local spawn = Instance.new("SpawnLocation")
@@ -297,8 +303,7 @@ local function buildVillage(map: Instance)
 		seat.Size = Vector3.new(7, 1, 2.4)
 		seat.CFrame = cf * CFrame.new(0, 1.8, 0)
 		seat.Color = C.Wood
-		seat.Material = Enum.Material.Wood
-		seat.TopSurface = SMOOTH
+		StudStyle.Apply(seat)
 		seat.Parent = v
 		P(v, { Name = "BenchBack", Size = Vector3.new(7, 2.5, 0.6), CFrame = cf * CFrame.new(0, 3.2, 1.3), Color = C.Wood, Material = Enum.Material.Wood })
 		for _, x in { -3, 3 } do
@@ -332,6 +337,98 @@ local function stationModel(parent: Instance, name: string): Model
 	return m
 end
 
+-- Shared floor-plate label: a SurfaceGui on top of a pressure plate so kids can read
+-- what the plate does (and live readouts from StationLabels) right on the floor.
+local function plateSurfaceGui(plate: BasePart, text: string)
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = "PlateLabel"
+	gui.Face = Enum.NormalId.Top
+	gui.PixelsPerStud = 50
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.LightInfluence = 0
+	local label = Instance.new("TextLabel")
+	label.Name = "Text"
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.FredokaOne
+	label.TextScaled = true
+	label.TextColor3 = C.Text
+	label.TextStrokeColor3 = Color3.fromRGB(25, 25, 30)
+	label.TextStrokeTransparency = 0
+	label.Text = text
+	label.Parent = gui
+	gui.Parent = plate
+end
+
+-- Floating sign over a pressure plate in the "buy next upgrade" cartoon style:
+-- a small white context line, a big green line naming what stepping gets you,
+-- a big yellow price line, and a chunky progress bar with "X / Y" text.
+-- StationLabels fills the numbers in from the plot attributes.
+local function plateBillboard(plate: BasePart, context: string)
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "Label"
+	gui.Size = UDim2.fromOffset(380, 200)
+	gui.StudsOffsetWorldSpace = Vector3.new(0, 7, 0)
+	gui.MaxDistance = 100
+	gui.LightInfluence = 0
+
+	-- dark rounded pane behind the rows so the text stays readable over the world
+	local back = Instance.new("Frame")
+	back.Name = "Back"
+	back.Size = UDim2.fromScale(1, 1)
+	back.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+	back.BackgroundTransparency = 0.45
+	back.BorderSizePixel = 0
+	back.Parent = gui
+	local backCorner = Instance.new("UICorner")
+	backCorner.CornerRadius = UDim.new(0.12, 0)
+	backCorner.Parent = back
+
+	local function label(name: string, parent: Instance, yScale: number, heightScale: number, color: Color3, text: string): TextLabel
+		local t = Instance.new("TextLabel")
+		t.Name = name
+		t.Position = UDim2.fromScale(0, yScale)
+		t.Size = UDim2.fromScale(1, heightScale)
+		t.BackgroundTransparency = 1
+		t.Font = Enum.Font.FredokaOne
+		t.TextScaled = true
+		t.TextColor3 = color
+		t.TextStrokeColor3 = Color3.fromRGB(25, 25, 30)
+		t.TextStrokeTransparency = 0
+		t.Text = text
+		t.Parent = parent
+		return t
+	end
+
+	local GREEN = Color3.fromRGB(105, 255, 105)
+	local YELLOW = Color3.fromRGB(255, 225, 80)
+	label("Title", gui, 0.04, 0.17, Color3.new(1, 1, 1), context)
+	label("Action", gui, 0.21, 0.28, GREEN, "STEP")
+	label("Cost", gui, 0.49, 0.25, YELLOW, "")
+	local bar = Instance.new("Frame")
+	bar.Name = "Bar"
+	bar.Position = UDim2.fromScale(0.09, 0.78)
+	bar.Size = UDim2.fromScale(0.82, 0.16)
+	bar.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+	bar.BackgroundTransparency = 0.1
+	bar.BorderSizePixel = 0
+	bar.Parent = gui
+	local barCorner = Instance.new("UICorner")
+	barCorner.CornerRadius = UDim.new(0.5, 0)
+	barCorner.Parent = bar
+	local fill = Instance.new("Frame")
+	fill.Name = "Fill"
+	fill.Size = UDim2.fromScale(0, 1)
+	fill.BackgroundColor3 = Color3.fromRGB(105, 255, 105)
+	fill.BorderSizePixel = 0
+	fill.Parent = bar
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(0.5, 0)
+	fillCorner.Parent = fill
+	label("BarText", bar, 0, 1, Color3.new(1, 1, 1), "")
+	gui.Parent = plate
+end
+
 local function buildHive(parent: Instance, cf: CFrame)
 	local m = stationModel(parent, "Hive")
 	-- the Base plate stays in every case: it carries the prompt and the label
@@ -349,9 +446,21 @@ local function buildHive(parent: Instance, cf: CFrame)
 	end
 	local anchor = P(m, { Name = "BeeExit", Size = Vector3.one, CFrame = cf * CFrame.new(0, 3.4, -8), Transparency = 1, CanCollide = false, CanQuery = false })
 	anchor:SetAttribute("Purpose", "Where bees leave/enter the hive (Phase 2)")
+	local pressurePlate = P(m, {
+		Name = "HivePressurePlate",
+		Size = Vector3.new(8, 0.2, 6),
+		CFrame = cf * CFrame.new(8, 0.2, -14),
+		Color = C.Honey,
+		Material = Enum.Material.Neon,
+		CanCollide = false,
+		CanTouch = true,
+	})
+	pressurePlate:SetAttribute("OwnerOnly", true)
+	pressurePlate:SetAttribute("StationTouch", "HivePlate")
+	plateSurfaceGui(pressurePlate, "STEP\nUPGRADE + COLLECT")
+	plateBillboard(pressurePlate, "(Auto Upgrade + Collect)")
 	m.PrimaryPart = base
 	billboard(base, Config.Stations.Hive.Label, 16)
-	addPrompt(base, "Hive")
 end
 
 local function buildFlowerPatch(parent: Instance, cf: CFrame)
@@ -363,12 +472,13 @@ local function buildFlowerPatch(parent: Instance, cf: CFrame)
 	local spots = Instance.new("Folder")
 	spots.Name = "FlowerSpots" -- bees fly to these in Phase 2
 	spots.Parent = m
+	-- Even 4x3 bed: one height, one spacing, colours repeating in rows.
 	local i = 0
-	for x = -1, 1 do
-		for z = -1, 1 do
+	for col = 0, 3 do
+		for row = 0, 2 do
 			i += 1
-			local pos = (cf * CFrame.new(x * 7, 1, z * 5.5)).Position
-			local fl = flower(m, pos, rng:NextNumber(5, 7.5), C.PetalColors[(i - 1) % #C.PetalColors + 1], false)
+			local pos = (cf * CFrame.new(-6 + col * 4, 1, -5 + row * 5)).Position
+			local fl = flower(m, pos, 6, C.PetalColors[(row) % #C.PetalColors + 1], false)
 			fl.Name = "Flower" .. i
 			local spot = P(spots, { Name = "Spot" .. i, Size = Vector3.one, CFrame = CFrame.new(pos + Vector3.new(0, 8, 0)), Transparency = 1, CanCollide = false, CanQuery = false })
 			spot.CanTouch = false
@@ -439,9 +549,24 @@ local function buildBottling(parent: Instance, cf: CFrame)
 	P(m, { Name = "Hopper", Size = Vector3.new(4, 1.4, 3), CFrame = cf * CFrame.new(-3, 7.8, -2.5), Color = C.DeepHoney })
 	local deposit = P(m, { Name = "DepositPoint", Size = Vector3.one, CFrame = cf * CFrame.new(0, 3, -5.5), Transparency = 1, CanCollide = false, CanQuery = false })
 	deposit:SetAttribute("Purpose", "Where carried honey is dropped off (Phase 2)")
+	-- Floor pressure plate: stepping on it deposits carried honey into the machine,
+	-- replacing the old E-prompt. Live bottling readout is written by StationLabels.
+	local pressurePlate = P(m, {
+		Name = "BottlingPressurePlate",
+		Size = Vector3.new(10, 0.2, 8),
+		CFrame = cf * CFrame.new(0, 0.2, -8),
+		Color = C.Honey,
+		Material = Enum.Material.Neon,
+		CanCollide = false,
+		CanTouch = true,
+	})
+	pressurePlate:SetAttribute("OwnerOnly", true)
+	pressurePlate:SetAttribute("StationTouch", "Bottling")
+	pressurePlate:SetAttribute("SquashOnPress", true)
+	plateSurfaceGui(pressurePlate, "STEP\nDEPOSIT HONEY")
+	plateBillboard(pressurePlate, "(Auto Deposit)")
 	m.PrimaryPart = body
 	billboard(body, Config.Stations.Bottling.Label, 12)
-	addPrompt(body, "Bottling")
 	return m
 end
 
@@ -449,16 +574,35 @@ local function buildSellStand(parent: Instance, cf: CFrame)
 	local m = stationModel(parent, "SellStand")
 	local counter = booth(m, cf, Color3.fromRGB(110, 200, 120), Color3.new(1, 1, 1))
 	signBoard(m, "Sign", Vector3.new(9, 2.4, 0.4), cf * CFrame.new(0, 7.4, 3.5), "HONEY STAND", Color3.fromRGB(110, 200, 120))
-	for i, x in { -4, -2.6, 3.2 } do
-		cyl(m, "Jar", 1.6, 1.4, cf * CFrame.new(x, 4.9, 0.6), C.Honey, { Material = Enum.Material.Glass, Transparency = 0.15, CanCollide = false })
-		cyl(m, "JarLid", 0.3, 1.5, cf * CFrame.new(x, 5.85, 0.6), i == 3 and Color3.fromRGB(230, 80, 80) or C.Wood, { CanCollide = false })
+	for i, x in { -4.6, -1.0, 3.6 } do
+		-- Creator Store honey jar (ReplicatedStorage/Props/Jar) with the block-built fallback
+		local jar = PropLibrary.Place(m, "Jar", cf * CFrame.new(x, 4.1, 0.6), 2.2, "Jar" .. i)
+		if not jar then
+			cyl(m, "Jar", 1.6, 1.4, cf * CFrame.new(x, 4.9, 0.6), C.Honey, { Material = Enum.Material.Glass, Transparency = 0.15, CanCollide = false })
+			cyl(m, "JarLid", 0.3, 1.5, cf * CFrame.new(x, 5.85, 0.6), i == 3 and Color3.fromRGB(230, 80, 80) or C.Wood, { CanCollide = false })
+		end
 	end
 	for _, x in { -7.5, 7.5 } do
 		P(m, { Name = "Crate", Size = Vector3.new(2.6, 2.6, 2.6), CFrame = cf * CFrame.new(x, 1.3, 1) * CFrame.Angles(0, math.rad(x * 2), 0), Color = C.Wood, Material = Enum.Material.WoodPlanks })
 	end
+	-- Floor pressure plate (matches the stud-textured floor): stepping on it collects cash,
+	-- replacing the old E-prompt on the counter. Sits just in front of the booth.
+	local pressurePlate = P(m, {
+		Name = "SellPressurePlate",
+		Size = Vector3.new(12, 0.2, 10),
+		CFrame = cf * CFrame.new(0, 0.25, -8),
+		Color = C.Path,
+		CanCollide = false,
+		CanTouch = true,
+	})
+	pressurePlate:SetAttribute("OwnerOnly", true)
+	pressurePlate:SetAttribute("StationTouch", "SellStand")
+	-- visual press-down squash when a step registers (driven by PlotService)
+	pressurePlate:SetAttribute("SquashOnPress", true)
+	plateSurfaceGui(pressurePlate, "STEP\nCOLLECT CASH")
+	plateBillboard(pressurePlate, "(Auto Collect)")
 	m.PrimaryPart = counter
 	billboard(counter, Config.Stations.SellStand.Label, 13)
-	addPrompt(counter, "SellStand")
 end
 
 -- Short conveyor between two plot-space points (both on the ground).
@@ -577,12 +721,12 @@ local function buildPlot(plots: Instance, id: number, cf: CFrame)
 	end
 
 	local ground = model(plot, "Ground")
-	P(ground, { Name = "Grass", Size = Vector3.new(Config.PlotSize, 1, Config.PlotSize), CFrame = cf * CFrame.new(0, -0.35, 0), Color = C.PlotGrass, Material = Enum.Material.Grass })
-	P(ground, { Name = "Path", Size = Vector3.new(10, 1, Config.PlotSize - 4), CFrame = cf * CFrame.new(0, -0.25, 0), Color = C.Path, Material = Enum.Material.Pebble })
+	P(ground, { Name = "Grass", Size = Vector3.new(Config.PlotSize, 1, Config.PlotSize), CFrame = cf * CFrame.new(0, -0.35, 0), Color = C.PlotGrass, Material = Enum.Material.SmoothPlastic })
+	local _pathMain = P(ground, { Name = "Path", Size = Vector3.new(10, 1, Config.PlotSize - 4), CFrame = cf * CFrame.new(0, -0.25, 0), Color = C.Path, Material = Enum.Material.SmoothPlastic })
 	-- side paths to each column of stations
 	for _, z in { -30, 2, 28 } do
 		for _, x in { -1, 1 } do
-			P(ground, { Name = "SidePath", Size = Vector3.new(18, 1, 6), CFrame = cf * CFrame.new(x * 13, -0.25, z), Color = C.Path, Material = Enum.Material.Pebble })
+			P(ground, { Name = "SidePath", Size = Vector3.new(18, 1, 6), CFrame = cf * CFrame.new(x * 13, -0.25, z), Color = C.Path, Material = Enum.Material.SmoothPlastic })
 		end
 	end
 
@@ -670,7 +814,7 @@ function MapBuilder.Build(): Model
 	map.Name = "HoneyFarmMap"
 
 	local h = Config.MapHalfSize
-	P(map, { Name = "Ground", Size = Vector3.new(h * 2, 4, h * 2), CFrame = CFrame.new(0, -2, 0), Color = C.Grass, Material = Enum.Material.Grass })
+	local _mainGround = P(map, { Name = "Ground", Size = Vector3.new(h * 2, 4, h * 2), CFrame = CFrame.new(0, -2, 0), Color = C.Grass, Material = Enum.Material.SmoothPlastic })
 
 	-- Invisible boundary walls
 	for _, side in { Vector3.xAxis, -Vector3.xAxis, Vector3.zAxis, -Vector3.zAxis } do
@@ -691,12 +835,12 @@ function MapBuilder.Build(): Model
 		buildPlot(plots, id, cf)
 		local dir = -cf.LookVector
 		local a, b = dir * inner, dir * outer
-		P(paths, {
+		local _ringPath = P(paths, {
 			Name = "Path" .. id,
 			Size = Vector3.new(Config.PathWidth, 1, (b - a).Magnitude),
 			CFrame = CFrame.lookAt(a:Lerp(b, 0.5), b) + Vector3.new(0, -0.3, 0),
 			Color = C.Path,
-			Material = Enum.Material.Pebble,
+			Material = Enum.Material.SmoothPlastic,
 		})
 	end
 

@@ -27,7 +27,8 @@
         "WelcomeBack": { "$className": "RemoteEvent" },
         "Feedback": { "$className": "RemoteEvent" },
         "EggHatched": { "$className": "RemoteEvent" },
-        "RebirthAction": { "$className": "RemoteEvent" }
+        "RebirthAction": { "$className": "RemoteEvent" },
+        "RobuxShop": { "$className": "RemoteEvent" }
       }
     },
     "ServerScriptService": {

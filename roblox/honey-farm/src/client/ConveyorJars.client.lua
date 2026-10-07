@@ -7,7 +7,7 @@ local Debris = game:GetService("Debris")
 
 local Config = require(ReplicatedStorage:WaitForChild("HoneyFarm"):WaitForChild("Config"))
 local JarRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("JarStarted") :: RemoteEvent
-local C = Config.Colors
+local _C = Config.Colors
 
 local plots = workspace:WaitForChild("HoneyFarmMap"):WaitForChild("Plots")
 
@@ -17,35 +17,26 @@ jarFolder.Parent = workspace
 
 local activeJars: { [number]: number } = {} -- plotId -> jars currently on the belt
 
-local function makeJar(): Model
-	local m = Instance.new("Model")
-	local body = Instance.new("Part")
-	body.Name = "Glass"
-	body.Shape = Enum.PartType.Cylinder
-	body.Size = Vector3.new(1.6, 1.3, 1.3)
-	body.Color = C.Honey
-	body.Material = Enum.Material.Glass
-	body.Transparency = 0.15
-	body.Anchored = true
-	body.CanCollide = false
-	body.CanQuery = false
-	body.CanTouch = false
-	body.Parent = m
-	local lid = Instance.new("Part")
-	lid.Name = "Lid"
-	lid.Shape = Enum.PartType.Cylinder
-	lid.Size = Vector3.new(0.3, 1.4, 1.4)
-	lid.Color = C.Wood
-	lid.Anchored = true
-	lid.CanCollide = false
-	lid.CanQuery = false
-	lid.CanTouch = false
-	lid.Parent = m
-	m.PrimaryPart = body
-	return m
-end
+-- Creator Store honey jar (ReplicatedStorage/Props/Jar). If it is missing, jars simply
+-- don't animate on the belt - the server still counts every jar.
+local jarTemplate = (ReplicatedStorage:FindFirstChild("Props") and ReplicatedStorage.Props:FindFirstChild("Jar")) :: Model?
 
-local UP = CFrame.Angles(0, 0, math.pi / 2)
+local function makeJar(): Model?
+	local jar = jarTemplate and jarTemplate:Clone()
+	if not jar then
+		return nil
+	end
+	jar:ScaleTo(0.6)
+	for _, d in jar:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			d.CanQuery = false
+			d.CanTouch = false
+		end
+	end
+	return jar
+end
 
 local function runJar(plotId: number, delay: number)
 	local plot = plots:FindFirstChild("Plot" .. plotId)
@@ -61,20 +52,30 @@ local function runJar(plotId: number, delay: number)
 
 	task.wait(delay)
 	local jar = makeJar()
-	local a = startPart.Position + Vector3.new(0, 0.8, 0)
-	local b = endPart.Position + Vector3.new(0, 0.8, 0)
-	local glass = jar.PrimaryPart :: BasePart
-	local lid = jar:FindFirstChild("Lid") :: BasePart
+	if not jar then
+		activeJars[plotId] -= 1
+		return
+	end
+	local lift = select(2, jar:GetBoundingBox()).Y / 2 -- pivot is the bbox centre, so raise by half the height
+	local a = startPart.Position + Vector3.new(0, 0.9 + lift, 0)
+	local b = endPart.Position + Vector3.new(0, 0.9 + lift, 0)
 	local function place(pos: Vector3)
-		glass.CFrame = CFrame.new(pos) * UP
-		lid.CFrame = CFrame.new(pos + Vector3.new(0, 0.8, 0)) * UP
+		jar:PivotTo(CFrame.new(pos))
+	end
+	local parts: { BasePart } = {}
+	for _, d in jar:GetDescendants() do
+		if d:IsA("BasePart") then
+			table.insert(parts, d)
+			d.Transparency = 1
+		end
 	end
 	place(a)
 	jar.Parent = jarFolder
 
-	-- pop in
-	glass.Size = Vector3.new(0.2, 0.2, 0.2)
-	TweenService:Create(glass, TweenInfo.new(0.2, Enum.EasingStyle.Back), { Size = Vector3.new(1.6, 1.3, 1.3) }):Play()
+	-- fade in standing upright on the belt
+	for _, p in parts do
+		TweenService:Create(p, TweenInfo.new(0.2), { Transparency = 0 }):Play()
+	end
 
 	local travel = Config.Economy.JarTravelTime
 	local t0 = os.clock()
@@ -85,8 +86,9 @@ local function runJar(plotId: number, delay: number)
 		if alpha >= 1 then
 			conn:Disconnect()
 			-- hop off the belt into the stand
-			TweenService:Create(glass, TweenInfo.new(0.25), { Transparency = 1, Size = Vector3.new(0.3, 0.3, 0.3) }):Play()
-			TweenService:Create(lid, TweenInfo.new(0.25), { Transparency = 1 }):Play()
+			for _, p in parts do
+				TweenService:Create(p, TweenInfo.new(0.25), { Transparency = 1 }):Play()
+			end
 			Debris:AddItem(jar, 0.3)
 			activeJars[plotId] -= 1
 		end

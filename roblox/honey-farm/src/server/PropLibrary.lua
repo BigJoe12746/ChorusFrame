@@ -14,8 +14,15 @@
 --   HeightScale (number)  multiply the slot height (e.g. 1.3 for a taller tree)
 --   KeepSize (boolean)    don't rescale at all
 --   CanCollide (boolean)  force collisions on/off (default: kind-dependent)
+--   YawOffset (number)    rotate the prop around its base by this many degrees (for Creator
+--                         Store models whose built-in "front" doesn't match the slot's facing)
+--   UprightFrom ("X"/"-X"/"Z"/"-Z")
+--                         the model's height axis in its source orientation, for models that
+--                         were authored lying down; the prop is rotated upright before scaling
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local StudStyle = require(ReplicatedStorage:WaitForChild("HoneyFarm"):WaitForChild("StudStyle"))
 
 local PropLibrary = {}
 
@@ -26,6 +33,7 @@ local COLLIDE_DEFAULT: { [string]: boolean } = {
 	Fountain = true,
 	Hive = false,
 	MiniHive = true,
+	Jar = false,
 }
 
 local rng = Random.new()
@@ -79,11 +87,34 @@ local function stripScripts(model: Instance): number
 	return removed
 end
 
+-- Clones a random variant of `kind`, standing on the ground at `cf` (cf.Position = ground point,
+-- cf rotation = facing), scaled so its bounding box is `height` studs tall.
+-- Returns the model, or nil when there is no prop for this kind.
 local function placeSource(source: Model, kind: string, parent: Instance, cf: CFrame, height: number, nameOverride: string?): Model
 	local model = source:Clone()
 	local removed = stripScripts(model)
 	if removed > 0 then
 		warn(("[HoneyFarm Props] Removed %d script(s) from prop '%s'"):format(removed, source.Name))
+	end
+
+	-- stand up models that were authored lying down (their height axis isn't Y).
+	-- Rotating every part explicitly (instead of PivotTo) because the pivot of an imported
+	-- model can carry its own baked-in rotation, which makes pivot-relative turns a no-op.
+	local upAxis = tostring(model:GetAttribute("UprightFrom") or "")
+	local uprightFix = ({
+		["X"] = CFrame.Angles(0, 0, math.pi / 2), -- the model's +X side is its top
+		["-X"] = CFrame.Angles(0, 0, -math.pi / 2),
+		["Z"] = CFrame.Angles(-math.pi / 2, 0, 0),
+		["-Z"] = CFrame.Angles(math.pi / 2, 0, 0),
+	})[upAxis]
+	if uprightFix then
+		local centre = (model:GetBoundingBox()).Position
+		local rot = CFrame.new(centre) * uprightFix * CFrame.new(-centre)
+		for _, d in model:GetDescendants() do
+			if d:IsA("BasePart") then
+				d.CFrame = rot * d.CFrame
+			end
+		end
 	end
 
 	local collide = model:GetAttribute("CanCollide")
@@ -94,6 +125,8 @@ local function placeSource(source: Model, kind: string, parent: Instance, cf: CF
 		if d:IsA("BasePart") then
 			d.Anchored = true
 			d.CanCollide = collide
+			-- imported props join the studded-blocky look where their geometry allows it
+			StudStyle.Apply(d)
 		end
 	end
 
@@ -107,7 +140,8 @@ local function placeSource(source: Model, kind: string, parent: Instance, cf: CF
 	local bcf, bsize = model:GetBoundingBox()
 	local bottomCentre = bcf.Position - Vector3.new(0, bsize.Y / 2, 0)
 	-- put the bottom centre of the box exactly on the ground point, facing cf's way
-	model:PivotTo(cf * CFrame.new(-bottomCentre))
+	local yaw = math.rad(tonumber(model:GetAttribute("YawOffset")) or 0)
+	model:PivotTo(cf * CFrame.Angles(0, yaw, 0) * CFrame.new(-bottomCentre))
 
 	model.Name = nameOverride or kind
 	model:SetAttribute("Prop", source.Name)

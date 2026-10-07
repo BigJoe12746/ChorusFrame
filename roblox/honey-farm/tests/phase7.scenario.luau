@@ -30,15 +30,13 @@ local function has(s, needle)
 	return string.find(s, needle, 1, true) ~= nil
 end
 local function press(player, plot, station)
-	local prompt = plot.Stations[station]:FindFirstChild("StationPrompt", true)
-	player.Character:PivotTo(prompt.Parent.CFrame + M.Vector3.new(0, 3, -4))
-	prompt.Triggered:Fire(player)
+	return useStation(player, plot, station)
 end
 local function atShop(player, plot)
 	player.Character:PivotTo(plot.Stations.BeeShop.Counter.CFrame + M.Vector3.new(0, 3, -4))
 end
 local function conserved(s, injected)
-	local paid = s.Totals.Earned / Config.Economy.JarValue
+	local paid = (s.Totals.Earned - Config.Economy.StartCash) / Config.Economy.JarValue -- Earned includes the $25 start
 	return s.Totals.Produced + (injected or 0) == s:HoneyInSystem() + paid
 end
 local function snapshot(s)
@@ -68,8 +66,13 @@ check(sa ~= nil and sb ~= nil and sa ~= sb, "both players have their own farm st
 tick(10.1) -- both hives have 2 honey
 local beforeA, beforeB = snapshot(sa), snapshot(sb)
 for _, station in { "Hive", "Bottling", "SellStand", "BeeShop", "FlowerPatch" } do
-	press(bob, plot1, station)
-	check(has(lastNote(bob), "Alice's farm"), "Bob refused at Alice's " .. station)
+	local notesBefore = #Remotes.Notify.fired
+	local how = press(bob, plot1, station)
+	if how == "prompt" then
+		check(has(lastNote(bob), "Alice's farm"), "Bob refused at Alice's " .. station)
+	else
+		check(#Remotes.Notify.fired == notesBefore, "Alice's " .. station .. " plate ignores Bob")
+	end
 end
 check(same(beforeA, snapshot(sa)) and same(beforeB, snapshot(sb)), "no state changed on either farm")
 check(#Remotes.OpenShop.fired == 0, "Alice's shop did not open for Bob")
@@ -85,7 +88,7 @@ press(alice, plot1, "Hive")
 check(sa.Carried == 50 and sa.HiveStored == 0, "Alice collected a full backpack")
 tick(10.1)
 press(alice, plot1, "Hive")
-check(sa.Carried == 50 and sa.HiveStored == 2 and has(lastNote(alice), "backpack is full"), "full backpack: honey stays in the hive, clear message")
+check(sa.Carried == 50 and sa.HiveStored == 2 and has(lastNote(alice), "backpack full"), "full backpack: honey stays in the hive, clear message")
 
 -- 3. Insufficient funds (Bob has exactly $25: one bee, then nothing)
 atShop(bob, plot2)
@@ -121,13 +124,15 @@ for i = 0, 6 do
 end
 check(sa.Cash == 1000000 - expectedSpend, "exactly 7 purchases charged at the listed prices")
 --   c) 100 Upgrade presses, limited cash: levels bought == what the cash allowed, never negative
-sa.Cash = 300 -- hive storage: 80 + 200 = 280 affordable, third (500) is not
+local hp = Config.Upgrades.HiveStorage.Prices
+sa.Cash = hp[1] + hp[2] + math.floor(hp[3] / 2) -- exactly two levels affordable, the third is not
+local budget = sa.Cash
 Remotes.ReturnToFarm.OnServerEvent:Fire(alice)
 tick(1.1) -- new limiter window
 for _ = 1, 100 do
 	Remotes.UpgradeAction.OnServerEvent:Fire(alice, "HiveStorage")
 end
-check(sa:UpgradeLevel("HiveStorage") == 3 and sa.Cash == 20, "spam bought exactly the two affordable levels; cash never negative")
+check(sa:UpgradeLevel("HiveStorage") == 3 and sa.Cash == budget - hp[1] - hp[2], "spam bought exactly the two affordable levels; cash never negative")
 --   d) the limiter is per player: Bob's presses still work during Alice's flood
 tick(1.1)
 for _ = 1, 100 do

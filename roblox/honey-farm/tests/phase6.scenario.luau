@@ -31,9 +31,7 @@ local function feedback(p)
 	return out
 end
 local function use(player, plot, station)
-	local prompt = plot.Stations[station]:FindFirstChild("StationPrompt", true)
-	player.Character:PivotTo(prompt.Parent.CFrame + M.Vector3.new(0, 3, -4))
-	prompt.Triggered:Fire(player)
+	return useStation(player, plot, station)
 end
 local function shop(player, plot, ...)
 	player.Character:PivotTo(plot.Stations.BeeShop.Counter.CFrame + M.Vector3.new(0, 3, -4))

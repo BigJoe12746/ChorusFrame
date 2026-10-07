@@ -94,6 +94,133 @@ Config.Economy.BeeBasePrice = 25 -- first Starter Bee costs this
 Config.Economy.BeePriceGrowth = 1.25 -- each purchase multiplies the price by this
 Config.Economy.MergeMultiplier = 2.5 -- a merged bee makes this x one bee of the previous tier
 
+Config.Rebirth = {
+	BaseCost = 500,
+	CostGrowth = 1.8,
+	ProductionMultiplier = 1.75,
+	KeepVariants = true, -- egg bees (the collection) survive a rebirth
+}
+
+-- Eggs, shiny merges (Phase 8) ------------------------------------------------------
+Config.Economy.ShinyChance = 0.05 -- a merge result is shiny this often (or if a parent was shiny)
+Config.Economy.ShinyMultiplier = 1.5 -- shiny bees make this x the normal rate
+
+-- Eggs sold in the Bee Shop. Odds are weights: a "Kind" is a ladder tier (Starter, Clover, ...)
+-- or a variant rarity (Common, Uncommon, Rare, Epic, Legendary, Mythic) that hatches one of the
+-- 50 VariantBees of that rarity. The shop shows these odds to the player as percentages.
+Config.Eggs = {
+	Order = { "Basic", "Golden", "Royal" },
+	Basic = {
+		Name = "Basic Egg", Icon = "🥚", Price = 100, Color = "#F5EBD8",
+		Odds = { { Kind = "Starter", Weight = 55 }, { Kind = "Clover", Weight = 25 }, { Kind = "Common", Weight = 15 }, { Kind = "Uncommon", Weight = 4.5 }, { Kind = "Rare", Weight = 0.5 } },
+	},
+	Golden = {
+		Name = "Golden Egg", Icon = "🟡", Price = 2500, Color = "#FFD75E",
+		Odds = { { Kind = "Daisy", Weight = 35 }, { Kind = "Strawberry", Weight = 25 }, { Kind = "Uncommon", Weight = 20 }, { Kind = "Rare", Weight = 15 }, { Kind = "Epic", Weight = 4.5 }, { Kind = "Legendary", Weight = 0.5 } },
+	},
+	Royal = {
+		Name = "Royal Egg", Icon = "👑", Price = 40000, Color = "#C58CFF",
+		Odds = { { Kind = "Knight", Weight = 30 }, { Kind = "Crystal", Weight = 25 }, { Kind = "Rare", Weight = 20 }, { Kind = "Epic", Weight = 15 }, { Kind = "Legendary", Weight = 8 }, { Kind = "Mythic", Weight = 2 } },
+	},
+}
+
+Config.Progression = {
+	CashPerJar = Config.Economy.JarValue,
+	HoneyPerSecondBase = 0.2,
+	BeeTierGrowth = Config.Economy.MergeMultiplier,
+	BeeMergeInputs = 2,
+	BeeMergeMultiplier = Config.Economy.MergeMultiplier,
+	StarterBeeCostBase = Config.Economy.BeeBasePrice,
+	StarterBeeCostGrowth = Config.Economy.BeePriceGrowth,
+	LifetimeLedgerVersion = 3,
+}
+Config.Progression.BeeTierGrowth = Config.Economy.MergeMultiplier
+
+function Config.Progression.TierHoneyPerSecond(tierIndex: number): number
+	return Config.Progression.HoneyPerSecondBase * Config.Progression.BeeTierGrowth ^ math.max(0, tierIndex - 1)
+end
+
+function Config.Progression.PotentialCashPerSecond(honeyPerSecond: number, productionMultiplier: number, rebirthMultiplier: number): number
+	return honeyPerSecond * productionMultiplier * rebirthMultiplier * Config.Progression.CashPerJar
+end
+
+function Config.Progression.RebirthMultiplier(rebirths: number, multiplier: number?): number
+	return (multiplier or Config.Rebirth.ProductionMultiplier) ^ math.max(0, rebirths)
+end
+
+function Config.Progression.RebirthCost(rebirths: number, baseCost: number?, growth: number?): number
+	return math.floor((baseCost or Config.Rebirth.BaseCost) * (growth or Config.Rebirth.CostGrowth) ^ math.max(0, rebirths) + 0.5)
+end
+
+function Config.Progression.NextRebirthMultiplier(rebirths: number, multiplier: number?): number
+	return Config.Progression.RebirthMultiplier(rebirths + 1, multiplier)
+end
+
+function Config.Progression.BeePurchaseCost(purchases: number, basePrice: number?, growth: number?): number
+	return math.floor((basePrice or Config.Economy.BeeBasePrice) * (growth or Config.Economy.BeePriceGrowth) ^ math.max(0, purchases) + 0.5)
+end
+
+function Config.Progression.UpgradePrice(id: string, level: number): number?
+	local upgrade = Config.Upgrades[id]
+	if not upgrade or level < 1 or level >= #upgrade.Levels then return nil end
+	return upgrade.Prices[level]
+end
+
+function Config.Progression.TierMergeGain(tierIndex: number): number
+	local current = Config.Progression.TierHoneyPerSecond(tierIndex) * Config.Progression.BeeMergeInputs
+	local merged = Config.Progression.TierHoneyPerSecond(tierIndex + 1)
+	return if current > 0 then merged / current else 1
+end
+
+function Config.Progression.NextTierIndex(tierIndex: number): number?
+	return if tierIndex < #Config.BeeOrder then tierIndex + 1 else nil
+end
+
+function Config.Progression.TierMergeCost(tierIndex: number): number
+	local base = Config.Economy.BeeBasePrice
+	return math.floor(base * Config.Progression.BeeMergeMultiplier ^ math.max(0, tierIndex - 1) + 0.5)
+end
+
+function Config.Progression.ExpectedTierBeeCount(tierIndex: number): number
+	return Config.Progression.BeeMergeInputs ^ math.max(0, tierIndex - 1)
+end
+
+function Config.Progression.ExpectedTierBeeInvestment(tierIndex: number): number
+	local count = 0
+	for purchase = 0, Config.Progression.ExpectedTierBeeCount(tierIndex) - 1 do
+		count += Config.Progression.BeePurchaseCost(purchase)
+	end
+	return count
+end
+
+function Config.Progression.RebirthTargetHours(rebirths: number): number
+	local cost = Config.Progression.RebirthCost(rebirths)
+	local productionRate = Config.Progression.HoneyPerSecondBase * Config.Progression.RebirthMultiplier(rebirths)
+	local sustainableRate = math.min(productionRate, Config.Economy.BottlingPerSecond)
+	local cashPerSecond = sustainableRate * Config.Progression.CashPerJar
+	local expectedHours = cost / math.max(cashPerSecond, 0.001) / 3600
+	return math.floor(expectedHours * 10 + 0.5) / 10
+end
+
+function Config.Progression.FormattedNumber(value: number): string
+	value = math.floor(value + 0.5)
+	if value < 1_000 then
+		return tostring(value)
+	end
+	-- Simulator-style ladder: K M B T Qd Qn Sx Sp Oc No Dc (1e3 per step)
+	local suffixes = { "K", "M", "B", "T", "Qd", "Qn", "Sx", "Sp", "Oc", "No", "Dc" }
+	local scale = 1_000
+	for _, suffix in suffixes do
+		if value < scale * 1_000 or suffix == "Dc" then
+			local text = ("%.2f"):format(value / scale)
+			text = text:gsub("0+$", ""):gsub("%.$", "")
+			return text .. suffix
+		end
+		scale *= 1_000
+	end
+	return tostring(value)
+end
+
 -- Bee tiers, lowest -> highest. Two bees of one tier merge into one of the next.
 -- Look: Body = head + light stripes, Stripe = dark stripes, Wing, Eye, Antenna (hex colours),
 --       Material / NeonStripes / Transparency / Reflectance / Glow, Accessory = the shape that
@@ -151,65 +278,63 @@ Config.Bees = {
 		Look = { Body = "#FFD700", Stripe = "#6A0DAD", Wing = "#FFF4C2", Eye = "#111111", Antenna = "#FFD700", Material = "Metal", Reflectance = 0.3, Glow = "#FFE37A", Accessory = "Royal" },
 	},
 }
--- Production doubles-and-a-half each tier; size grows a little so big bees look important.
+
+local advancedBeeNames = {
+	"Coral", "Tide", "Frost", "Aurora", "Comet", "Meteor", "Nebula", "Void", "Prism", "Opal",
+	"Sapphire", "Ruby", "Emerald", "Topaz", "Amethyst", "Obsidian", "Titan", "Phoenix", "Solar", "Lunar",
+	"Tempest", "Inferno", "Glacier", "Thunder", "Spirit", "Phantom", "Shadow", "Radiant", "Celestial", "Eclipse",
+	"Infinity", "Ancient", "Mythic", "Divine", "Ethereal", "Ascendant", "Eternal", "Supreme", "Cosmic", "Overlord",
+}
+local advancedBeeColors = {
+	{ "#FF6B35", "#682A20", "#FFD3A5" }, { "#E34234", "#5A1515", "#FFB36A" }, { "#FF7F8A", "#8D2947", "#FFE3E5" }, { "#29B6C8", "#126375", "#B4F6FF" },
+	{ "#9CEBFF", "#3B73A8", "#F1FCFF" }, { "#7BE6C4", "#4268A8", "#D9FFF2" }, { "#FF8C42", "#713C9E", "#FFE6B8" }, { "#D7DDE8", "#596579", "#FFFFFF" },
+	{ "#7557C8", "#34205F", "#C8B4FF" }, { "#25233D", "#12111E", "#8884B2" }, { "#F4F1FF", "#8657D6", "#E1D4FF" }, { "#B7F1FF", "#5796C8", "#FFFFFF" },
+	{ "#246BCE", "#12305E", "#B9DBFF" }, { "#E84855", "#7B2030", "#FFD0C6" }, { "#36B37E", "#165B42", "#C4FFE4" }, { "#FFC247", "#91601E", "#FFF0B8" },
+	{ "#A978D1", "#573477", "#E8D1FF" }, { "#474552", "#20202B", "#BEBBCB" }, { "#A8B3C4", "#43506A", "#F2F5FA" }, { "#FF5D73", "#802C45", "#FFD6A4" },
+	{ "#FFD34D", "#9B641C", "#FFF4B0" }, { "#8894FF", "#45448F", "#E2E5FF" }, { "#5A87B8", "#283D59", "#C9DDF4" }, { "#FF4D35", "#742513", "#FFC65C" },
+	{ "#75DFFF", "#356A9C", "#E0FAFF" }, { "#FFE34F", "#79651C", "#FFF8B8" }, { "#54C7A2", "#276A5A", "#D5FFF1" }, { "#AAA7C7", "#56536F", "#EEEAFE" },
+	{ "#4A3B62", "#1D172B", "#B29CDF" }, { "#FFED8A", "#B85A3C", "#FFF9D7" }, { "#67E2D0", "#356B92", "#E4FFFB" }, { "#B694FF", "#583F98", "#E9DEFF" },
+	{ "#D2F65A", "#597629", "#F4FFD1" }, { "#4FD1E8", "#255C88", "#D7FAFF" }, { "#F1B0FF", "#763A8C", "#FFE6FF" }, { "#FFB457", "#844B25", "#FFF0D2" },
+	{ "#B5F6D1", "#3F8163", "#E7FFF1" }, { "#F6E7A1", "#82713D", "#FFFAE0" }, { "#FFFFFF", "#A96B35", "#FFF1C9" }, { "#FFDF55", "#593C8F", "#FFF4BB" },
+}
+for index, name in advancedBeeNames do
+	local colors = advancedBeeColors[index]
+	local tierName = name
+	table.insert(Config.BeeOrder, tierName)
+	Config.Bees[tierName] = {
+		Name = name .. " Bee",
+		Description = if index == 1 then name .. "-tier bee. Merge two Royal Bees to discover it." else name .. "-tier bee. Merge two " .. advancedBeeNames[index - 1] .. " bees to discover it.",
+		Look = { Body = colors[1], Stripe = colors[2], Wing = colors[3], Eye = "#111111", Antenna = colors[2], Glow = colors[1] },
+	}
+end
+
+-- Merging two bees into the next tier preserves the total base production of both inputs.
 for i, tier in Config.BeeOrder do
 	local bee = Config.Bees[tier]
 	bee.Tier = i
-	bee.HoneyPerSecond = (1 / 5) * Config.Economy.MergeMultiplier ^ (i - 1)
+	bee.HoneyPerSecond = Config.Progression.TierHoneyPerSecond(i)
 	bee.Scale = 0.35 + (i - 1) * 0.025
 end
-
--- Eggs, shiny merges and Royal Jelly (Phase 8) --------------------------------------
-Config.Economy.ShinyChance = 0.05 -- a merge result is shiny this often (or if a parent was shiny)
-Config.Economy.ShinyMultiplier = 1.5 -- shiny bees make this x the normal rate
-
--- Eggs sold in the Bee Shop. Odds are weights: a "Kind" is a ladder tier (Starter, Clover, ...)
--- or a variant rarity (Common, Uncommon, Rare, Epic, Legendary, Mythic) that hatches one of the
--- 50 VariantBees of that rarity. The shop shows these odds to the player as percentages.
-Config.Eggs = {
-	Order = { "Basic", "Golden", "Royal" },
-	Basic = {
-		Name = "Basic Egg",
-		Icon = "🥚",
-		Price = 100,
-		Color = "#F5EBD8",
-		Odds = { { Kind = "Starter", Weight = 55 }, { Kind = "Clover", Weight = 25 }, { Kind = "Common", Weight = 15 }, { Kind = "Uncommon", Weight = 4.5 }, { Kind = "Rare", Weight = 0.5 } },
-	},
-	Golden = {
-		Name = "Golden Egg",
-		Icon = "🟡",
-		Price = 2500,
-		Color = "#FFD75E",
-		Odds = { { Kind = "Daisy", Weight = 35 }, { Kind = "Strawberry", Weight = 25 }, { Kind = "Uncommon", Weight = 20 }, { Kind = "Rare", Weight = 15 }, { Kind = "Epic", Weight = 4.5 }, { Kind = "Legendary", Weight = 0.5 } },
-	},
-	Royal = {
-		Name = "Royal Egg",
-		Icon = "👑",
-		Price = 40000,
-		Color = "#C58CFF",
-		Odds = { { Kind = "Knight", Weight = 30 }, { Kind = "Crystal", Weight = 25 }, { Kind = "Rare", Weight = 20 }, { Kind = "Epic", Weight = 15 }, { Kind = "Legendary", Weight = 8 }, { Kind = "Mythic", Weight = 2 } },
-	},
-}
-
--- Rebirth: once you own a Royal Bee you can reset the farm for permanent Royal Jelly.
-Config.Rebirth = {
-	RequiresTier = "Royal", -- must own a bee of this tier
-	JellyPerRebirth = 1,
-	BonusPerJelly = 0.25, -- +25% production per jelly, forever
-	KeepVariants = true, -- egg bees (the collection) survive a rebirth; ladder bees and upgrades don't
-}
 
 -- Farm upgrades (Phase 4). Levels[1] is the starting value (free); Prices[i] is the
 -- cost of going from level i to level i+1. Edit these two lists to rebalance.
 Config.Upgrades = {
-	Order = { "Production", "HiveStorage", "Backpack", "BottlingSpeed", "BeeSlots" },
+	Order = { "Production", "HoneyFlow", "HiveStorage", "Backpack", "BottlingSpeed", "BeeSlots" },
 	Production = {
 		Name = "Bee Production",
 		Icon = "🐝",
 		Description = "Every bee makes more honey.",
 		Format = "x%.2g",
 		Levels = { 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6.5, 8 },
-		Prices = { 120, 300, 750, 1800, 4000, 9000, 20000, 45000, 100000 },
+		Prices = { 120, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000 },
+	},
+	HoneyFlow = {
+		Name = "Honey Flow",
+		Icon = "🍯",
+		Description = "All honey production is boosted.",
+		Format = "x%.2g",
+		Levels = { 1, 1.15, 1.3, 1.5, 1.75, 2, 2.4, 3 },
+		Prices = { 150, 350, 800, 1800, 4000, 9000, 20000 },
 	},
 	HiveStorage = {
 		Name = "Hive Storage",
@@ -217,7 +342,7 @@ Config.Upgrades = {
 		Description = "The hive holds more honey before the bees stop.",
 		Format = "%d honey",
 		Levels = { 50, 120, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000 },
-		Prices = { 80, 200, 500, 1200, 3000, 7000, 16000, 36000, 80000 },
+		Prices = { 80, 160, 320, 650, 1300, 2600, 5200, 10400, 20800 },
 	},
 	Backpack = {
 		Name = "Backpack",
@@ -225,7 +350,7 @@ Config.Upgrades = {
 		Description = "Carry more honey per trip.",
 		Format = "%d honey",
 		Levels = { 50, 100, 200, 400, 800, 1600, 3200, 6400, 12800 },
-		Prices = { 60, 150, 400, 1000, 2500, 6000, 14000, 32000 },
+		Prices = { 60, 120, 240, 480, 960, 1920, 3840, 7680 },
 	},
 	BottlingSpeed = {
 		Name = "Bottling Speed",
@@ -233,7 +358,7 @@ Config.Upgrades = {
 		Description = "The machine fills jars faster.",
 		Format = "%g jars/s",
 		Levels = { 1, 2, 3, 5, 8, 12, 20, 30, 50 },
-		Prices = { 100, 250, 600, 1500, 3500, 8000, 18000, 40000 },
+		Prices = { 100, 220, 450, 900, 1800, 3600, 7200, 14400 },
 	},
 	BeeSlots = {
 		Name = "Bee Slots",
@@ -241,7 +366,7 @@ Config.Upgrades = {
 		Description = "Keep more bees on the farm at once.",
 		Format = "%d bees",
 		Levels = { 8, 10, 12, 14, 16, 18, 20 },
-		Prices = { 200, 600, 1500, 4000, 10000, 25000 },
+		Prices = { 200, 600, 1500, 3500, 7500, 15000 },
 	},
 }
 
@@ -260,9 +385,9 @@ export type TutorialStep = { Station: string, Title: string, Body: string, WaitB
 Config.Tutorial = {
 	Reward = 50, -- cash for finishing the introduction
 	Steps = {
-		{ Station = "Hive", Title = "Collect your honey", Body = "Your bee is filling the hive. Walk up to it and press E (or tap) to collect.", WaitBody = "Your bee is making honey… the hive fills 1 honey every 5 seconds." },
-		{ Station = "Bottling", Title = "Bottle it", Body = "Take the honey to the Bottling machine and press E to deposit it. Jars ride the belt to the stand." },
-		{ Station = "SellStand", Title = "Collect your cash", Body = "Every jar is worth $5 at the Honey Stand. Press E there to collect." },
+		{ Station = "Hive", Title = "Collect your honey", Body = "Your bee is filling the hive. Step on the glowing floor plate beside the hive to collect (it also upgrades hive storage).", WaitBody = "Your bee is making honey… the hive fills 1 honey every 5 seconds." },
+		{ Station = "Bottling", Title = "Bottle it", Body = "Take the honey to the Bottling machine and step on its glowing floor plate to deposit it. Jars ride the belt to the stand." },
+		{ Station = "SellStand", Title = "Collect your cash", Body = "Every jar is worth $5 at the Honey Stand. Step on the floor plate in front of the stand to collect." },
 		{ Station = "BeeShop", Title = "Buy a second bee", Body = "Open the Bee Shop and buy another Starter Bee for $25. Keep collecting if you're short!" },
 		{ Station = "BeeShop", Title = "Make your first merge", Body = "In the Bee Shop, tap both Starter Bees and press Merge to make a Clover Bee (2.5× honey)." },
 	} :: { TutorialStep },
@@ -277,8 +402,19 @@ Config.Sounds = {
 	Cash = "rbxasset://sounds/snap.mp3",
 	Merge = "rbxasset://sounds/victory.wav",
 	Click = "rbxasset://sounds/button.wav",
+	Deny = "rbxasset://sounds/electronicpingshort.wav", -- played at low pitch as the "can't afford" buzz
 	Buzz = "", -- e.g. "rbxassetid://..." (looping bee hum), left off until you pick one
 	BuzzVolume = 0.12,
+}
+
+-- Robux cash shop. Amounts are the cash granted; Robux prices are what the player pays.
+-- ProductId stays 0 until a Developer Product is created on the Roblox site and its id is pasted here.
+Config.Shop = {
+	{ Id = "Handful", Name = "Handful of Cash", Amount = 1000, Robux = 25, ProductId = 0 },
+	{ Id = "Jar", Name = "Jar of Cash", Amount = 10000, Robux = 99, ProductId = 0 },
+	{ Id = "Barrel", Name = "Barrel of Cash", Amount = 100000, Robux = 249, ProductId = 0 },
+	{ Id = "Vault", Name = "Honey Vault", Amount = 1000000, Robux = 499, ProductId = 0 },
+	{ Id = "Mountain", Name = "Cash Mountain", Amount = 10000000, Robux = 999, ProductId = 0 },
 }
 
 -- Flood protection (Phase 7). A human can't press more than ~10 times a second; anything

@@ -1,5 +1,4 @@
--- Collection book: the ten bee tiers, discovered ones as spinning models with their stats,
--- undiscovered ones as dark silhouettes with a hint on how to get them.
+-- Collection book: the fifty bee tiers, discoveries, base income, and merge progression.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,204 +11,260 @@ local Config = require(Shared:WaitForChild("Config"))
 local BeeAppearance = require(Shared:WaitForChild("BeeAppearance"))
 local VariantBees = require(Shared:WaitForChild("VariantBees"))
 
-local C = Config.Colors
 local player = Players.LocalPlayer
 local plots = workspace:WaitForChild("HoneyFarmMap"):WaitForChild("Plots")
 local template = ReplicatedStorage:WaitForChild("Assets"):WaitForChild("BeeTemplate") :: Model
-
-local function corner(parent: Instance, r: number)
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, r)
-	c.Parent = parent
-end
-local function stroke(parent: Instance, color: Color3, t: number)
-	local s = Instance.new("UIStroke")
-	s.Color = color
-	s.Thickness = t
-	s.Parent = parent
-end
-local function text(parent: Instance, props: { [string]: any }): TextLabel
-	local l = Instance.new("TextLabel")
-	l.BackgroundTransparency = 1
-	l.Font = Enum.Font.FredokaOne
-	l.TextColor3 = C.Text
-	l.TextWrapped = true
-	for k, v in props do
-		(l :: any)[k] = v
-	end
-	l.Parent = parent
-	return l
-end
-
 local gui = Instance.new("ScreenGui")
 gui.Name = "CollectionBook"
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.ResetOnSpawn = false
 gui.ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets
 gui.Parent = player:WaitForChild("PlayerGui")
 
--- Button: top-right, left of the Upgrades button
-local toggle = Instance.new("TextButton")
-toggle.AnchorPoint = Vector2.new(1, 0)
-toggle.Position = UDim2.new(1, -170, 0, 6)
-toggle.Size = UDim2.fromOffset(120, 54)
-toggle.BackgroundColor3 = Color3.fromRGB(190, 150, 255)
-toggle.Font = Enum.Font.FredokaOne
-toggle.TextColor3 = C.Text
-toggle.TextSize = 24
-toggle.Text = "📖 Bees"
-toggle.Parent = gui
-corner(toggle, 16)
-stroke(toggle, C.Text, 3)
+local function border(parent: Instance, thickness: number)
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.new(0, 0, 0)
+	stroke.Thickness = thickness
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	stroke.Parent = parent
+	return stroke
+end
+local function makeText(parent: Instance, name: string, value: string, size: UDim2, position: UDim2, textSize: number, z: number, alignment: Enum.TextXAlignment?)
+	local label = Instance.new("TextLabel")
+	label.Name = name
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.FredokaOne
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.TextSize = textSize
+	label.TextWrapped = true
+	label.TextXAlignment = alignment or Enum.TextXAlignment.Left
+	label.TextYAlignment = Enum.TextYAlignment.Top
+	label.Text = value
+	label.Size = size
+	label.Position = position
+	label.ZIndex = z
+	label.Parent = parent
+	local outline = Instance.new("UIStroke")
+	outline.Color = Color3.new(0, 0, 0)
+	outline.Thickness = if textSize >= 22 then 3 else 2.5
+	outline.Parent = label
+	return label
+end
+local function buildFace(base: GuiObject, color: Color3, height: number, tile: number, flat: boolean?)
+	local face = Instance.new("Frame")
+	face.BackgroundColor3 = if flat then color else Color3.new(1, 1, 1)
+	face.BorderSizePixel = 0
+	face.Size = UDim2.new(1, 0, height, 0)
+	face.ZIndex = base.ZIndex + 1
+	face.Parent = base
+	if not flat then
+		local gradient = Instance.new("UIGradient")
+		gradient.Rotation = 90
+		gradient.Color = ColorSequence.new(Color3.new(1, 1, 1), color)
+		gradient.Parent = face
+	end
+	local pattern = Instance.new("ImageLabel")
+	pattern.BackgroundTransparency = 1
+	pattern.Image = "rbxassetid://92521981645530"
+	pattern.ImageTransparency = 0.55
+	pattern.ScaleType = Enum.ScaleType.Tile
+	pattern.TileSize = UDim2.fromOffset(tile, tile)
+	pattern.Size = UDim2.fromScale(1, 1)
+	pattern.ZIndex = base.ZIndex + 2
+	pattern.Parent = face
+	return face
+end
+local function makeButton(parent: Instance, name: string, value: string, color: Color3, position: UDim2, size: UDim2)
+	local button = Instance.new("TextButton")
+	button.Name = name
+	button.Text = ""
+	button.AutoButtonColor = false
+	button.BackgroundColor3 = color:Lerp(Color3.new(0, 0, 0), 0.35)
+	button.BorderSizePixel = 0
+	button.Position = position
+	button.Size = size
+	button.ZIndex = 5
+	button.Parent = parent
+	border(button, 4)
+	local face = buildFace(button, color, 0.9, math.max(40, math.floor(size.Y.Offset * 0.9 + 0.5)))
+	makeText(face, "Label", value, UDim2.new(0.92, 0, 0.62, 0), UDim2.fromScale(0.04, 0.12), 17, face.ZIndex + 2, Enum.TextXAlignment.Center)
+	local scale = Instance.new("UIScale")
+	scale.Parent = button
+	local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+	local function scaleTo(target: number)
+		TweenService:Create(scale, tweenInfo, { Scale = target }):Play()
+	end
+	button.MouseEnter:Connect(function() scaleTo(1.06) end)
+	button.MouseLeave:Connect(function() scaleTo(1) end)
+	button.MouseButton1Down:Connect(function() scaleTo(0.94) end)
+	button.MouseButton1Up:Connect(function() scaleTo(1.06) end)
+	return button
+end
 
+local toggle = makeButton(gui, "BeeIndexButton", "BEES", Color3.fromRGB(155, 92, 215), UDim2.new(1, -14, 0, 12), UDim2.fromOffset(180, 48))
+toggle.AnchorPoint = Vector2.new(1, 0)
 local panel = Instance.new("Frame")
-panel.Visible = false
+panel.Name = "Panel"
 panel.AnchorPoint = Vector2.new(0.5, 0.5)
 panel.Position = UDim2.fromScale(0.5, 0.5)
-panel.Size = UDim2.new(0.94, 0, 0.86, 0)
-panel.BackgroundColor3 = C.Cream
+panel.Size = UDim2.new(0.92, 0, 0.86, 0)
+panel.BackgroundColor3 = Color3.new(0, 0, 0)
+panel.BackgroundTransparency = 0.4
+panel.BorderSizePixel = 0
+panel.Visible = false
+panel.ZIndex = 1
 panel.Parent = gui
-corner(panel, 18)
-stroke(panel, C.Text, 3)
-local maxSize = Instance.new("UISizeConstraint")
-maxSize.MaxSize = Vector2.new(820, 600)
-maxSize.Parent = panel
+border(panel, 4)
+local panelLimit = Instance.new("UISizeConstraint")
+panelLimit.MinSize = Vector2.new(540, 450)
+panelLimit.MaxSize = Vector2.new(1020, 820)
+panelLimit.Parent = panel
 
-local _header = text(panel, { Text = "📖 BEE COLLECTION", TextSize = 30, Size = UDim2.new(1, -120, 0, 44), Position = UDim2.fromOffset(18, 6), TextXAlignment = Enum.TextXAlignment.Left })
-local progress = text(panel, { Text = "", TextSize = 16, Font = Enum.Font.GothamBold, TextColor3 = Color3.fromRGB(140, 100, 60), Size = UDim2.new(1, -120, 0, 20), Position = UDim2.fromOffset(20, 46), TextXAlignment = Enum.TextXAlignment.Left })
-local close = Instance.new("TextButton")
-close.Size = UDim2.fromOffset(46, 46)
-close.Position = UDim2.new(1, -56, 0, 8)
-close.BackgroundColor3 = Color3.fromRGB(240, 120, 110)
-close.Font = Enum.Font.FredokaOne
-close.TextSize = 24
-close.TextColor3 = C.Text
-close.Text = "✕"
-close.Parent = panel
-corner(close, 12)
-stroke(close, C.Text, 2)
+local titleBar = Instance.new("Frame")
+titleBar.Name = "TitleBar"
+titleBar.BackgroundColor3 = Color3.fromRGB(112, 67, 157)
+titleBar.BorderSizePixel = 0
+titleBar.Size = UDim2.new(1, 0, 0, 58)
+titleBar.ZIndex = 3
+titleBar.Parent = panel
+border(titleBar, 4)
+local titleFace = buildFace(titleBar, Color3.fromRGB(112, 67, 157), 0.88, 76, true)
+makeText(titleFace, "Title", "BEE COLLECTION", UDim2.new(0.74, 0, 0.7, 0), UDim2.new(0, 18, 0.12, 0), 25, 6)
+local close = makeButton(titleBar, "Close", "X", Color3.fromRGB(239, 28, 28), UDim2.new(1, -54, 0.5, -22), UDim2.fromOffset(46, 44))
 
--- Tabs: ladder tiers | egg bees
-local tabs = Instance.new("Frame")
-tabs.Position = UDim2.fromOffset(14, 70)
-tabs.Size = UDim2.new(1, -28, 0, 36)
-tabs.BackgroundTransparency = 1
-tabs.Parent = panel
-local tabLayout = Instance.new("UIListLayout")
-tabLayout.FillDirection = Enum.FillDirection.Horizontal
-tabLayout.Padding = UDim.new(0, 8)
-tabLayout.Parent = tabs
-local function tabButton(label: string): TextButton
-	local b = Instance.new("TextButton")
-	b.Size = UDim2.fromOffset(170, 36)
-	b.BackgroundColor3 = Color3.fromRGB(230, 220, 200)
-	b.Font = Enum.Font.FredokaOne
-	b.TextSize = 17
-	b.TextColor3 = C.Text
-	b.Text = label
-	b.Parent = tabs
-	corner(b, 10)
-	return b
-end
-local tabTiers = tabButton("🐝 Merge ladder")
-local tabVariants = tabButton("🥚 Egg bees")
+local summary = Instance.new("Frame")
+summary.Name = "Summary"
+summary.BackgroundColor3 = Color3.fromRGB(61, 41, 87)
+summary.BorderSizePixel = 0
+summary.Position = UDim2.fromOffset(14, 68)
+summary.Size = UDim2.new(1, -28, 0, 62)
+summary.ZIndex = 3
+summary.Parent = panel
+border(summary, 4)
+local summaryFace = buildFace(summary, Color3.fromRGB(115, 81, 154), 0.94, 48)
+local progress = makeText(summaryFace, "Progress", "0 / 50 BEES", UDim2.new(0.48, -18, 0, 26), UDim2.fromOffset(12, 4), 18, 6)
+local economics = makeText(summaryFace, "Economy", "Rebirth x1.00  ·  next x1.75 at $500", UDim2.new(0.48, -18, 0, 24), UDim2.fromOffset(12, 31), 14, 6)
+local recommendation = makeText(summaryFace, "NextSpend", "", UDim2.new(0.48, -18, 0, 45), UDim2.new(0.51, 6, 0, 7), 14, 6)
+
+-- Tabs: merge ladder | egg bees
+local tabTiers = makeButton(panel, "TabTiers", "MERGE LADDER", Color3.fromRGB(155, 92, 215), UDim2.fromOffset(14, 138), UDim2.fromOffset(190, 34))
+local tabVariants = makeButton(panel, "TabEggs", "EGG BEES", Color3.fromRGB(110, 110, 120), UDim2.fromOffset(212, 138), UDim2.fromOffset(190, 34))
 
 local grid = Instance.new("ScrollingFrame")
-grid.Position = UDim2.fromOffset(14, 112)
-grid.Size = UDim2.new(1, -28, 1, -126)
-grid.BackgroundTransparency = 1
-grid.ScrollBarThickness = 6
+grid.Name = "BeeGrid"
+grid.Position = UDim2.fromOffset(14, 178)
+grid.Size = UDim2.new(1, -28, 1, -192)
+grid.BackgroundColor3 = Color3.fromRGB(34, 24, 47)
+grid.BackgroundTransparency = 0.12
+grid.BorderSizePixel = 0
+grid.ScrollBarThickness = 8
 grid.CanvasSize = UDim2.new()
 grid.AutomaticCanvasSize = Enum.AutomaticSize.Y
+grid.ScrollingDirection = Enum.ScrollingDirection.Y
+grid.ZIndex = 3
 grid.Parent = panel
-local layout = Instance.new("UIGridLayout")
-layout.CellSize = UDim2.new(0.5, -6, 0, 150)
-layout.CellPadding = UDim2.fromOffset(8, 8)
-layout.SortOrder = Enum.SortOrder.LayoutOrder
-layout.Parent = grid
+border(grid, 4)
+local gridLayout = Instance.new("UIGridLayout")
+gridLayout.CellSize = UDim2.new(0.5, -14, 0, 156)
+gridLayout.CellPadding = UDim2.fromOffset(8, 8)
+gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+gridLayout.Parent = grid
 
-type Card = { Frame: Frame, Viewport: ViewportFrame, World: WorldModel, Camera: Camera, Model: Model?, Name: TextLabel, Info: TextLabel, Hint: TextLabel, Shown: boolean? }
+type Card = { Base: Frame, Face: Frame, Viewport: ViewportFrame, Camera: Camera, Model: Model?, Name: TextLabel, Info: TextLabel, Hint: TextLabel, Shown: boolean? }
 local cards: { [string]: Card } = {}
+local beeColors = { Color3.fromRGB(255, 190, 40), Color3.fromRGB(140, 205, 110), Color3.fromRGB(110, 175, 235), Color3.fromRGB(235, 130, 110), Color3.fromRGB(185, 145, 235) }
 
-for i, tier in Config.BeeOrder do
+for index, tier in Config.BeeOrder do
 	local info = Config.Bees[tier]
-	local frame = Instance.new("Frame")
-	frame.LayoutOrder = i
-	frame.BackgroundColor3 = Color3.fromRGB(255, 241, 205)
-	frame.Parent = grid
-	corner(frame, 14)
-
-	local vp = Instance.new("ViewportFrame")
-	vp.Size = UDim2.fromOffset(126, 126)
-	vp.Position = UDim2.fromOffset(10, 12)
-	vp.BackgroundColor3 = Color3.fromRGB(255, 251, 235)
-	vp.Ambient = Color3.fromRGB(200, 200, 200)
-	vp.LightColor = Color3.new(1, 1, 1)
-	vp.LightDirection = Vector3.new(-1, -2, -1)
-	vp.Parent = frame
-	corner(vp, 10)
+	local base = Instance.new("Frame")
+	base.Name = "BeeCard_" .. tier
+	base.LayoutOrder = index
+	base.BackgroundColor3 = Color3.fromRGB(69, 47, 87)
+	base.BorderSizePixel = 0
+	base.ZIndex = 4
+	base.Parent = grid
+	border(base, 4)
+	local face = buildFace(base, beeColors[(index - 1) % #beeColors + 1], 0.94, 76)
+	local viewport = Instance.new("ViewportFrame")
+	viewport.Name = "BeeArt"
+	viewport.Size = UDim2.fromOffset(112, 112)
+	viewport.Position = UDim2.fromOffset(8, 12)
+	viewport.BackgroundColor3 = Color3.fromRGB(235, 226, 247)
+	viewport.BackgroundTransparency = 0.06
+	viewport.BorderSizePixel = 0
+	viewport.Ambient = Color3.fromRGB(200, 200, 200)
+	viewport.LightColor = Color3.new(1, 1, 1)
+	viewport.LightDirection = Vector3.new(-1, -2, -1)
+	viewport.ZIndex = 7
+	viewport.Parent = face
+	border(viewport, 2)
 	local camera = Instance.new("Camera")
 	camera.FieldOfView = 40
-	camera.Parent = vp
-	vp.CurrentCamera = camera
+	camera.Parent = viewport
+	viewport.CurrentCamera = camera
 	local world = Instance.new("WorldModel")
-	world.Parent = vp
-
-	local nameL = text(frame, { Text = ("#%d  %s"):format(i, info.Name), TextSize = 20, Size = UDim2.new(1, -150, 0, 26), Position = UDim2.fromOffset(146, 12), TextXAlignment = Enum.TextXAlignment.Left })
-	local infoL = text(frame, { Text = "", TextSize = 14, Font = Enum.Font.GothamBold, TextColor3 = Color3.fromRGB(140, 100, 60), Size = UDim2.new(1, -150, 0, 60), Position = UDim2.fromOffset(146, 40), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top })
-	local hintL = text(frame, { Text = "", TextSize = 13, Font = Enum.Font.GothamBold, TextColor3 = Color3.fromRGB(40, 140, 60), Size = UDim2.new(1, -150, 0, 34), Position = UDim2.fromOffset(146, 104), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top })
-	cards[tier] = { Frame = frame, Viewport = vp, World = world, Camera = camera, Model = nil, Name = nameL, Info = infoL, Hint = hintL }
+	world.Parent = viewport
+	local name = makeText(face, "Name", ("#%02d  %s"):format(index, info.Name), UDim2.new(1, -136, 0, 24), UDim2.fromOffset(128, 8), 17, 7)
+	local _rate = makeText(face, "Income", "", UDim2.new(1, -136, 0, 22), UDim2.fromOffset(128, 37), 14, 7)
+	local infoLabel = makeText(face, "Description", "", UDim2.new(1, -136, 0, 41), UDim2.fromOffset(128, 61), 12, 7)
+	local hint = makeText(face, "Progression", "", UDim2.new(1, -18, 0, 34), UDim2.fromOffset(10, 118), 12, 7)
+	cards[tier] = { Base = base, Face = face, Viewport = viewport, Camera = camera, Model = nil, Name = name, Info = infoLabel, Hint = hint }
 end
 
--- Egg-bee list (compact rows grouped by rarity)
+-- Egg-bee list: compact rows grouped by rarity
 local variantList = Instance.new("ScrollingFrame")
+variantList.Name = "EggBees"
 variantList.Visible = false
-variantList.Position = UDim2.fromOffset(14, 112)
-variantList.Size = UDim2.new(1, -28, 1, -126)
-variantList.BackgroundTransparency = 1
-variantList.ScrollBarThickness = 6
+variantList.Position = UDim2.fromOffset(14, 178)
+variantList.Size = UDim2.new(1, -28, 1, -192)
+variantList.BackgroundColor3 = Color3.fromRGB(34, 24, 47)
+variantList.BackgroundTransparency = 0.12
+variantList.BorderSizePixel = 0
+variantList.ScrollBarThickness = 8
 variantList.CanvasSize = UDim2.new()
 variantList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+variantList.ZIndex = 3
 variantList.Parent = panel
+border(variantList, 4)
 local vLayout = Instance.new("UIGridLayout")
-vLayout.CellSize = UDim2.new(0.5, -6, 0, 44)
-vLayout.CellPadding = UDim2.fromOffset(6, 6)
+vLayout.CellSize = UDim2.new(0.5, -14, 0, 44)
+vLayout.CellPadding = UDim2.fromOffset(8, 8)
 vLayout.SortOrder = Enum.SortOrder.LayoutOrder
 vLayout.Parent = variantList
+local vPad = Instance.new("UIPadding")
+vPad.PaddingTop = UDim.new(0, 8)
+vPad.PaddingLeft = UDim.new(0, 8)
+vPad.PaddingRight = UDim.new(0, 8)
+vPad.Parent = variantList
 local variantRows: { [number]: TextLabel } = {}
-local rarityRank = {}
+local rarityRank: { [string]: number } = {}
 for i, r in VariantBees.Rarities do
 	rarityRank[r.Name] = i
 end
 for _, v in VariantBees.List do
-	local row = text(variantList, {
-		LayoutOrder = rarityRank[v.Rarity] * 100 + v.Id,
-		Text = "",
-		TextSize = 14,
-		Font = Enum.Font.GothamBold,
-		BackgroundTransparency = 0,
-		BackgroundColor3 = Color3.fromRGB(226, 220, 205),
-		TextXAlignment = Enum.TextXAlignment.Left,
-	})
-	corner(row, 10)
+	local row = makeText(variantList, "V" .. v.Id, "", UDim2.new(1, 0, 1, 0), UDim2.fromOffset(0, 0), 14, 4, Enum.TextXAlignment.Left)
+	row.LayoutOrder = rarityRank[v.Rarity] * 100 + v.Id
+	row.BackgroundTransparency = 0
+	row.BackgroundColor3 = Color3.fromRGB(70, 60, 85)
+	row.BorderSizePixel = 0
 	local pad = Instance.new("UIPadding")
-	pad.PaddingLeft = UDim.new(0, 10)
-	pad.PaddingRight = UDim.new(0, 6)
+	pad.PaddingLeft = UDim.new(0, 14)
 	pad.Parent = row
 	local tag = Instance.new("Frame")
 	tag.Size = UDim2.new(0, 6, 1, 0)
-	tag.Position = UDim2.fromOffset(-10, 0)
+	tag.Position = UDim2.fromOffset(-14, 0)
 	tag.BackgroundColor3 = Color3.fromHex(VariantBees.RarityColor(v.Rarity))
 	tag.BorderSizePixel = 0
+	tag.ZIndex = 5
 	tag.Parent = row
-	corner(tag, 10)
 	variantRows[v.Id] = row
 end
 
 local function showTab(variants: boolean)
 	grid.Visible = not variants
 	variantList.Visible = variants
-	tabTiers.BackgroundColor3 = if variants then Color3.fromRGB(230, 220, 200) else C.Honey
-	tabVariants.BackgroundColor3 = if variants then C.Honey else Color3.fromRGB(230, 220, 200)
+	tabTiers.BackgroundColor3 = (if variants then Color3.fromRGB(110, 110, 120) else Color3.fromRGB(155, 92, 215)):Lerp(Color3.new(0, 0, 0), 0.35)
+	tabVariants.BackgroundColor3 = (if variants then Color3.fromRGB(155, 92, 215) else Color3.fromRGB(110, 110, 120)):Lerp(Color3.new(0, 0, 0), 0.35)
 end
 tabTiers.Activated:Connect(function()
 	showTab(false)
@@ -217,128 +272,109 @@ end)
 tabVariants.Activated:Connect(function()
 	showTab(true)
 end)
-showTab(false)
 
 local function showModel(card: Card, tier: string, silhouette: boolean)
-	if card.Model then
-		card.Model:Destroy()
-		card.Model = nil
-	end
+	if card.Model then card.Model:Destroy(); card.Model = nil end
 	local model = BeeAppearance.Build(template, tier)
 	model:ScaleTo(1)
 	model:PivotTo(CFrame.new())
 	if silhouette then
-		for _, d in model:GetDescendants() do
-			if d:IsA("BasePart") then
-				d.Color = Color3.fromRGB(60, 50, 45)
-				d.Material = Enum.Material.SmoothPlastic
-				d.Transparency = math.max(d.Transparency, 0.1)
-			elseif d:IsA("PointLight") then
-				d:Destroy()
+		for _, descendant in model:GetDescendants() do
+			if descendant:IsA("BasePart") then
+				descendant.Color = Color3.fromRGB(54, 48, 63)
+				descendant.Material = Enum.Material.SmoothPlastic
+				descendant.Transparency = math.max(descendant.Transparency, 0.15)
+			elseif descendant:IsA("PointLight") then
+				descendant:Destroy()
 			end
 		end
 	end
-	model.Parent = card.World
+	model.Parent = card.Viewport:FindFirstChildOfClass("WorldModel")
 	card.Model = model
 	local _, size = model:GetBoundingBox()
-	local r = size.Magnitude * 0.9
-	card.Camera.CFrame = CFrame.lookAt(Vector3.new(r * 0.8, r * 0.45, r * 0.8), Vector3.zero)
+	local radius = size.Magnitude * 0.85
+	card.Camera.CFrame = CFrame.lookAt(Vector3.new(radius * 0.8, radius * 0.45, radius * 0.8), Vector3.zero)
 end
-
-local function discoveredSet(): { [string]: boolean }
-	local id = player:GetAttribute("PlotId")
-	local plot = id and plots:FindFirstChild("Plot" .. id)
-	local set = {}
-	for key in string.gmatch((plot and plot:GetAttribute("Discovered") :: string?) or "", "[%w%*]+") do
-		set[key] = true
-	end
-	return set
+local function plotAndDiscoveries(): (Instance?, { [string]: boolean })
+	local plotId = player:GetAttribute("PlotId")
+	local plot = plotId and plots:FindFirstChild("Plot" .. plotId) or nil
+	local discovered = {}
+	for key in string.gmatch((plot and plot:GetAttribute("Discovered") :: string?) or "", "[%w%*]+") do discovered[key] = true end
+	return plot, discovered
 end
-
 local function refresh()
-	local found = discoveredSet()
-	local n = 0
-	for i, tier in Config.BeeOrder do
-		local info = Config.Bees[tier]
+	local _plot, discovered = plotAndDiscoveries()
+	local count = 0
+	for index, tier in Config.BeeOrder do
 		local card = cards[tier]
-		local has = found[tier] == true
-		if has then
-			n += 1
+		local info = Config.Bees[tier]
+		local found = discovered[tier] == true
+		if found then count += 1 end
+		if card.Shown ~= found then
+			showModel(card, tier, not found)
+			card.Shown = found
 		end
-		local wantSilhouette = not has
-		if card.Shown == nil or card.Shown ~= has then
-			showModel(card, tier, wantSilhouette)
-			card.Shown = has
-		end
-		card.Frame.BackgroundColor3 = if has then Color3.fromRGB(255, 241, 205) else Color3.fromRGB(226, 220, 205)
-		card.Name.Text = if has then ("#%d  %s"):format(i, info.Name) else ("#%d  ???"):format(i)
-		local rate = info.HoneyPerSecond
-		local shiny = found[tier .. "*"] == true
-		card.Info.Text = if has then ("%s\n%s honey/s%s"):format(info.Description, if rate < 10 then ("%.1f"):format(rate) else ("%d"):format(rate), if shiny then "  ·  ✨ shiny found!" else "") else "Not discovered yet."
-		local prev = Config.BeeOrder[i - 1]
-		card.Hint.Text = if has then "" elseif prev then ("Merge two %ss to find it."):format(Config.Bees[prev].Name) else "Buy one in the Bee Shop."
+		card.Name.Text = if found then ("#%02d  %s"):format(index, info.Name) else ("#%02d  ???"):format(index)
+		local income = Config.Progression.PotentialCashPerSecond(info.HoneyPerSecond, 1, 1)
+		card.Info.Text = if found then (info.Description .. (if discovered[tier .. "*"] then "  ✨ shiny found!" else "")) else "Not discovered yet"
+		card.Hint.Text = if index == 1 then ("BASE ≈$%s / sec · buy in Bee Shop"):format(Config.Progression.FormattedNumber(income)) else ("BASE ≈$%s / sec · merge two %s"):format(Config.Progression.FormattedNumber(income), Config.Bees[Config.BeeOrder[index - 1]].Name)
+		local rateLabel = card.Face:FindFirstChild("Income") :: TextLabel
+		rateLabel.Text = if found then ("%.2f honey/s · ≈$%s/s"):format(info.HoneyPerSecond, Config.Progression.FormattedNumber(income)) else "LOCKED · undiscovered"
+		card.Face.BackgroundColor3 = if found then Color3.new(1, 1, 1) else Color3.fromRGB(170, 170, 170)
 	end
 	local vFound = 0
 	for _, v in VariantBees.List do
 		local row = variantRows[v.Id]
-		local hasV = found["V" .. v.Id] == true
+		local hasV = discovered["V" .. v.Id] == true
 		if hasV then
 			vFound += 1
 		end
-		row.Text = if hasV then ("%s  ·  %s  ·  %s/s"):format(v.Name, v.Rarity, if v.HoneyPerSecond < 10 then ("%.1f"):format(v.HoneyPerSecond) else ("%d"):format(v.HoneyPerSecond)) else ("???  ·  %s egg bee"):format(v.Rarity)
-		row.TextColor3 = if hasV then C.Text else Color3.fromRGB(140, 130, 115)
-		row.BackgroundColor3 = if hasV then Color3.fromRGB(255, 241, 205) else Color3.fromRGB(226, 220, 205)
+		row.Text = if hasV then ("%s  ·  %s  ·  %s honey/s"):format(v.Name, v.Rarity, if v.HoneyPerSecond < 10 then ("%.1f"):format(v.HoneyPerSecond) else Config.Progression.FormattedNumber(v.HoneyPerSecond)) else ("???  ·  %s egg bee"):format(v.Rarity)
+		row.TextColor3 = if hasV then Color3.new(1, 1, 1) else Color3.fromRGB(170, 165, 185)
+		row.BackgroundColor3 = if hasV then Color3.fromRGB(95, 70, 130) else Color3.fromRGB(70, 60, 85)
 	end
-	progress.Text = ("%d of %d ladder bees  ·  %d of %d egg bees discovered"):format(n, #Config.BeeOrder, vFound, #VariantBees.List)
+	progress.Text = ("%d / %d ladder  ·  %d / %d egg bees"):format(count, #Config.BeeOrder, vFound, #VariantBees.List)
+	local rebirths = player:GetAttribute("Rebirths") or 0
+	local multiplier = player:GetAttribute("RebirthMultiplier") or Config.Progression.RebirthMultiplier(rebirths)
+	local cost = player:GetAttribute("RebirthCost") or Config.Progression.RebirthCost(rebirths)
+	economics.Text = ("Rebirth x%.2f  ·  next x%.2f at %s"):format(multiplier, Config.Progression.NextRebirthMultiplier(rebirths), "$" .. Config.Progression.FormattedNumber(cost))
+	local cash = player:GetAttribute("Cash") or 0
+	local spend = player:GetAttribute("RecommendedSpend") or "Bee"
+	local spendCost = player:GetAttribute("RecommendedSpendCost") or Config.Economy.BeeBasePrice
+	recommendation.Text = ("CASH $%s\nNEXT: %s · $%s"):format(Config.Progression.FormattedNumber(cash), spend, Config.Progression.FormattedNumber(spendCost))
 end
-
--- gentle spin for the visible models
-local angle = 0
-RunService.RenderStepped:Connect(function(dt)
-	if not panel.Visible then
-		return
-	end
-	angle += dt * 0.7
-	for _, card in cards do
-		if card.Model then
-			card.Model:PivotTo(CFrame.Angles(0, angle, 0))
-		end
-	end
-end)
 
 local function setOpen(open: boolean)
 	panel.Visible = open
-	if open then
-		refresh()
-		panel.Size = UDim2.new(0.8, 0, 0.7, 0)
-		TweenService:Create(panel, TweenInfo.new(0.2, Enum.EasingStyle.Back), { Size = UDim2.new(0.94, 0, 0.86, 0) }):Play()
-	end
+	if open then refresh() end
 end
-
-toggle.Activated:Connect(function()
-	setOpen(not panel.Visible)
+toggle.Activated:Connect(function() setOpen(not panel.Visible) end)
+close.Activated:Connect(function() setOpen(false) end)
+UserInputService.InputBegan:Connect(function(input, processed)
+	if processed then return end
+	if input.KeyCode == Enum.KeyCode.B then setOpen(not panel.Visible) end
 end)
-close.Activated:Connect(function()
-	setOpen(false)
-end)
-UserInputService.InputBegan:Connect(function(input)
-	if input.KeyCode == Enum.KeyCode.Escape and panel.Visible then
-		setOpen(false)
-	elseif input.KeyCode == Enum.KeyCode.B then
-		setOpen(not panel.Visible)
-	end
-end)
-
+for _, attribute in { "Cash", "Rebirths", "RebirthMultiplier", "RebirthCost", "RecommendedSpend", "RecommendedSpendCost", "PlotId" } do
+	player:GetAttributeChangedSignal(attribute):Connect(function() if panel.Visible then refresh() end end)
+end
+local activePlot: Instance? = nil
+local plotConnections: { RBXScriptConnection } = {}
 local function watchPlot()
-	local id = player:GetAttribute("PlotId")
-	local plot = id and plots:FindFirstChild("Plot" .. id)
-	if plot then
-		plot:GetAttributeChangedSignal("Discovered"):Connect(function()
-			if panel.Visible then
-				refresh()
-			end
-		end)
+	for _, connection in plotConnections do connection:Disconnect() end
+	table.clear(plotConnections)
+	activePlot = select(1, plotAndDiscoveries())
+	if activePlot then
+		table.insert(plotConnections, activePlot:GetAttributeChangedSignal("Discovered"):Connect(function() if panel.Visible then refresh() end end))
 	end
+	if panel.Visible then refresh() end
 end
 player:GetAttributeChangedSignal("PlotId"):Connect(watchPlot)
 watchPlot()
+local angle = 0
+RunService.RenderStepped:Connect(function(dt)
+	if not panel.Visible then return end
+	angle += dt * 0.55
+	for _, card in cards do
+		if card.Model and card.Model.Parent then card.Model:PivotTo(CFrame.Angles(0, angle, 0)) end
+	end
+end)

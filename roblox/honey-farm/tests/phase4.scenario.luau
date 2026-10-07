@@ -85,7 +85,8 @@ check(has(lastNote(alice), "Hive Storage upgraded to 120 honey"), "upgrade messa
 local v = visuals(plot1)
 check(v.MiniHive == 1, "one mini hive appears in the hive yard")
 upgrade(alice, "HiveStorage")
-check(plot1:GetAttribute("HiveCapacity") == 250 and visuals(plot1).MiniHive == 2 and s.Cash == 5000 - 80 - 200, "level 3: capacity 250, two mini hives, $200 charged")
+local hp = Config.Upgrades.HiveStorage.Prices
+check(plot1:GetAttribute("HiveCapacity") == 250 and visuals(plot1).MiniHive == 2 and s.Cash == 5000 - hp[1] - hp[2], ("level 3: capacity 250, two mini hives, $%d charged"):format(hp[2]))
 
 -- bottling speed: tanks appear and jars really come out faster
 upgrade(alice, "BottlingSpeed")
@@ -147,7 +148,7 @@ upgrade(alice, nil)
 check(s.Cash == cashAtMax, "unknown / garbage upgrade ids change nothing")
 
 -- conservation still holds with upgrades in play
-local paid = s.Totals.Earned / Config.Economy.JarValue
+local paid = (s.Totals.Earned - Config.Economy.StartCash) / Config.Economy.JarValue
 check(s.Totals.Produced + injected == s:HoneyInSystem() + paid, "no honey counted twice with upgrades active")
 
 -- another player can't upgrade Alice's farm, and starts at level 1 himself

@@ -24,7 +24,9 @@ for id = 1, 6 do
 		local st = plot.Stations:FindFirstChild(s)
 		check(st ~= nil, ("Plot%d has %s"):format(id, s))
 		local prompt = st:FindFirstChild("StationPrompt", true)
-		check(prompt ~= nil and prompt:GetAttribute("OwnerOnly") == true, ("Plot%d %s has an owner-only prompt"):format(id, s))
+		local plate = st:FindFirstChild("HivePressurePlate", true) or st:FindFirstChild("BottlingPressurePlate", true) or st:FindFirstChild("SellPressurePlate", true)
+		local trigger = prompt or plate
+		check(trigger ~= nil and trigger:GetAttribute("OwnerOnly") == true, ("Plot%d %s has an owner-only prompt or plate"):format(id, s))
 	end
 	check(plot:GetAttribute("OwnerUserId") == 0, "Plot" .. id .. " starts unowned")
 end
@@ -85,13 +87,15 @@ check(dist(charPos(bob), spawnPos(2)) < 3, "My Farm returns Bob to plot 2, not A
 alice.spawnCharacter()
 check(dist(charPos(alice), spawnPos(1)) < 3, "respawning puts Alice back on her farm")
 
--- Ownership of stations
-local aliceHivePrompt = plots.Plot1.Stations.Hive:FindFirstChild("StationPrompt", true)
-aliceHivePrompt.Triggered:Fire(bob)
-check(string.find(lastNote(bob), "Alice's farm") ~= nil, "Bob can't use Alice's hive")
-alice.Character:PivotTo(aliceHivePrompt.Parent.CFrame + M.Vector3.new(0, 3, -4))
-aliceHivePrompt.Triggered:Fire(alice)
-check(string.find(lastNote(alice), "Alice's farm") == nil, "Alice can use her own hive")
+-- Ownership of stations (the shop keeps an E-prompt; the hive is a floor plate)
+local aliceShopPrompt = plots.Plot1.Stations.BeeShop:FindFirstChild("StationPrompt", true)
+aliceShopPrompt.Triggered:Fire(bob)
+check(string.find(lastNote(bob), "Alice's farm") ~= nil, "Bob can't use Alice's shop")
+local notesBefore = #Remotes.Notify.fired
+useStation(bob, plots.Plot1, "Hive")
+check(#Remotes.Notify.fired == notesBefore, "Alice's hive plate ignores Bob")
+useStation(alice, plots.Plot1, "Hive")
+check(#Remotes.Notify.fired > notesBefore and string.find(lastNote(alice), "Alice's farm") == nil, "Alice can use her own hive plate")
 
 -- Leaving frees the plot and clears temporary objects
 local junk = M.Instance.new("Part")

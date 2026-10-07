@@ -98,7 +98,7 @@ local alice = M.newPlayer(game, 1001, "Alice")
 alice.spawnCharacter()
 local plot1 = plots.Plot1
 local s = FarmService.GetState(alice)
-check(plot1:GetAttribute("RoyalJelly") == 0 and plot1:GetAttribute("CanRebirth") == false, "no jelly, can't rebirth yet")
+check(alice:GetAttribute("Rebirths") == 0 and alice:GetAttribute("RebirthCost") == 500, "no rebirths yet; first costs $500")
 
 -- eggs: refused without cash, then hatch a scripted result
 atShop(alice, plot1)
@@ -151,39 +151,33 @@ check(shinyM and shinyM:GetAttribute("Shiny") == true, "shiny model on the farm"
 check(math.abs(plot1:GetAttribute("ProductionRate") - (VariantBees.Get(rareId).HoneyPerSecond + 0.5 * 1.5)) < 1e-9, "production: rare variant + shiny clover (x1.5)")
 check(has(plot1:GetAttribute("Discovered"), "Clover*"), "shiny discovery tracked")
 
--- rebirth: refused without a Royal, then works
+-- rebirth: costs cash ($500 first), x1.75 production per rebirth, egg bees survive
 Remotes.ReturnToFarm.OnServerEvent:Fire(alice)
+s.Cash = 100
 Remotes.RebirthAction.OnServerEvent:Fire(alice)
-check(plot1:GetAttribute("RoyalJelly") == 0 and has(lastNote(alice), "need a Royal Bee"), "rebirth refused without a Royal Bee")
-s:AddBee("Royal")
+check(alice:GetAttribute("Rebirths") == 0 and has(lastNote(alice), "need $500"), "rebirth refused without $500")
+s.Cash = 5000
 Remotes.UpgradeAction.OnServerEvent:Fire(alice, "HiveStorage")
 FarmService.Tick(0.01)
-check(plot1:GetAttribute("CanRebirth") == true, "CanRebirth flips on with a Royal Bee")
-local cashBeforeRebirth = s.Cash
+check(alice:GetAttribute("RebirthCost") == 500, "rebirth cost shown as $500")
 Remotes.RebirthAction.OnServerEvent:Fire(alice)
-check(plot1:GetAttribute("RoyalJelly") == 1 and plot1:GetAttribute("Rebirths") == 1, "rebirth grants 1 jelly")
-check(alice:GetAttribute("Cash") == 25 and cashBeforeRebirth > 25, "cash reset to $25")
+check(alice:GetAttribute("Rebirths") == 1 and math.abs(alice:GetAttribute("RebirthMultiplier") - 1.75) < 1e-9, "rebirth counted; production x1.75")
+check(alice:GetAttribute("Cash") == 25, "cash reset to $25")
 check(plot1:GetAttribute("HiveCapacity") == 50, "upgrades reset")
 local afterRb = bees(plot1)
 check(#afterRb == 2 and afterRb[1].Key == "V" .. rareId and afterRb[2].Key == "Starter", "egg bee kept; ladder bees replaced by one Starter")
-check(plot1.Temp:FindFirstChild("Bee" .. shinyKey.Id) == nil and plot1.Temp:FindFirstChild("Bee" .. list[2].Id) ~= nil, "shiny model removed, variant model kept")
+check(plot1.Temp:FindFirstChild("Bee" .. shinyKey.Id) == nil and plot1.Temp:FindFirstChild("Bee" .. list[2].Id) ~= nil, "shiny model removed, variant model kept (respawned)")
 check(plot1.Temp.Upgrades:FindFirstChild("MiniHive") == nil, "upgrade visuals reset")
-check(math.abs(plot1:GetAttribute("ProductionRate") - (VariantBees.Get(rareId).HoneyPerSecond + 0.2) * 1.25) < 1e-6, "all bees make x1.25 after rebirth")
+check(math.abs(plot1:GetAttribute("ProductionRate") - (VariantBees.Get(rareId).HoneyPerSecond + 0.2) * 1.75) < 1e-6, "all bees make x1.75 after rebirth")
 check(has(lastNote(alice), "Rebirth 1"), "rebirth message")
-check(has(plot1:GetAttribute("Discovered"), "Royal") and has(plot1:GetAttribute("Discovered"), "Clover*"), "collection survives rebirth")
-
--- off-plot rebirth refused
-s:AddBee("Royal")
-FarmService.Tick(0.01)
-alice.Character:PivotTo(M.CFrame.new(0, 3, 0))
-Remotes.RebirthAction.OnServerEvent:Fire(alice)
-check(plot1:GetAttribute("RoyalJelly") == 1, "rebirth from the village is refused")
+check(has(plot1:GetAttribute("Discovered"), "Clover*"), "collection survives rebirth")
+check(alice:GetAttribute("RebirthCost") == 900, "next rebirth costs $900")
 
 -- saved and restored
 M.removePlayer(game, alice)
 local saved = M.datastore.data.player_1001
-check(saved.RoyalJelly == 1 and saved.Bees[1].Variant == rareId, "jelly and egg bee saved")
+check(saved.Rebirths == 1 and saved.Bees[1].Variant == rareId, "rebirths and egg bee saved")
 local alice2 = M.newPlayer(game, 1001, "Alice")
 alice2.spawnCharacter()
-check(plot1:GetAttribute("RoyalJelly") == 1 and bees(plot1)[1].Key == "V" .. rareId and plot1.Temp:FindFirstChild("Bee" .. list[2].Id) ~= nil, "restored: jelly, egg bee and its model")
+check(alice2:GetAttribute("Rebirths") == 1 and bees(plot1)[1].Key == "V" .. rareId and plot1.Temp:FindFirstChild("Bee" .. list[2].Id) ~= nil, "restored: rebirths, egg bee and its model")
 check(has(plot1:GetAttribute("Discovered"), "Clover*"), "shiny discovery restored")

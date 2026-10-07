@@ -40,15 +40,13 @@ local function welcomes(p)
 	return out
 end
 local function use(player, plot, station)
-	local prompt = plot.Stations[station]:FindFirstChild("StationPrompt", true)
-	player.Character:PivotTo(prompt.Parent.CFrame + M.Vector3.new(0, 3, -4))
-	prompt.Triggered:Fire(player)
+	return useStation(player, plot, station)
 end
 local function saved(userId)
 	return ds.data["player_" .. userId]
 end
 
-check(SaveService.Available == true and ds.name == Config.Save.StoreName, "DataStore opened with the configured name")
+check(SaveService.Available == true and ds.names[Config.Save.StoreName] == true, "DataStore opened with the configured name")
 
 ------------------------------------------------------------------------------
 -- New player: nothing to load, plays, leaves -> saved
@@ -141,6 +139,7 @@ local good = saved(1001)
 ds.failNext = Config.Save.LoadRetries -- every retry fails
 local alice5 = M.newPlayer(game, 1001, "Alice")
 alice5.spawnCharacter()
+tick(8) -- the loader backs off 1 + 2 + 4 s between attempts before giving up
 local s5 = FarmService.GetState(alice5)
 check(s5 ~= nil and s5.Cash == 25 and #s5.Bees == 1, "after a failed load the player gets a temporary fresh farm")
 check(has(lastNote(alice5), "Couldn't load your save"), "player is told the load failed and nothing will be saved")
@@ -153,6 +152,7 @@ check(saved(1001).Cash == good.Cash and saved(1001).SavedAt == good.SavedAt, "te
 ds.failNext = 1
 local alice6 = M.newPlayer(game, 1001, "Alice")
 alice6.spawnCharacter()
+tick(1.5) -- one retry after a 1 s backoff
 check(FarmService.GetState(alice6).Cash == good.Cash, "one failed attempt then success: progress loads")
 M.removePlayer(game, alice6)
 
