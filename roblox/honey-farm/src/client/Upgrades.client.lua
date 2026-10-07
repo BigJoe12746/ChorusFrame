@@ -229,21 +229,19 @@ local function failFlash(button: TextButton, word: TextLabel, priceText: string)
 		word.Text = originalWord
 	end)
 end
--- Per-row logo art (each upgrade section gets its own image; add ids here as
--- new logos are uploaded, one per section).
-local ROW_ICONS: { [string]: string } = {
-	Backpack = "rbxassetid://124300905660565",
-}
+-- Per-row logo: the upgrade's Image from Config (its uploaded logo), or its emoji Icon
+-- until the logo has an asset id. Every row keeps the same icon slot so the names line up.
 for order, id in Config.Upgrades.Order do
 	local upgrade = Config.Upgrades[id]
 	local row, face = makeBase(list, "Upgrade_" .. id, Color3.fromRGB(90, 120, 170), UDim2.new(), UDim2.new(1, -8, 0, 94), 3)
 	row.LayoutOrder = order
-	local iconOffset = 12
-	if ROW_ICONS[id] then
+	local iconOffset = 64
+	local image: string = upgrade.Image or ""
+	if image ~= "" then
 		local rowIcon = Instance.new("ImageLabel")
 		rowIcon.Name = "RowIcon"
 		rowIcon.BackgroundTransparency = 1
-		rowIcon.Image = ROW_ICONS[id]
+		rowIcon.Image = image
 		rowIcon.ScaleType = Enum.ScaleType.Fit
 		rowIcon.Size = UDim2.fromOffset(44, 44)
 		rowIcon.Position = UDim2.fromOffset(12, 25)
@@ -252,7 +250,9 @@ for order, id in Config.Upgrades.Order do
 		local iconAspect = Instance.new("UIAspectRatioConstraint")
 		iconAspect.AspectRatio = 1
 		iconAspect.Parent = rowIcon
-		iconOffset = 64
+	else
+		local emoji = glyph(face, upgrade.Icon or "", UDim2.fromOffset(44, 44), UDim2.fromOffset(12, 25), 30)
+		emoji.Name = "RowIcon"
 	end
 	glyph(face, upgrade.Name, UDim2.new(0.6, -20 - iconOffset, 0, 25), UDim2.fromOffset(iconOffset, 11), 19, Enum.TextXAlignment.Left)
 	local level = glyph(face, "", UDim2.new(0.6, -20 - iconOffset, 0, 19), UDim2.fromOffset(iconOffset, 37), 13, Enum.TextXAlignment.Left)

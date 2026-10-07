@@ -340,9 +340,13 @@ end
 -- cost of going from level i to level i+1. Edit these two lists to rebalance.
 Config.Upgrades = {
 	Order = { "Production", "HoneyFlow", "HiveStorage", "Backpack", "BottlingSpeed", "BeeSlots" },
+	-- Image: the upgrade's logo (assets/ui/upgrades/<Id>.png). Upload each PNG in Studio
+	-- (Asset Manager → Import) and paste its id here as "rbxassetid://<id>"; an empty
+	-- string shows the emoji Icon instead.
 	Production = {
 		Name = "Bee Production",
 		Icon = "🐝",
+		Image = "", -- assets/ui/upgrades/Production.png (bee + honey drop + arrow)
 		Description = "Every bee makes more honey.",
 		Format = "x%.2g",
 		Levels = { 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6.5, 8 },
@@ -351,6 +355,7 @@ Config.Upgrades = {
 	HoneyFlow = {
 		Name = "Honey Flow",
 		Icon = "🍯",
+		Image = "", -- no logo yet
 		Description = "All honey production is boosted.",
 		Format = "x%.2g",
 		Levels = { 1, 1.15, 1.3, 1.5, 1.75, 2, 2.4, 3 },
@@ -359,6 +364,7 @@ Config.Upgrades = {
 	HiveStorage = {
 		Name = "Hive Storage",
 		Icon = "🏠",
+		Image = "", -- assets/ui/upgrades/HiveStorage.png (hive + arrow)
 		Description = "The hive holds more honey before the bees stop.",
 		Format = "%d honey",
 		Levels = { 50, 120, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000 },
@@ -367,6 +373,7 @@ Config.Upgrades = {
 	Backpack = {
 		Name = "Backpack",
 		Icon = "🎒",
+		Image = "rbxassetid://124300905660565", -- assets/ui/upgrades/Backpack.png (uploaded by Lemonade)
 		Description = "Carry more honey per trip.",
 		Format = "%d honey",
 		Levels = { 50, 100, 200, 400, 800, 1600, 3200, 6400, 12800 },
@@ -375,6 +382,7 @@ Config.Upgrades = {
 	BottlingSpeed = {
 		Name = "Bottling Speed",
 		Icon = "🍯",
+		Image = "", -- assets/ui/upgrades/BottlingSpeed.png (jar on conveyor + lightning)
 		Description = "The machine fills jars faster.",
 		Format = "%g jars/s",
 		Levels = { 1, 2, 3, 5, 8, 12, 20, 30, 50 },
@@ -383,6 +391,7 @@ Config.Upgrades = {
 	BeeSlots = {
 		Name = "Bee Slots",
 		Icon = "➕",
+		Image = "", -- assets/ui/upgrades/BeeSlots.png (two bees + plus)
 		Description = "Keep more bees on the farm at once.",
 		Format = "%d bees",
 		Levels = { 8, 10, 12, 14, 16, 18, 20 },
@@ -425,6 +434,10 @@ Config.Sounds = {
 	Deny = "rbxasset://sounds/electronicpingshort.wav", -- played at low pitch as the "can't afford" buzz
 	Buzz = "", -- e.g. "rbxassetid://..." (looping bee hum), left off until you pick one
 	BuzzVolume = 0.12,
+	-- Background music (assets/audio/Honey_Harvest.mp3). Upload it in Studio (Asset Manager →
+	-- Import, audio) and paste the id as "rbxassetid://<id>"; empty = no music.
+	Music = "",
+	MusicVolume = 0.35,
 }
 
 -- Robux cash shop. Amounts are the cash granted; Robux prices are what the player pays.

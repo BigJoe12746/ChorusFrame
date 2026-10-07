@@ -124,6 +124,7 @@ Things that need eyes, ears, a phone, or a real DataStore:
 1. Game Settings → Places → **Server size 6** (one plot each; a 7th player waits and is told so).
 2. Game Settings → Security → **Enable Studio Access to API Services** (for saving in Studio).
 3. Decide `Config.Save.StoreName`: changing it later wipes everyone's progress (useful for a pre‑launch reset).
-4. Create the five Developer Products (Creator Dashboard → Monetization) and paste their ids into `Config.Shop[*].ProductId`; leave 0 to keep the shop in SOON mode.
-5. Optionally paste a bee‑buzz asset into `Config.Sounds.Buzz`.
-6. Playtest the Studio list above with two clients, once on a phone‑sized viewport.
+4. Upload the five upgrade logos and the music track (Asset Manager → Import) and paste their ids into `Config.Upgrades.<Id>.Image` and `Config.Sounds.Music`; check each row shows its logo and the music loops at a comfortable volume.
+5. Create the five Developer Products (Creator Dashboard → Monetization) and paste their ids into `Config.Shop[*].ProductId`; leave 0 to keep the shop in SOON mode.
+6. Optionally paste a bee‑buzz asset into `Config.Sounds.Buzz`.
+7. Playtest the Studio list above with two clients, once on a phone‑sized viewport.

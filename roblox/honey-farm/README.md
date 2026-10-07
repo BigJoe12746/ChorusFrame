@@ -125,6 +125,8 @@ Press the **⬆ Upgrades** button (top‑right) or **U** anywhere on your own fa
 | 🍯 Bottling Speed | 1, 2, 3, 5, 8, 12, 20, 30, 50 jars/s | $100, 220, 450, 900, 1.8k, 3.6k, 7.2k, 14.4k |
 | ➕ Bee Slots | 8, 10, 12, 14, 16, 18, 20 bees | see `Config.Upgrades.BeeSlots` |
 
+**Logos and music.** Each upgrade row shows its own logo next to its name (`assets/ui/upgrades/<Id>.png`: Backpack, Bee Production, Bee Slots, Bottling Speed, Hive Storage), and `assets/audio/Honey_Harvest.mp3` is the background music. Roblox only serves images and audio as uploaded assets, so they need a one-time upload: in Studio open **View → Asset Manager → Import**, pick the five PNGs and the MP3 (audio uploads need an ID-verified account), wait for moderation, then right-click each asset → **Copy ID** and paste it into `Config.Upgrades.<Id>.Image` and `Config.Sounds.Music` as `rbxassetid://<id>`. The Backpack logo is already uploaded (Lemonade did it); rows without an id show their emoji until then, and the game stays silent until the music id is in. Honey Flow has no logo yet and keeps its 🍯. `Config.Sounds.MusicVolume` sets how loud the track is (it fades in over 3 s).
+
 All of it is the `Config.Upgrades` table in `src/shared/Config.lua`: `Levels` is the list of values (level 1 is free), `Prices[i]` is the cost of going from level i to i+1. Add or remove entries and the UI, server and visuals follow.
 
 **Visible on the farm** (`src/server/UpgradeVisuals.lua`, built into `Plot.Temp.Upgrades`): the first Hive Storage upgrade plants a **block hive tree** in the hive yard (cube trunk, cube branches, cube leaf clumps, all in the studded style), and every level after that adds a trunk block and a branch with a hive hanging from its tip on a rope, so the tree grows taller and busier with the farm. Levels also add a gold band to the main hive; each Bottling Speed level adds a honey tank with a pipe beside the machine; Production levels add glowing pollen orbs over the flower patch; Bee Slot levels add landing boards to the hive. Tree sizes live at the top of `UpgradeVisuals.lua` (`BLOCK`, `TRUNK_BASE_BLOCKS`, `BRANCH_REACH`, `ROPE`).
@@ -225,8 +227,9 @@ ReplicatedStorage.Props                         empty folder: drop Creator Store
 ReplicatedStorage.BeeModels                     empty folder: hand-made bee models (see above)
 src/client/   → StarterPlayerScripts.HoneyFarm FarmClient, FarmHud, StationLabels, BeeFlight, ConveyorJars, BeeShop, MergeEffects,
                                                 Upgrades, WelcomeBack, Tutorial, Effects, CollectionBook, BeeSounds, Hatching,
-                                                RebirthUI, RobuxShop, HivePlateFlash
+                                                RebirthUI, RobuxShop, HivePlateFlash, Music
 assets/BeeTemplate.rbxm → ReplicatedStorage.Assets.BeeTemplate
+assets/ui/upgrades/*.png, assets/audio/*.mp3   upload in Studio, paste ids into Config (see Phase 4)
 tests/                          offline tests (see below)
 ```
 
