@@ -35,6 +35,35 @@ fakeProp("Hive", 8, 30, 8, true).Parent = props -- way too big; must shrink to 1
 fakeProp("Cottage", 20, 40, 20, false).Parent = props
 -- no Tree / Fountain prop: those must fall back to the block versions
 
+-- Hand-made bee models: a store bee renamed "Clover Bee" (with a hidden script) and a "Panda Bee"
+local beeModels = ReplicatedStorage.BeeModels
+fakeProp("Clover Bee", 4, 9, 6, true).Parent = beeModels
+fakeProp("Panda Bee", 4, 9, 6, false).Parent = beeModels
+-- the generated bees need the template (same stand-in as phase3)
+local function makeTemplate()
+	local m = M.Instance.new("Model")
+	m.Name = "BeeTemplate"
+	local function part(parent, color, size, pos)
+		local p = M.Instance.new("Part")
+		p.Color = M.Color3.fromRGB(color[1], color[2], color[3])
+		p.Size = M.Vector3.new(size[1], size[2], size[3])
+		p.CFrame = M.CFrame.new(pos[1], pos[2], pos[3])
+		p.Parent = parent
+		return p
+	end
+	local Y, D, W, E = { 255, 255, 0 }, { 27, 42, 53 }, { 159, 243, 233 }, { 17, 17, 17 }
+	part(m, Y, { 7.77, 5.44, 3.89 }, { 0, 0, 0 })
+	part(m, D, { 7.77, 5.44, 1.55 }, { 0, 0, -2.7 })
+	part(m, Y, { 7.77, 5.44, 1.55 }, { 0, 0, -4.3 })
+	part(m, W, { 3.89, 0.78, 5.44 }, { -2, 3.1, -3 })
+	part(m, E, { 1.55, 3.11, 0.78 }, { -2.3, 0, 2.3 })
+	return m
+end
+local assets = M.Instance.new("Folder")
+assets.Name = "Assets"
+assets.Parent = ReplicatedStorage
+makeTemplate().Parent = assets
+
 boot()
 local map = workspace.HoneyFarmMap
 local plots = map.Plots
@@ -106,6 +135,24 @@ for _, c in map.Scenery:GetChildren() do
 end
 check(trees > 0 and trees == blockTrees, "trees fall back to the block version")
 check(village.HoneyFountain:FindFirstChild("HoneyPot") ~= nil, "fountain falls back to the block version")
+
+-- hand-made bee models replace generated ones, by name
+local BeeAppearance = req(ReplicatedStorage.HoneyFarm.BeeAppearance)
+local VariantBees = req(ReplicatedStorage.HoneyFarm.VariantBees)
+local Config = req(ReplicatedStorage.HoneyFarm.Config)
+local clover = BeeAppearance.Build(assets.BeeTemplate, "Clover")
+check(clover:GetAttribute("Custom") == "Clover Bee" and clover:GetAttribute("Tier") == "Clover" and clover:GetAttribute("Bee") == true, "Clover uses the hand-made model")
+check(scripts(clover) == 0, "hand-made bee's hidden script stripped")
+local _, cs = clover:GetBoundingBox()
+check(math.abs(cs.Y - 2.0 * Config.Bees.Clover.Scale / 0.35) < 0.05, ("hand-made bee scaled to its tier height (%.2f)"):format(cs.Y))
+check(clover:FindFirstChild("Accessory") == nil, "no generated accessory on a hand-made bee")
+local shinyClover = BeeAppearance.Build(assets.BeeTemplate, "Clover", true)
+check(shinyClover:GetAttribute("Custom") == "Clover Bee" and shinyClover:GetAttribute("Shiny") == true and shinyClover:FindFirstChildWhichIsA("Sparkles", true) ~= nil, "shiny falls back to the normal hand-made model and adds sparkles")
+local daisy = BeeAppearance.Build(assets.BeeTemplate, "Daisy")
+check(daisy:GetAttribute("Custom") == nil and daisy:FindFirstChild("Accessory") ~= nil, "tiers without a hand-made model are still generated")
+local panda = BeeAppearance.BuildVariant(assets.BeeTemplate, VariantBees.ByName["Panda Bee"])
+check(panda:GetAttribute("Custom") == "Panda Bee" and panda:GetAttribute("Tier") == "Variant" and panda:GetAttribute("Variant") == VariantBees.ByName["Panda Bee"].Id, "egg bee uses its hand-made model")
+check(beeModels["Clover Bee"]:FindFirstChild("FreeModelVirus", true) ~= nil, "original BeeModels entry untouched")
 
 -- upgrades: a MiniHive falls back to the Hive prop
 local alice = M.newPlayer(game, 1001, "Alice")

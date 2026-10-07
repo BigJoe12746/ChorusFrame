@@ -99,6 +99,7 @@ end
         """
 local remotes = M.Instance.new("Folder"); remotes.Name = "Remotes"; remotes.Parent = services.ReplicatedStorage
 local propsFolder = M.Instance.new("Folder"); propsFolder.Name = "Props"; propsFolder.Parent = services.ReplicatedStorage
+local beeModels = M.Instance.new("Folder"); beeModels.Name = "BeeModels"; beeModels.Parent = services.ReplicatedStorage
 """
     )
     for r in REMOTES:

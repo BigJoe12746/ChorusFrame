@@ -191,6 +191,10 @@ What the game does with each prop: clones it, **removes any scripts hidden insid
 
 Kinds you don't add keep the block version, so you can replace one thing at a time. The bees stay yours either way: they're built from your `BeeTemplate`.
 
+### Your own bee models (`ReplicatedStorage.BeeModels`)
+
+All bees are generated from `BeeTemplate` by recolouring parts and adding accessories. If you'd rather hand‑make them (a nicer bee from the Creator Store, edited in Studio or with Lemonade), drop models into **`ReplicatedStorage.BeeModels`** named after the bee they replace: `Starter Bee`, `Clover Bee`, … `Royal Bee`, optionally `Shiny Clover Bee`, or any egg bee's name (`Panda Bee`, `Galaxy Bee`, …). The game uses them as‑is: scripts stripped, anchored, scaled to the tier's size, flown with the model's pivot **front** as the head (select the model → Pivot tool → point the arrow out of its face). Names without a model keep the generated bee, so you can replace one at a time. `KeepSize = true` attribute skips the rescale.
+
 I can't browse the Creator Store from here, so I haven't picked specific models for you. The honest check once you've added some: do they sit on the ground, face the path, and look the right size? If one floats or sinks, its pivot is odd; set `KeepSize` or adjust `HeightScale` on that prop.
 
 ## Project layout (Rojo)

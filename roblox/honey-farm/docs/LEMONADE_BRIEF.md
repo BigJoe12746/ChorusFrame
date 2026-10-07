@@ -51,6 +51,8 @@ If `Workspace.HoneyFarmMap` already exists, the game keeps it and does **not** r
 2. **Decorate the baked map.** Bake it (command above), then add lamp posts, signs, crates, bushes, paths detail, terrain touches, lighting, skybox, anywhere in `Workspace.HoneyFarmMap`. Keep walkways clear.
 3. **Re-skin stations** by adding parts around them. Fine to add roofs, flags, barrels, honeycomb textures to the hive, pipes to the bottling machine, awnings to the stands.
 
+4. **Hand-made bees (optional).** Instead of recolouring the template, you may build full bee models and put them in `ReplicatedStorage.BeeModels`, named exactly: `Starter Bee`, `Clover Bee`, `Daisy Bee`, `Strawberry Bee`, `Panda Bee`, `Knight Bee`, `Crystal Bee`, `Storm Bee`, `Galaxy Bee`, `Royal Bee` (optionally `Shiny <name>`), or any egg bee name from `VariantBees`. Set each model's pivot so its front arrow points out of the bee's face. The game scales them automatically; no scripts inside.
+
 ## What to leave alone
 
 - **Do not edit, rename, move or delete scripts** under `ServerScriptService.HoneyFarm`, `ReplicatedStorage.HoneyFarm`, `StarterPlayerScripts.HoneyFarm`, or the `Remotes` folder. Code changes go through the other assistant (Claude), who maintains the source.

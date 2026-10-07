@@ -239,6 +239,58 @@ end
 -- Build
 ------------------------------------------------------------------------------
 
+------------------------------------------------------------------------------
+-- Hand-made bees: ReplicatedStorage.BeeModels
+-- Drop your own models there, named after what they replace: "Starter Bee", "Clover Bee", ...
+-- "Shiny Clover Bee" (optional), or an egg bee's name like "Panda Bee". They're used as-is
+-- instead of the generated bee: scripts stripped, anchored, scaled to the tier's size, and
+-- flown with their pivot's FRONT as the head (set the pivot in Studio so the arrow points out
+-- of the face). Any name without a model falls back to the generated bee.
+------------------------------------------------------------------------------
+
+local BASE_HEIGHT = 2.0 -- studs tall for a scale-0.35 (Starter) bee; tiers grow from there
+
+local function customModel(name: string): Model?
+	local folder = ReplicatedStorage:FindFirstChild("BeeModels")
+	local m = folder and folder:FindFirstChild(name)
+	return if m and m:IsA("Model") then m else nil
+end
+
+local function prepareCustom(source: Model, scale: number, name: string, shiny: boolean?): Model
+	local model = source:Clone()
+	for _, d in model:GetDescendants() do
+		if d:IsA("LuaSourceContainer") then
+			d:Destroy()
+		elseif d:IsA("BasePart") then
+			d.Anchored = true
+			d.CanCollide = false
+			d.CanQuery = false
+			d.CanTouch = false
+		end
+	end
+	-- normalise: pivot at the origin, scale to the tier's height, pivot at the box centre
+	model:PivotTo(CFrame.new())
+	local _, size = model:GetBoundingBox()
+	if size.Y > 0.01 and model:GetAttribute("KeepSize") ~= true then
+		model:ScaleTo(model:GetScale() * (BASE_HEIGHT * scale / 0.35) / size.Y)
+	end
+	local bcf = model:GetBoundingBox()
+	model.WorldPivot = CFrame.new(bcf.Position) -- keep the author's facing (pivot front = head)
+	if shiny then
+		local anyPart = model:FindFirstChildWhichIsA("BasePart", true)
+		if anyPart then
+			local sparkles = Instance.new("Sparkles")
+			sparkles.SparkleColor = hex("#FFF2B0")
+			sparkles.Parent = anyPart
+		end
+		model:SetAttribute("Shiny", true)
+	end
+	model.Name = name
+	model:SetAttribute("Bee", true)
+	model:SetAttribute("Custom", source.Name)
+	return model
+end
+
 -- Shared dressing: recolour by role, add the accessory, light, canonical pivot, scale.
 local function dress(template: Model, look: { [string]: any }, scale: number, name: string, shiny: boolean?): Model
 	BeeAppearance.PrepareTemplate(template)
@@ -328,13 +380,28 @@ end
 function BeeAppearance.Build(template: Model, tier: string, shiny: boolean?): Model
 	local info = Config.Bees[tier]
 	assert(info, "Unknown bee tier: " .. tostring(tier))
-	local model = dress(template, info.Look, info.Scale, (if shiny then "Shiny " else "") .. info.Name, shiny)
+	local displayName = (if shiny then "Shiny " else "") .. info.Name
+	local custom = (if shiny then customModel(displayName) else nil) or customModel(info.Name)
+	if custom then
+		local model = prepareCustom(custom, info.Scale, displayName, shiny)
+		model:SetAttribute("Tier", tier)
+		return model
+	end
+	local model = dress(template, info.Look, info.Scale, displayName, shiny)
 	model:SetAttribute("Tier", tier)
 	return model
 end
 
 -- Same for one of the 50 egg bees (VariantBees.List[id]).
 function BeeAppearance.BuildVariant(template: Model, variant: { [string]: any }): Model
+	local custom = customModel(variant.Name)
+	if custom then
+		local model = prepareCustom(custom, variant.Scale, variant.Name, false)
+		model:SetAttribute("Tier", "Variant")
+		model:SetAttribute("Variant", variant.Id)
+		model:SetAttribute("Rarity", variant.Rarity)
+		return model
+	end
 	local look = table.clone(variant.Look)
 	look.Sparkles = variant.Sparkles
 	local model = dress(template, look, variant.Scale, variant.Name, false)

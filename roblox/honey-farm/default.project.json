@@ -12,6 +12,9 @@
       "Props": {
         "$className": "Folder"
       },
+      "BeeModels": {
+        "$className": "Folder"
+      },
       "Remotes": {
         "$className": "Folder",
         "ReturnToFarm": { "$className": "RemoteEvent" },
