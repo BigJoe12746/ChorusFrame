@@ -43,7 +43,7 @@ end
 local function glyph(parent: Instance, value: string, size: UDim2, position: UDim2, textSize: number, alignment: Enum.TextXAlignment?): TextLabel
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.FredokaOne
+	label.Font = Config.UI.Font
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.TextSize = textSize
 	label.TextWrapped = true
@@ -113,7 +113,7 @@ local function makeButton(parent: Instance, name: string, label: string, color: 
 	button.Parent = parent
 	border(button, 4)
 	local face = buildFace(button, color, 0.9, math.max(40, math.floor(size.Y.Offset * 0.9 + 0.5)))
-	glyph(face, label, UDim2.new(0.9, 0, 0.62, 0), UDim2.fromScale(0.05, 0.14), 20, Enum.TextXAlignment.Center)
+	glyph(face, label, UDim2.new(0.92, 0, 0.62, 0), UDim2.fromScale(0.04, 0.12), Config.UI.ButtonSize, Enum.TextXAlignment.Center)
 	addPressFeedback(button)
 	return button
 end
@@ -222,7 +222,7 @@ basket.Parent = titleFace
 local basketAspect = Instance.new("UIAspectRatioConstraint")
 basketAspect.AspectRatio = 1
 basketAspect.Parent = basket
-glyph(titleFace, "BEE SHOP", UDim2.new(0.62, 0, 0.68, 0), UDim2.fromOffset(64, 8), 26)
+glyph(titleFace, "BEE SHOP", UDim2.new(0.62, 0, 0.68, 0), UDim2.fromOffset(64, 8), Config.UI.TitleSize)
 local close = makeButton(titleBar, "Close", "X", Color3.fromRGB(239, 28, 28), UDim2.new(1, -54, 0.5, -21), UDim2.fromOffset(42, 42))
 
 -- Left: buy

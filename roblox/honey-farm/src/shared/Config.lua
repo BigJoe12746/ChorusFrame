@@ -19,6 +19,26 @@ Config.ReturnCooldown = 2 -- seconds between "My Farm" teleports
 Config.ReturnHotkey = Enum.KeyCode.H
 
 -- Palette --------------------------------------------------------------------
+-- One type scale for the whole interface. Every panel title, launcher "tab", in-panel tab,
+-- action button, body line and hint reads these, so the UI uses one font and the same sizes
+-- everywhere. The launchers stack down the right edge in fixed slots.
+Config.UI = {
+	Font = Enum.Font.FredokaOne,
+	TitleSize = 26, -- panel title bars
+	ButtonSize = 22, -- launcher tabs, in-panel tabs, action buttons
+	BodySize = 16, -- descriptions and values
+	SmallSize = 14, -- hints, footnotes, key badges
+	Launcher = { Width = 180, Height = 48, Right = 14, Top = 12, Gap = 8 },
+	TabHeight = 44, -- tabs inside panels
+}
+function Config.UI.LauncherPosition(slot: number): UDim2
+	local l = Config.UI.Launcher
+	return UDim2.new(1, -l.Right, 0, l.Top + (slot - 1) * (l.Height + l.Gap))
+end
+function Config.UI.LauncherSize(): UDim2
+	return UDim2.fromOffset(Config.UI.Launcher.Width, Config.UI.Launcher.Height)
+end
+
 Config.Colors = {
 	Grass = Color3.fromRGB(110, 196, 84),
 	PlotGrass = Color3.fromRGB(126, 210, 94),

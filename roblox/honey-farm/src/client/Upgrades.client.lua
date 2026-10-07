@@ -26,7 +26,7 @@ end
 local function glyph(parent: Instance, value: string, size: UDim2, position: UDim2, textSize: number, alignment: Enum.TextXAlignment?)
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.FredokaOne
+	label.Font = Config.UI.Font
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.TextScaled = false
 	label.TextSize = textSize
@@ -92,7 +92,7 @@ local function makeButton(parent: Instance, name: string, label: string, color: 
 	button.Parent = parent
 	border(button, 4)
 	local face = buildFace(button, color, 0.9, math.max(40, math.floor(size.Y.Offset * 0.9 + 0.5)))
-	glyph(face, label, UDim2.new(0.92, 0, 0.62, 0), UDim2.new(0.04, 0, 0.12, 0), 17)
+	glyph(face, label, UDim2.new(0.92, 0, 0.62, 0), UDim2.new(0.04, 0, 0.12, 0), Config.UI.ButtonSize)
 	addPressFeedback(button)
 	return button
 end
@@ -110,7 +110,7 @@ local function makeBase(parent: Instance, name: string, color: Color3, position:
 	return base, face
 end
 
-local launcher = makeButton(gui, "UpgradeToggle", "UPGRADES", Color3.fromRGB(90, 190, 70), UDim2.new(1, -14, 0, 124), UDim2.fromOffset(180, 48))
+local launcher = makeButton(gui, "UpgradeToggle", "UPGRADES", Color3.fromRGB(90, 190, 70), Config.UI.LauncherPosition(3), Config.UI.LauncherSize())
 launcher.AnchorPoint = Vector2.new(1, 0)
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
@@ -138,7 +138,7 @@ titleBar.ZIndex = 2
 titleBar.Parent = panel
 border(titleBar, 4)
 local titleFace = buildFace(titleBar, Color3.fromRGB(35, 105, 48), 0.88, 78, true)
-glyph(titleFace, "FARM UPGRADES", UDim2.new(0.78, 0, 0.72, 0), UDim2.new(0.03, 0, 0.12, 0), 27, Enum.TextXAlignment.Left)
+glyph(titleFace, "FARM UPGRADES", UDim2.new(0.78, 0, 0.72, 0), UDim2.new(0.03, 0, 0.12, 0), Config.UI.TitleSize, Enum.TextXAlignment.Left)
 local close = makeButton(titleBar, "Close", "X", Color3.fromRGB(239, 28, 28), UDim2.new(1, -58, 0.5, -23), UDim2.fromOffset(46, 46))
 
 local coinIcon = Instance.new("ImageLabel")

@@ -85,7 +85,7 @@ local function banner(tier: string, isNew: boolean)
 	title.Size = UDim2.new(1, -20, 0, 40)
 	title.Position = UDim2.fromOffset(10, 8)
 	title.BackgroundTransparency = 1
-	title.Font = Enum.Font.FredokaOne
+	title.Font = Config.UI.Font
 	title.TextSize = 26
 	title.TextColor3 = C.Text
 	title.Text = if isNew then "✨ New bee discovered!" else "Merged!"
@@ -95,7 +95,7 @@ local function banner(tier: string, isNew: boolean)
 	body.Size = UDim2.new(1, -20, 0, 40)
 	body.Position = UDim2.fromOffset(10, 48)
 	body.BackgroundTransparency = 1
-	body.Font = Enum.Font.GothamBold
+	body.Font = Config.UI.Font
 	body.TextSize = 17
 	body.TextWrapped = true
 	body.TextColor3 = Color3.fromRGB(140, 100, 60)

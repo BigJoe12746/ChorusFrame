@@ -695,7 +695,7 @@ local function ownerSign(parent: Instance, cf: CFrame, accent: Color3)
 		sub.Size = UDim2.fromOffset(440, 60)
 		sub.Position = UDim2.fromOffset(205, 130)
 		sub.BackgroundTransparency = 1
-		sub.Font = Enum.Font.GothamBold
+		sub.Font = Enum.Font.FredokaOne
 		sub.TextScaled = true
 		sub.TextXAlignment = Enum.TextXAlignment.Left
 		sub.TextColor3 = Color3.fromRGB(140, 100, 60)

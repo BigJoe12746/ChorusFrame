@@ -114,7 +114,7 @@ local function card(name: string, rarity: string, isNew: boolean)
 	title.Size = UDim2.new(1, -20, 0, 40)
 	title.Position = UDim2.fromOffset(10, 8)
 	title.BackgroundTransparency = 1
-	title.Font = Enum.Font.FredokaOne
+	title.Font = Config.UI.Font
 	title.TextSize = 26
 	title.TextColor3 = C.Text
 	title.Text = if isNew then "🥚 New bee hatched!" else "🥚 Hatched!"
@@ -123,7 +123,7 @@ local function card(name: string, rarity: string, isNew: boolean)
 	body.Size = UDim2.new(1, -20, 0, 40)
 	body.Position = UDim2.fromOffset(10, 50)
 	body.BackgroundTransparency = 1
-	body.Font = Enum.Font.GothamBold
+	body.Font = Config.UI.Font
 	body.TextSize = 18
 	body.TextColor3 = color
 	body.Text = if rarity == "Ladder" then name else ("%s  ·  %s"):format(name, rarity)

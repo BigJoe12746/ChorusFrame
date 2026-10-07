@@ -33,7 +33,7 @@ local function makeText(parent: Instance, name: string, value: string, size: UDi
 	local label = Instance.new("TextLabel")
 	label.Name = name
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.FredokaOne
+	label.Font = Config.UI.Font
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.TextSize = textSize
 	label.TextWrapped = true
@@ -87,7 +87,7 @@ local function makeButton(parent: Instance, name: string, value: string, color: 
 	button.Parent = parent
 	border(button, 4)
 	local face = buildFace(button, color, 0.9, math.max(40, math.floor(size.Y.Offset * 0.9 + 0.5)))
-	makeText(face, "Label", value, UDim2.new(0.92, 0, 0.62, 0), UDim2.fromScale(0.04, 0.12), 17, face.ZIndex + 2, Enum.TextXAlignment.Center)
+	makeText(face, "Label", value, UDim2.new(0.92, 0, 0.62, 0), UDim2.fromScale(0.04, 0.12), Config.UI.ButtonSize, face.ZIndex + 2, Enum.TextXAlignment.Center)
 	local scale = Instance.new("UIScale")
 	scale.Parent = button
 	local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
@@ -101,7 +101,7 @@ local function makeButton(parent: Instance, name: string, value: string, color: 
 	return button
 end
 
-local toggle = makeButton(gui, "BeeIndexButton", "BEES", Color3.fromRGB(155, 92, 215), UDim2.new(1, -14, 0, 12), UDim2.fromOffset(180, 48))
+local toggle = makeButton(gui, "BeeIndexButton", "BEES", Color3.fromRGB(155, 92, 215), Config.UI.LauncherPosition(1), Config.UI.LauncherSize())
 toggle.AnchorPoint = Vector2.new(1, 0)
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
@@ -129,7 +129,7 @@ titleBar.ZIndex = 3
 titleBar.Parent = panel
 border(titleBar, 4)
 local titleFace = buildFace(titleBar, Color3.fromRGB(112, 67, 157), 0.88, 76, true)
-makeText(titleFace, "Title", "BEE COLLECTION", UDim2.new(0.74, 0, 0.7, 0), UDim2.new(0, 18, 0.12, 0), 25, 6)
+makeText(titleFace, "Title", "BEE COLLECTION", UDim2.new(0.74, 0, 0.7, 0), UDim2.new(0, 18, 0.12, 0), Config.UI.TitleSize, 6)
 local close = makeButton(titleBar, "Close", "X", Color3.fromRGB(239, 28, 28), UDim2.new(1, -54, 0.5, -22), UDim2.fromOffset(46, 44))
 
 local summary = Instance.new("Frame")
@@ -147,13 +147,13 @@ local economics = makeText(summaryFace, "Economy", "Rebirth x1.00  ·  next x1.7
 local recommendation = makeText(summaryFace, "NextSpend", "", UDim2.new(0.48, -18, 0, 45), UDim2.new(0.51, 6, 0, 7), 14, 6)
 
 -- Tabs: merge ladder | egg bees
-local tabTiers = makeButton(panel, "TabTiers", "MERGE LADDER", Color3.fromRGB(155, 92, 215), UDim2.fromOffset(14, 138), UDim2.fromOffset(190, 34))
-local tabVariants = makeButton(panel, "TabEggs", "EGG BEES", Color3.fromRGB(110, 110, 120), UDim2.fromOffset(212, 138), UDim2.fromOffset(190, 34))
+local tabTiers = makeButton(panel, "TabTiers", "MERGE LADDER", Color3.fromRGB(155, 92, 215), UDim2.fromOffset(14, 138), UDim2.fromOffset(190, Config.UI.TabHeight))
+local tabVariants = makeButton(panel, "TabEggs", "EGG BEES", Color3.fromRGB(110, 110, 120), UDim2.fromOffset(212, 138), UDim2.fromOffset(190, Config.UI.TabHeight))
 
 local grid = Instance.new("ScrollingFrame")
 grid.Name = "BeeGrid"
-grid.Position = UDim2.fromOffset(14, 178)
-grid.Size = UDim2.new(1, -28, 1, -192)
+grid.Position = UDim2.fromOffset(14, 138 + Config.UI.TabHeight + 10)
+grid.Size = UDim2.new(1, -28, 1, -(138 + Config.UI.TabHeight + 24))
 grid.BackgroundColor3 = Color3.fromRGB(34, 24, 47)
 grid.BackgroundTransparency = 0.12
 grid.BorderSizePixel = 0

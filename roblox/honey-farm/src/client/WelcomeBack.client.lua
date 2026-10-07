@@ -64,7 +64,7 @@ WelcomeRemote.OnClientEvent:Connect(function(w: { [string]: any })
 		l.Size = UDim2.new(1, 0, 0, 0)
 		l.AutomaticSize = Enum.AutomaticSize.Y
 		l.BackgroundTransparency = 1
-		l.Font = font or Enum.Font.GothamBold
+		l.Font = font or Config.UI.Font
 		l.TextSize = size
 		l.TextWrapped = true
 		l.TextColor3 = color or C.Text
@@ -75,9 +75,9 @@ WelcomeRemote.OnClientEvent:Connect(function(w: { [string]: any })
 	end
 
 	local labels = {
-		line("🐝 Welcome back!", 30, C.Text, Enum.Font.FredokaOne),
+		line("🐝 Welcome back!", 30, C.Text, Config.UI.Font),
 		line(("You were away for %s."):format(duration(w.Away or 0)), 18, Color3.fromRGB(140, 100, 60)),
-		line(("Your bees made %d 🍯"):format(w.Credited or 0), 36, C.DeepHoney, Enum.Font.FredokaOne),
+		line(("Your bees made %d 🍯"):format(w.Credited or 0), 36, C.DeepHoney, Config.UI.Font),
 	}
 	if w.HiveFull then
 		table.insert(labels, line(("The hive filled up (%d / %d). Upgrade Hive Storage to keep more!"):format(w.HiveStored or 0, w.HiveCapacity or 0), 15, Color3.fromRGB(190, 90, 60)))

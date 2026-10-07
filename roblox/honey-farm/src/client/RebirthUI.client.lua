@@ -32,13 +32,13 @@ local function outline(parent, thickness)
     stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     stroke.Parent = parent
 end
-local function glyph(parent, text, size, position, thickness)
+local function glyph(parent, text, size, position, textSize)
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
     label.Text = text
     label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.Font = Enum.Font.FredokaOne
-    label.TextScaled = true
+    label.Font = config.UI.Font
+    label.TextSize = textSize or config.UI.BodySize
     label.TextWrapped = true
     label.Position = position
     label.Size = size
@@ -46,7 +46,7 @@ local function glyph(parent, text, size, position, thickness)
     label.Parent = parent
     local stroke = Instance.new("UIStroke")
     stroke.Color = Color3.new(0, 0, 0)
-    stroke.Thickness = thickness or 3
+    stroke.Thickness = if (textSize or config.UI.BodySize) >= 24 then 3 else 2.5
     stroke.Parent = label
     return label
 end
@@ -81,7 +81,7 @@ local function makeButton(parent, name, text, color, position, size)
     pattern.Size = UDim2.fromScale(1, 1)
     pattern.ZIndex = 7
     pattern.Parent = face
-    glyph(face, text, UDim2.new(0.92, 0, 0.62, 0), UDim2.fromScale(0.04, 0.16), 2.5)
+    glyph(face, text, UDim2.new(0.92, 0, 0.62, 0), UDim2.fromScale(0.04, 0.12), config.UI.ButtonSize)
     addPressFeedback(base)
     return base
 end
@@ -89,7 +89,7 @@ local function money(value)
     return "$" .. config.Progression.FormattedNumber(value)
 end
 
-local launcher = makeButton(gui, "RebirthButton", "REBIRTH", Color3.fromRGB(245, 165, 35), UDim2.new(1, -14, 0, 68), UDim2.fromOffset(180, 48))
+local launcher = makeButton(gui, "RebirthButton", "REBIRTH", Color3.fromRGB(245, 165, 35), config.UI.LauncherPosition(2), config.UI.LauncherSize())
 launcher.AnchorPoint = Vector2.new(1, 0)
 local panel = Instance.new("Frame")
 panel.Name = "Dialog"
@@ -124,7 +124,7 @@ titlePattern.TileSize = UDim2.fromOffset(58, 58)
 titlePattern.Size = UDim2.fromScale(1, 1)
 titlePattern.ZIndex = 4
 titlePattern.Parent = title
-glyph(title, "HONEY FARM REBIRTH", UDim2.new(0.78, 0, 0.7, 0), UDim2.new(0, 18, 0.15, 0), 3)
+glyph(title, "HONEY FARM REBIRTH", UDim2.new(0.78, 0, 0.7, 0), UDim2.new(0, 18, 0.15, 0), config.UI.TitleSize)
 local close = makeButton(title, "Close", "X", Color3.fromRGB(240, 35, 35), UDim2.new(1, -58, 0.18, 0), UDim2.fromOffset(46, 46))
 local content = Instance.new("Frame")
 content.Name = "Content"
@@ -133,11 +133,11 @@ content.Position = UDim2.new(0.06, 0, 0.18, 0)
 content.Size = UDim2.new(0.88, 0, 0.76, 0)
 content.ZIndex = 3
 content.Parent = panel
-local _info = glyph(content, ("Reset farm progress for a permanent x%.2f honey-production bonus per rebirth. Lifetime stats and bee discoveries stay."):format(config.Rebirth.ProductionMultiplier), UDim2.new(0.88, 0, 0.18, 0), UDim2.new(0.06, 0, 0.08, 0), 3)
-local price = glyph(content, "Current cost: loading...", UDim2.new(0.88, 0, 0.11, 0), UDim2.new(0.06, 0, 0.32, 0), 3)
-local boost = glyph(content, "Next rebirth increases production", UDim2.new(0.88, 0, 0.12, 0), UDim2.new(0.06, 0, 0.47, 0), 3)
-local timeHint = glyph(content, "Suggested pace: about 2 hours per rebirth.", UDim2.new(0.88, 0, 0.1, 0), UDim2.new(0.06, 0, 0.60, 0), 2.5)
-local _warning = glyph(content, "Resets cash, bees, upgrades, stored honey, jars, and unclaimed cash.", UDim2.new(0.88, 0, 0.1, 0), UDim2.new(0.06, 0, 0.71, 0), 2.5)
+local _info = glyph(content, ("Reset farm progress for a permanent x%.2f honey-production bonus per rebirth. Lifetime stats and bee discoveries stay."):format(config.Rebirth.ProductionMultiplier), UDim2.new(0.88, 0, 0.18, 0), UDim2.new(0.06, 0, 0.08, 0), config.UI.BodySize)
+local price = glyph(content, "Current cost: loading...", UDim2.new(0.88, 0, 0.11, 0), UDim2.new(0.06, 0, 0.32, 0), config.UI.BodySize)
+local boost = glyph(content, "Next rebirth increases production", UDim2.new(0.88, 0, 0.12, 0), UDim2.new(0.06, 0, 0.47, 0), config.UI.BodySize)
+local timeHint = glyph(content, "Suggested pace: about 2 hours per rebirth.", UDim2.new(0.88, 0, 0.1, 0), UDim2.new(0.06, 0, 0.60, 0), config.UI.SmallSize)
+local _warning = glyph(content, "Resets cash, bees, upgrades, stored honey, jars, and unclaimed cash.", UDim2.new(0.88, 0, 0.1, 0), UDim2.new(0.06, 0, 0.71, 0), config.UI.SmallSize)
 local confirm = makeButton(content, "ConfirmButton", "REBIRTH", Color3.fromRGB(45, 190, 65), UDim2.new(0.48, 0, 0.91, 0), UDim2.new(0.32, 0, 0, 48))
 confirm.AnchorPoint = Vector2.new(1, 0.5)
 local cancel = makeButton(content, "CancelButton", "CANCEL", Color3.fromRGB(210, 130, 35), UDim2.new(0.52, 0, 0.91, 0), UDim2.new(0.32, 0, 0, 48))

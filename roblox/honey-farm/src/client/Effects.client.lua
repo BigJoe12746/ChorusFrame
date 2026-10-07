@@ -85,7 +85,7 @@ local function floatingText(position: Vector3, text: string, color: Color3, size
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.FredokaOne
+	label.Font = Config.UI.Font
 	label.TextScaled = true
 	label.TextColor3 = color
 	label.TextStrokeColor3 = C.Text

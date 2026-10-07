@@ -232,7 +232,7 @@ local function glyph(parent: GuiObject, text: string, size: UDim2, position: UDi
 	label.BackgroundTransparency = 1
 	label.Size = size
 	label.Position = position
-	label.Font = Enum.Font.FredokaOne
+	label.Font = Config.UI.Font
 	label.TextSize = textSize
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.Text = text
@@ -251,8 +251,8 @@ launcher.Name = "ShopButton"
 launcher.Text = ""
 launcher.AutoButtonColor = false
 launcher.AnchorPoint = Vector2.new(1, 0)
-launcher.Position = UDim2.new(1, -14, 0, 252)
-launcher.Size = UDim2.fromOffset(180, 48)
+launcher.Position = Config.UI.LauncherPosition(4)
+launcher.Size = Config.UI.LauncherSize()
 launcher.BackgroundColor3 = Color3.fromRGB(20, 110, 40)
 launcher.BorderSizePixel = 0
 launcher.Parent = gui
@@ -272,7 +272,7 @@ launcherGradient.Color = ColorSequence.new({
 })
 launcherGradient.Parent = launcherFace
 studs(launcherFace, 43)
-glyph(launcherFace, "SHOP", UDim2.new(1, 0, 0.62, 0), UDim2.fromScale(0, 0.16), 26).TextXAlignment = Enum.TextXAlignment.Center
+glyph(launcherFace, "SHOP", UDim2.new(0.92, 0, 0.62, 0), UDim2.fromScale(0.04, 0.12), Config.UI.ButtonSize).TextXAlignment = Enum.TextXAlignment.Center
 addPressFeedback(launcher)
 
 -- Panel
@@ -314,7 +314,7 @@ basket.Parent = titleFace
 local basketAspect = Instance.new("UIAspectRatioConstraint")
 basketAspect.AspectRatio = 1
 basketAspect.Parent = basket
-local titleLabel = glyph(titleFace, "CASH SHOP", UDim2.new(0.6, 0, 0.7, 0), UDim2.new(0, 72, 0.12, 0), 30)
+local titleLabel = glyph(titleFace, "CASH SHOP", UDim2.new(0.6, 0, 0.7, 0), UDim2.new(0, 72, 0.12, 0), Config.UI.TitleSize)
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 
 local close = Instance.new("TextButton")
@@ -342,7 +342,7 @@ local closeGradient = Instance.new("UIGradient")
 closeGradient.Rotation = 90
 closeGradient.Color = ColorSequence.new(Color3.fromRGB(255, 130, 130), Color3.fromRGB(239, 28, 28))
 closeGradient.Parent = closeFace
-local closeX = glyph(closeFace, "X", UDim2.fromScale(0.7, 0.7), UDim2.fromScale(0.15, 0.12), 24)
+local closeX = glyph(closeFace, "X", UDim2.fromScale(0.7, 0.7), UDim2.fromScale(0.15, 0.12), Config.UI.ButtonSize)
 closeX.TextXAlignment = Enum.TextXAlignment.Center
 addPressFeedback(close)
 
@@ -450,7 +450,7 @@ for index, offer in Config.Shop do
 	local robuxAspect = Instance.new("UIAspectRatioConstraint")
 	robuxAspect.AspectRatio = 1
 	robuxAspect.Parent = robuxIcon
-	local priceLabel = glyph(buyRow, tostring(offer.Robux), UDim2.new(0.5, 0, 1, 0), UDim2.fromScale(0, 0), 22)
+	local priceLabel = glyph(buyRow, tostring(offer.Robux), UDim2.new(0.5, 0, 1, 0), UDim2.fromScale(0, 0), Config.UI.ButtonSize)
 	priceLabel.TextXAlignment = Enum.TextXAlignment.Left
 	addPressFeedback(buy)
 
