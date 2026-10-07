@@ -13,4 +13,4 @@ RunService.Heartbeat:Connect(function(dt)
 	FarmService.Tick(dt)
 end)
 
-print("[HoneyFarm] ready: map, honey loop, shop + merging, upgrades, saving, introduction, flood protection")
+print("[HoneyFarm] ready: map, honey loop, shop + merging, upgrades, saving, introduction, flood protection, eggs + rebirth")

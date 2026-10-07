@@ -117,7 +117,7 @@ check(M.datastore.data["player_1001"].TutorialStep == 6, "tutorial progress is s
 local alice2 = M.newPlayer(game, 1001, "Alice")
 alice2.spawnCharacter()
 check(alice2:GetAttribute("TutorialStep") == 6, "tutorial progress is restored on rejoin")
-check(plot1:GetAttribute("Discovered") == "Starter,Clover", "collection book data: Starter and Clover discovered")
+check(has(plot1:GetAttribute("Discovered"), "Starter") and has(plot1:GetAttribute("Discovered"), "Clover"), "collection book data: Starter and Clover discovered")
 M.removePlayer(game, alice2)
 
 -- a second player has their own independent introduction

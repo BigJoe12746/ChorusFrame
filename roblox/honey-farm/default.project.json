@@ -22,7 +22,9 @@
         "BeeMerged": { "$className": "RemoteEvent" },
         "UpgradeAction": { "$className": "RemoteEvent" },
         "WelcomeBack": { "$className": "RemoteEvent" },
-        "Feedback": { "$className": "RemoteEvent" }
+        "Feedback": { "$className": "RemoteEvent" },
+        "EggHatched": { "$className": "RemoteEvent" },
+        "RebirthAction": { "$className": "RemoteEvent" }
       }
     },
     "ServerScriptService": {

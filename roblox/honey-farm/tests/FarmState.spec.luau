@@ -297,4 +297,115 @@ local tBack = FarmState.Deserialize(tData, ECO, BEES, ORDER, UPG)
 check(tBack.TutorialStep == 3, "tutorial step is restored")
 check(FarmState.Deserialize({ TutorialStep = -4 }, ECO, BEES, ORDER, UPG).TutorialStep == 1, "bad tutorial step is clamped")
 
+-- EGGS, SHINY, REBIRTH ------------------------------------------------------------
+local VARIANTS = {
+	List = {
+		{ Id = 1, Name = "Honey Bee", Rarity = "Common", HoneyPerSecond = 0.6 },
+		{ Id = 2, Name = "Sky Bee", Rarity = "Common", HoneyPerSecond = 0.66 },
+		{ Id = 3, Name = "Ruby Bee", Rarity = "Rare", HoneyPerSecond = 12 },
+		{ Id = 4, Name = "Cosmic Bee", Rarity = "Mythic", HoneyPerSecond = 900 },
+	},
+	ByRarity = { Common = { 1, 2 }, Rare = { 3 }, Mythic = { 4 } },
+}
+function VARIANTS.Get(id)
+	return VARIANTS.List[id]
+end
+local EGGS = {
+	Order = { "Basic", "Royal" },
+	Basic = { Name = "Basic Egg", Price = 100, Odds = { { Kind = "Starter", Weight = 60 }, { Kind = "Common", Weight = 30 }, { Kind = "Rare", Weight = 10 } } },
+	Royal = { Name = "Royal Egg", Price = 1000, Odds = { { Kind = "Royal", Weight = 50 }, { Kind = "Mythic", Weight = 50 } } },
+}
+local REBIRTH = { RequiresTier = "Royal", JellyPerRebirth = 1, BonusPerJelly = 0.25, KeepVariants = true }
+local X = { Variants = VARIANTS, Eggs = EGGS, Rebirth = REBIRTH, ShinyChance = 0.05, ShinyMultiplier = 1.5 }
+
+local e = FarmState.new(ECO, BEES, ORDER, UPG, X)
+local odds = e:EggOdds("Basic")
+check(#odds == 3 and math.abs(odds[1].Chance - 0.6) < 1e-9 and math.abs(odds[3].Chance - 0.1) < 1e-9, "egg odds are weights normalised to 100%")
+check(select(2, e:CanBuyEgg("Basic")) == "NoCash", "can't afford an egg with $25")
+check(select(2, e:CanBuyEgg("Dragon")) == "Unknown", "unknown egg refused")
+e.Cash = 10000
+-- roll1 picks the kind by weight: 0.0-0.6 Starter, 0.6-0.9 Common, 0.9-1.0 Rare
+local b1, new1, kind1 = e:HatchEgg("Basic", 0.3, 0)
+check(b1 ~= nil and b1.Tier == "Starter" and kind1 == "Starter" and e.Cash == 9900, "roll 0.3 -> Starter Bee, $100 charged")
+check(new1 == false, "a second Starter isn't a discovery")
+local b2, new2, kind2 = e:HatchEgg("Basic", 0.7, 0.9)
+check(b2 ~= nil and b2.Tier == "Variant" and b2.Variant == 2 and kind2 == "Common" and new2 == true, "roll 0.7 / 0.9 -> Common rarity, second Common variant (Sky Bee), new")
+local b3 = e:HatchEgg("Basic", 0.95, 0)
+check(b3 ~= nil and b3.Variant == 3, "roll 0.95 -> Rare -> Ruby Bee")
+check(e:BeeName(b3) == "Ruby Bee" and e:BeeRate(b3) == 12, "variant name and rate")
+check(FarmState.BeeKey(b2) == "V2" and e.Discovered.V2 == true and e.Discovered.V3 == true, "variants are tracked as V<id> in the collection")
+check(e.EggsHatched == 3, "egg counter")
+local b4 = e:HatchEgg("Basic", 1.0, 1.0)
+check(b4 ~= nil and b4.Variant == 3, "roll 1.0 clamps to the last kind / last variant, never nil")
+-- variants can't merge
+check(select(2, e:MergePreview(b2.Id, b3.Id)) == "Variant", "two variants can't merge")
+check(select(2, e:MergePreview(b1.Id, b2.Id)) == "Variant", "ladder + variant can't merge")
+-- slots: eggs need a free slot
+while e:FreeSlots() > 0 do
+	e:AddBee("Starter")
+end
+check(select(2, e:CanBuyEgg("Basic")) == "NoSlots" and e:HatchEgg("Basic", 0, 0) == nil, "no slots -> no egg, no charge")
+check(e.Cash == 9600, "exactly 4 eggs charged")
+
+-- shiny merges
+local sh2 = FarmState.new(ECO, BEES, ORDER, UPG, X)
+sh2.Cash = 100000
+sh2:BuyBee()
+local normal = sh2:MergeBees(1, 2, 0.5) -- roll above 5%
+check(normal ~= nil and not normal.Shiny and FarmState.BeeKey(normal) == "Clover", "roll 0.5 -> normal Clover")
+sh2:AddBee("Starter")
+sh2:AddBee("Starter")
+local ids2 = { sh2.Bees[2].Id, sh2.Bees[3].Id }
+local shiny, shinyNew = sh2:MergeBees(ids2[1], ids2[2], 0.01) -- roll under 5%
+check(shiny ~= nil and shiny.Shiny == true and FarmState.BeeKey(shiny) == "Clover*", "roll 0.01 -> shiny Clover")
+check(shinyNew == true and sh2.Discovered["Clover*"] == true and sh2.Discovered.Clover == true, "shiny counts as its own discovery and as the tier")
+check(math.abs(sh2:BeeRate(shiny) - 0.5 * 1.5) < 1e-9 and sh2:BeeName(shiny) == "Shiny Clover Bee", "shiny makes 1.5x and is named")
+local daisyS = sh2:MergeBees(normal.Id, shiny.Id, 0.99) -- one shiny parent, bad roll
+check(daisyS ~= nil and daisyS.Tier == "Daisy" and daisyS.Shiny == true, "a shiny parent always gives a shiny child")
+check(sh2:MergeBees(99, 98) == nil, "merge without a roll still works for bad ids")
+
+-- rebirth
+local rb = FarmState.new(ECO, BEES, ORDER, UPG, X)
+check(select(2, rb:CanRebirth()) == "NeedsTier" and rb:Rebirth() == nil, "can't rebirth without a Royal Bee")
+rb.Cash = 5000
+rb:BuyUpgrade("HiveStorage")
+rb.HiveStored = 40
+rb.Carried = 10
+rb.Unclaimed = 55
+local keep = rb:AddBee("Variant", 4) -- Cosmic Bee stays
+rb:AddBee("Royal")
+local rateBefore = rb:ProductionRate()
+check(rb:CanRebirth() == true, "owning a Royal Bee unlocks rebirth")
+local jelly = rb:Rebirth()
+check(jelly == 1 and rb.RoyalJelly == 1 and rb.Rebirths == 1, "rebirth grants 1 Royal Jelly")
+check(rb.Cash == 25 and rb.HiveStored == 0 and rb.Carried == 0 and rb.Unclaimed == 0 and rb.BottlingQueue == 0, "cash and honey reset")
+check(rb:UpgradeLevel("HiveStorage") == 1 and rb.HiveCapacity == 50, "upgrades reset")
+check(#rb.Bees == 2 and rb.Bees[1].Id == keep.Id and rb.Bees[1].Variant == 4 and rb.Bees[2].Tier == "Starter", "egg bee kept, ladder bees replaced by a fresh Starter")
+check(rb.Discovered.Royal == true and rb.Discovered.V4 == true, "collection is kept")
+check(math.abs(rb:JellyMultiplier() - 1.25) < 1e-9 and math.abs(rb:ProductionRate() - (900 + 0.2) * 1.25) < 1e-6, "all bees now make x1.25")
+rb:AddBee("Royal")
+rb:Rebirth()
+check(rb.RoyalJelly == 2 and math.abs(rb:JellyMultiplier() - 1.5) < 1e-9, "second rebirth stacks to x1.5")
+check(rateBefore > 0, "(sanity) had production before")
+
+-- save round trip with variants, shiny and jelly
+local sv2 = rb:Serialize(5)
+check(sv2.RoyalJelly == 2 and sv2.Bees[1].Variant == 4, "save holds jelly and variant ids")
+local back2 = FarmState.Deserialize(sv2, ECO, BEES, ORDER, UPG, X)
+check(back2.RoyalJelly == 2 and back2.Bees[1].Variant == 4 and back2.Discovered.V4 == true and back2:JellyMultiplier() == 1.5, "restore: jelly, variant bee, collection")
+local sShiny = sh2:Serialize(6)
+local backShiny = FarmState.Deserialize(sShiny, ECO, BEES, ORDER, UPG, X)
+local foundShiny = false
+for _, bee in backShiny.Bees do
+	if bee.Shiny then
+		foundShiny = true
+	end
+end
+check(foundShiny and backShiny.Discovered["Clover*"] == true, "restore: shiny flag and shiny discovery")
+local badV = FarmState.Deserialize({ Bees = { { Id = 1, Tier = "Variant", Variant = 999 }, { Id = 2, Tier = "Variant", Variant = 1 } }, Discovered = { "V999", "V1", "Clover*" } }, ECO, BEES, ORDER, UPG, X)
+check(#badV.Bees == 1 and badV.Bees[1].Variant == 1 and badV.Discovered.V999 == nil and badV.Discovered["Clover*"] == true, "unknown variant dropped, known kept")
+-- no extras: everything degrades gracefully
+local plain2 = FarmState.new(ECO, BEES, ORDER, UPG)
+check(select(2, plain2:CanBuyEgg("Basic")) == "Unknown" and select(2, plain2:CanRebirth()) == "Unknown" and plain2:JellyMultiplier() == 1, "without egg/rebirth config nothing breaks")
+
 print(("FarmState: %d checks passed"):format(passed))

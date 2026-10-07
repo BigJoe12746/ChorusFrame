@@ -157,6 +157,46 @@ for i, tier in Config.BeeOrder do
 	bee.Scale = 0.35 + (i - 1) * 0.025
 end
 
+-- Eggs, shiny merges and Royal Jelly (Phase 8) --------------------------------------
+Config.Economy.ShinyChance = 0.05 -- a merge result is shiny this often (or if a parent was shiny)
+Config.Economy.ShinyMultiplier = 1.5 -- shiny bees make this x the normal rate
+
+-- Eggs sold in the Bee Shop. Odds are weights: a "Kind" is a ladder tier (Starter, Clover, ...)
+-- or a variant rarity (Common, Uncommon, Rare, Epic, Legendary, Mythic) that hatches one of the
+-- 50 VariantBees of that rarity. The shop shows these odds to the player as percentages.
+Config.Eggs = {
+	Order = { "Basic", "Golden", "Royal" },
+	Basic = {
+		Name = "Basic Egg",
+		Icon = "🥚",
+		Price = 100,
+		Color = "#F5EBD8",
+		Odds = { { Kind = "Starter", Weight = 55 }, { Kind = "Clover", Weight = 25 }, { Kind = "Common", Weight = 15 }, { Kind = "Uncommon", Weight = 4.5 }, { Kind = "Rare", Weight = 0.5 } },
+	},
+	Golden = {
+		Name = "Golden Egg",
+		Icon = "🟡",
+		Price = 2500,
+		Color = "#FFD75E",
+		Odds = { { Kind = "Daisy", Weight = 35 }, { Kind = "Strawberry", Weight = 25 }, { Kind = "Uncommon", Weight = 20 }, { Kind = "Rare", Weight = 15 }, { Kind = "Epic", Weight = 4.5 }, { Kind = "Legendary", Weight = 0.5 } },
+	},
+	Royal = {
+		Name = "Royal Egg",
+		Icon = "👑",
+		Price = 40000,
+		Color = "#C58CFF",
+		Odds = { { Kind = "Knight", Weight = 30 }, { Kind = "Crystal", Weight = 25 }, { Kind = "Rare", Weight = 20 }, { Kind = "Epic", Weight = 15 }, { Kind = "Legendary", Weight = 8 }, { Kind = "Mythic", Weight = 2 } },
+	},
+}
+
+-- Rebirth: once you own a Royal Bee you can reset the farm for permanent Royal Jelly.
+Config.Rebirth = {
+	RequiresTier = "Royal", -- must own a bee of this tier
+	JellyPerRebirth = 1,
+	BonusPerJelly = 0.25, -- +25% production per jelly, forever
+	KeepVariants = true, -- egg bees (the collection) survive a rebirth; ladder bees and upgrades don't
+}
+
 -- Farm upgrades (Phase 4). Levels[1] is the starting value (free); Prices[i] is the
 -- cost of going from level i to level i+1. Edit these two lists to rebalance.
 Config.Upgrades = {

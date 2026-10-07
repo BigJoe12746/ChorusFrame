@@ -2,7 +2,7 @@
 
 A colourful multiplayer bee‑farming tycoon. Players own a garden plot, buy bees, make honey, bottle and sell it, merge bees, and expand their farm.
 
-**Status: all seven phases are done.** Map and plots, the honey loop, the Bee Shop and merging, farm upgrades, saving and offline honey, interface and introduction, and the multiplayer/quality pass. See **[TESTING.md](TESTING.md)** for exactly what was verified here and what still needs a Studio playtest.
+**Status: all seven phases plus Phase 8 (eggs, rare bees, shiny merges, Royal Jelly rebirth) are done.** Map and plots, the honey loop, the Bee Shop and merging, farm upgrades, saving and offline honey, interface and introduction, and the multiplayer/quality pass. See **[TESTING.md](TESTING.md)** for exactly what was verified here and what still needs a Studio playtest.
 
 | Whole map (top‑down, generated from the real scripts) | One plot |
 |---|---|
@@ -166,6 +166,18 @@ Keys: **H** My Farm, **U** Upgrades, **B** Bee collection, **Esc** closes any pa
 - Marker parts: `Hive/BeeExit`, `FlowerPatch/FlowerSpots/Spot1‑9`, `Bottling/DepositPoint`, `Conveyor/ConveyorStart`/`ConveyorEnd`.
 - `ReplicatedStorage.Assets.BeeTemplate` is your original bee model: the Starter Bee, the shop display bee, and the base for the 10 tiers.
 
+## What Phase 8 includes: eggs, rare bees, shiny merges and Royal Jelly
+
+This is the "long tail" from the Chicken Farm concept: something to chase and a reason to reset.
+
+- **Eggs** in the Bee Shop (`Config.Eggs`): Basic $100, Golden $2,500, Royal $40,000. Each lists its odds *as the player sees them* (weights normalised to percentages). An egg hatches either a ladder bee (Starter … Crystal) or one of the **50 egg bees** by rarity (Common → Mythic). Eggs need a free slot; the hatch plays an egg‑wobble‑crack at the hive and a card names what hatched.
+- **50 egg bees** (`src/shared/VariantBees.lua`, generated from the day‑one variant list): Honey Bee, Panda Bee, Galaxy Bee, Golden Queen Bee… each with its own colours, materials, glow/sparkles and a rate pegged to the ladder (Common ≈ Clover, Mythic ≈ Royal+). They **can't be merged**: they're one of a kind, to collect and show off. They have their own tab in the collection book, listed by rarity with "???" for the ones you haven't found.
+- **Shiny merges**: every merge has a 5% chance (`Config.Economy.ShinyChance`) to produce a shiny version of the result: ×1.5 honey, neon stripes, sparkles, its own collection entry (✨ shiny found!). A shiny parent always gives a shiny child, so shininess carries up the ladder.
+- **Royal Jelly rebirth** (👑 Jelly button): once you own a Royal Bee you can reset the farm (cash to $25, ladder bees and upgrades gone, honey emptied) for +1 Royal Jelly, and every jelly makes *all* bees produce +25% forever. Egg bees and the collection book survive. Two taps to confirm; the server re‑checks the Royal Bee and that you're standing on your plot.
+- Everything saves: egg bees, shiny flags, jelly, rebirth count, eggs hatched.
+
+Bee entries replicate as `id:Tier`, `id:Tier*` (shiny) or `id:V12` (egg bee #12).
+
 ## Using real models from the Creator Store (instead of the block scenery)
 
 The flowers, trees, cottages, fountain and hives are built from basic parts so the game works out of the box. To make them look proper, drop models from the Creator Store into **`ReplicatedStorage.Props`** and the map uses them automatically. No code changes.
@@ -186,11 +198,11 @@ I can't browse the Creator Store from here, so I haven't picked specific models 
 ```
 default.project.json          how files map into the game
 HoneyFarm.rbxl                 built place file, ready to open
-src/shared/   → ReplicatedStorage.HoneyFarm   Config, PlotAllocator, FarmState, BeeAppearance
+src/shared/   → ReplicatedStorage.HoneyFarm   Config, PlotAllocator, FarmState, BeeAppearance, VariantBees
 src/server/   → ServerScriptService.HoneyFarm  Main, MapBuilder, PlotService, FarmService, UpgradeVisuals, SaveService, RateLimiter, PropLibrary
 ReplicatedStorage.Props                         empty folder: drop Creator Store models here (see above)
 src/client/   → StarterPlayerScripts.HoneyFarm FarmClient, FarmHud, StationLabels, BeeFlight, ConveyorJars, BeeShop, MergeEffects,
-                                                Upgrades, WelcomeBack, Tutorial, Effects, CollectionBook, BeeSounds
+                                                Upgrades, WelcomeBack, Tutorial, Effects, CollectionBook, BeeSounds, Hatching, Rebirth
 assets/BeeTemplate.rbxm → ReplicatedStorage.Assets.BeeTemplate
 tests/                          offline tests (see below)
 ```
@@ -204,8 +216,9 @@ You can change all the sizes, colours and the plot count in `src/shared/Config.l
 | Test | How | Result |
 |---|---|---|
 | Plot assignment logic: separate plots, no double assignment, release, queue when full, rejoin | `luau tests/PlotAllocator.spec.luau` | 17/17 pass |
-| Economy logic: production rate, hive cap and lost honey, backpack cap, 1 jar/sec, $5 per jar, collecting twice never pays twice, a 3,000‑step conservation run with random frame times, shop prices and exact charges, 8‑slot cap, merge rules (same bee, missing bee, different tiers, top tier), ×2.5 production, discovery flags, upgrade levels/values/prices, maxed and unaffordable refusals, multiplier, faster bottling, bigger backpack, a 9th bee after the slot upgrade, base values without an upgrade table, save round‑trip (money, honey, bees with ids, upgrades, processing, discoveries), hostile data clamped, offline honey (rate × time, 8‑hour cap, hive‑room cap, credited once), introduction steps (no skipping, saved, clamped) | `luau tests/FarmState.spec.luau` | 98/98 pass |
+| Economy logic: production rate, hive cap and lost honey, backpack cap, 1 jar/sec, $5 per jar, collecting twice never pays twice, a 3,000‑step conservation run with random frame times, shop prices and exact charges, 8‑slot cap, merge rules (same bee, missing bee, different tiers, top tier), ×2.5 production, discovery flags, upgrade levels/values/prices, maxed and unaffordable refusals, multiplier, faster bottling, bigger backpack, a 9th bee after the slot upgrade, base values without an upgrade table, save round‑trip (money, honey, bees with ids, upgrades, processing, discoveries), hostile data clamped, offline honey (rate × time, 8‑hour cap, hive‑room cap, credited once), introduction steps (no skipping, saved, clamped), egg odds and scripted hatches, variants can't merge, slots gate eggs, shiny rolls and inheritance, rebirth requirements/reset/keeps/multiplier stacking, save round‑trip with variants/shiny/jelly, unknown variants dropped | `luau tests/FarmState.spec.luau` | 134/134 pass |
 | Full Phase 1 scenario: the **real** server scripts run against a small mock of the Roblox engine. Builds the map, two players join, spawn on separate farms, use **My Farm** (including spam and visiting), respawn, owner‑only stations, leave and clear the plot, rejoin, a full server with a 7th player queued | `python3 tests/run_sim.py --luau <path to luau> --render out/` | 123/123 pass |
+| Full Phase 8 scenario: all 50 egg bees build from the template; every egg kind resolves; shiny model tagged/named/sparkles; egg refused without cash; scripted dice hatch a specific Rare variant with the right event, model, message and collection entry; bad egg names ignored; egg bee can't merge; low roll makes a shiny Clover with ×1.5 production; rebirth refused without a Royal and from the village; rebirth grants jelly, resets cash/upgrades, keeps the egg bee, removes ladder models, ×1.25 production; all of it saved and restored | `python3 tests/run_sim.py --luau <luau> --scenario tests/phase8.scenario.luau` | 50/50 pass |
 | Full Phase 7 scenario (two players at once): see TESTING.md | `python3 tests/run_sim.py --luau <luau> --scenario tests/phase7.scenario.luau` | 37/37 pass |
 | Props: Creator Store stand‑ins replace flowers/hive/cottages, scripts stripped, scaled to each slot, standing on the ground, variants mixed, originals untouched, missing kinds fall back to block versions, mini hives reuse the Hive prop | `python3 tests/run_sim.py --luau <luau> --scenario tests/props.scenario.luau` | 57/57 pass |
 | Rate limiter: window, reset, per‑key buckets, a 100‑call burst passes exactly 25 | `luau tests/RateLimiter.spec.luau` | 8/8 pass |
@@ -266,4 +279,5 @@ Phase 6 (needs a real client):
 - [x] **5. Saving and offline honey**: DataStore, autosave, offline earnings capped at 8 hours
 - [x] **6. Interface and introduction**: tutorial, collection book, effects and sounds
 - [x] **7. Multiplayer and quality checks**: server authority, anti‑spam, two‑player tests
+- [x] **8. Eggs, rare bees, shiny merges, Royal Jelly rebirth**
 - Later: flower combos, Royal Jelly rebirths, quests, seasonal bees, hive skins, co‑op events

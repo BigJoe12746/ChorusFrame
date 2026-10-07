@@ -200,7 +200,7 @@ check(after[7].Tier == "Clover" and after[7].Id == 9, "the new bee is a Clover w
 check(plot1.Temp:FindFirstChild("Bee1") == nil and plot1.Temp:FindFirstChild("Bee2") == nil and plot1.Temp:FindFirstChild("Bee9") ~= nil, "parent models removed, Clover model spawned")
 check(plot1.Temp.Bee9:GetAttribute("Tier") == "Clover" and plot1.Temp.Bee9.Accessory ~= nil, "Clover model has its clover")
 check(math.abs(plot1:GetAttribute("ProductionRate") - (6 * 0.2 + 0.5)) < 1e-9, "production: 6 starters + 1 clover (2.5x)")
-check(plot1:GetAttribute("Discovered") == "Starter,Clover", "Clover added to discoveries")
+check(has(plot1:GetAttribute("Discovered"), "Starter") and has(plot1:GetAttribute("Discovered"), "Clover"), "Clover added to discoveries")
 local mergeEvt = Remotes.BeeMerged.fired[#Remotes.BeeMerged.fired]
 check(mergeEvt and mergeEvt[2] == 1 and mergeEvt[6] == "Clover" and mergeEvt[7] == true, "clients told to play the merge effect + discovery")
 check(has(lastNote(alice), "New bee discovered: Clover Bee"), "discovery notification")

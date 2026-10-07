@@ -28,7 +28,7 @@ Plus `luau-lsp analyze` against the Roblox API definitions (type check) and `roj
 | Module | Checks | Covers |
 |---|---|---|
 | `PlotAllocator` | 17 | separate plots, no double assignment, release and reuse, queue when full, hand‑over, rejoin |
-| `FarmState` | 98 | production rate, hive cap + lost honey, backpack cap, 1 jar/s, $5/jar, double‑collect never pays twice, 3,000‑step conservation run with random frame times, shop prices and exact charges, 8‑slot cap, merge rules (same bee, missing bee, different tier, top tier), ×2.5 production, discoveries, upgrade levels/values/prices, maxed/unaffordable refusals, multiplier, faster bottling, bigger backpack, 9th bee after the slot upgrade, save round‑trip, hostile save data clamped, offline honey (rate × time, 8‑h cap, hive‑room cap, credited once), introduction steps can't skip and are saved |
+| `FarmState` | 134 | production rate, hive cap + lost honey, backpack cap, 1 jar/s, $5/jar, double‑collect never pays twice, 3,000‑step conservation run with random frame times, shop prices and exact charges, 8‑slot cap, merge rules (same bee, missing bee, different tier, top tier), ×2.5 production, discoveries, upgrade levels/values/prices, maxed/unaffordable refusals, multiplier, faster bottling, bigger backpack, 9th bee after the slot upgrade, save round‑trip, hostile save data clamped, offline honey (rate × time, 8‑h cap, hive‑room cap, credited once), introduction steps can't skip and are saved |
 | `RateLimiter` | 8 | window, reset, per‑key buckets, 100‑call burst passes exactly 25 |
 
 ### Scenarios through the real server scripts
@@ -41,6 +41,7 @@ Plus `luau-lsp analyze` against the Roblox API definitions (type check) and `roj
 | Phase 4 | 40 | config sanity; refused without cash and off‑plot; hive storage 120/250 with mini hives and exact charges; bottling 2 jars/s and a tank; production ×1.25 + pollen orb; backpack; slot upgrade → 9th bee; two presses = two levels; maxed refused; garbage ids ignored; conservation with upgrades; other player can't upgrade your farm; next owner at level 1 |
 | Phase 5 | 29 | new player loads empty; leave saves with timestamp; rejoin 2 h later restores everything and credits offline honey capped by hive room, once; 30 h counts as 8 h; autosave; failed load → temporary farm, never written; transient failure still loads; newer save elsewhere not overwritten; BindToClose saves everyone; unavailable DataStores reported and write nothing |
 | Phase 6 | 32 | steps point at real stations; built‑in sound ids; early presses don't skip; each real action advances one step with the matching Feedback event; bonus pays once; finished stays finished; saved and restored; second player has their own |
+| Phase 8 | 50 | eggs with scripted dice (odds → kind → variant), egg bees build and can't merge, shiny merges and inheritance, Royal Jelly rebirth (requirements, reset, keeps, multiplier), everything saved and restored |
 | Phase 7 | 37 | **two players at once**: Bob refused at all five of Alice's stations with nothing changed on either farm; remotes can only hit the sender's farm; both hives cap and count lost honey; full backpack; insufficient funds for bee and upgrade; 100 hive presses move only the honey that exists; 100 Buy presses → 8 slots, exactly 7 purchases charged; 100 Upgrade presses with $300 → exactly the two affordable levels, cash never negative; limiter is per player; 30 merge presses on one pair = one merge; conservation on both farms; both saved and restored independently; offline rewards use each farm's own away time and rate; a queued 7th player gets the freed plot and loads *his own* save |
 
 ### Static checks
@@ -76,6 +77,11 @@ Everything that changes money, honey, bees or upgrades runs in `FarmService` on 
 ## Still needs Roblox Studio (not verifiable here)
 
 Things that need eyes, ears, a phone, or a real DataStore:
+
+**Phase 8**
+- [ ] Egg odds in the shop read clearly; hatching feels good (wobble, crack, card); the 50 egg bees look distinct and sit well on the farm (they use only colours/materials, no accessories).
+- [ ] Shiny bees are visibly special (neon stripes + sparkles).
+- [ ] The Jelly panel's two‑tap confirm prevents accidental rebirths on a phone.
 
 **Looks**
 - [ ] The map reads as bright and cartoonish; paths are walkable; nothing blocks a gate or a path.

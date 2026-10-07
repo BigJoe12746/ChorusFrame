@@ -239,13 +239,8 @@ end
 -- Build
 ------------------------------------------------------------------------------
 
--- Returns a fully dressed, anchored bee model for `tier`, pivoted so that
--- model:PivotTo(CFrame.lookAt(a, b)) flies head-first with the wings up.
-function BeeAppearance.Build(template: Model, tier: string): Model
-	local info = Config.Bees[tier]
-	assert(info, "Unknown bee tier: " .. tostring(tier))
-	local look = info.Look
-
+-- Shared dressing: recolour by role, add the accessory, light, canonical pivot, scale.
+local function dress(template: Model, look: { [string]: any }, scale: number, name: string, shiny: boolean?): Model
 	BeeAppearance.PrepareTemplate(template)
 	local model = template:Clone()
 	local cam = model:FindFirstChildOfClass("Camera")
@@ -268,8 +263,8 @@ function BeeAppearance.Build(template: Model, tier: string): Model
 		local role = d:GetAttribute("BeeRole")
 		if role == "Head" or role == "BodyStripe" or role == "DarkStripe" then
 			d.Color = hex(if role == "DarkStripe" then look.Stripe else look.Body)
-			d.Material = if role == "DarkStripe" and look.NeonStripes then Enum.Material.Neon else material
-			d.Reflectance = look.Reflectance or 0
+			d.Material = if role == "DarkStripe" and (look.NeonStripes or shiny) then Enum.Material.Neon else material
+			d.Reflectance = (look.Reflectance or 0) + (if shiny then 0.15 else 0)
 			d.Transparency = look.Transparency or 0
 			table.insert(bodyParts, d)
 			if role == "Head" then
@@ -302,6 +297,11 @@ function BeeAppearance.Build(template: Model, tier: string): Model
 			light.Range = 10
 			light.Parent = head
 		end
+		if shiny or look.Sparkles then
+			local sparkles = Instance.new("Sparkles")
+			sparkles.SparkleColor = hex(if shiny then "#FFF2B0" else look.Stripe)
+			sparkles.Parent = head
+		end
 
 		-- Canonical pivot: centre of the body, facing the way the head points, wings up.
 		local sum = Vector3.zero
@@ -314,10 +314,33 @@ function BeeAppearance.Build(template: Model, tier: string): Model
 		model.WorldPivot = CFrame.fromMatrix(centre, forward:Cross(up), up, -forward)
 	end
 
-	model:ScaleTo(info.Scale)
-	model.Name = info.Name
+	model:ScaleTo(scale)
+	model.Name = name
 	model:SetAttribute("Bee", true)
+	if shiny then
+		model:SetAttribute("Shiny", true)
+	end
+	return model
+end
+
+-- Returns a fully dressed, anchored bee model for a ladder `tier`, pivoted so that
+-- model:PivotTo(CFrame.lookAt(a, b)) flies head-first with the wings up.
+function BeeAppearance.Build(template: Model, tier: string, shiny: boolean?): Model
+	local info = Config.Bees[tier]
+	assert(info, "Unknown bee tier: " .. tostring(tier))
+	local model = dress(template, info.Look, info.Scale, (if shiny then "Shiny " else "") .. info.Name, shiny)
 	model:SetAttribute("Tier", tier)
+	return model
+end
+
+-- Same for one of the 50 egg bees (VariantBees.List[id]).
+function BeeAppearance.BuildVariant(template: Model, variant: { [string]: any }): Model
+	local look = table.clone(variant.Look)
+	look.Sparkles = variant.Sparkles
+	local model = dress(template, look, variant.Scale, variant.Name, false)
+	model:SetAttribute("Tier", "Variant")
+	model:SetAttribute("Variant", variant.Id)
+	model:SetAttribute("Rarity", variant.Rarity)
 	return model
 end
 

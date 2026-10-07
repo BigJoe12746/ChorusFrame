@@ -14,6 +14,11 @@
 --             UpgradeAction(id)                       <- the owner's client (must be standing on their plot)
 --             WelcomeBack(summary)                    -> the owner's client shows the offline-honey summary
 --             Feedback(kind, amount, station)         -> the owner's client plays effects/sounds
+--             ShopAction("Egg", eggName)              <- buy + hatch an egg
+--             EggHatched(plotId, beeId, name, rarity, isNew) -> all clients play the hatch
+--             RebirthAction()                         <- reset for Royal Jelly (must own a Royal Bee)
+--   Plot attributes RoyalJelly, Rebirths, CanRebirth; Bees entries are "id:Tier", "id:Tier*" (shiny)
+--   or "id:V12" (variant #12)
 --   Player attribute TutorialStep (1..#Config.Tutorial.Steps, or one past = finished)
 --   Player attribute FarmLoading = true while the save is being read; no economy action is
 --   possible until it clears (farms[player] stays nil).
@@ -25,6 +30,7 @@ local Shared = ReplicatedStorage:WaitForChild("HoneyFarm")
 local Config = require(Shared:WaitForChild("Config"))
 local FarmState = require(Shared:WaitForChild("FarmState"))
 local BeeAppearance = require(Shared:WaitForChild("BeeAppearance"))
+local VariantBees = require(Shared:WaitForChild("VariantBees"))
 local PlotService = require(script.Parent:WaitForChild("PlotService"))
 local UpgradeVisuals = require(script.Parent:WaitForChild("UpgradeVisuals"))
 local SaveService = require(script.Parent:WaitForChild("SaveService"))
@@ -39,8 +45,24 @@ local BeeMergedRemote = Remotes:WaitForChild("BeeMerged") :: RemoteEvent
 local UpgradeRemote = Remotes:WaitForChild("UpgradeAction") :: RemoteEvent
 local WelcomeRemote = Remotes:WaitForChild("WelcomeBack") :: RemoteEvent
 local FeedbackRemote = Remotes:WaitForChild("Feedback") :: RemoteEvent
+local EggHatchedRemote = Remotes:WaitForChild("EggHatched") :: RemoteEvent
+local RebirthRemote = Remotes:WaitForChild("RebirthAction") :: RemoteEvent
+
+local EXTRAS = {
+	Variants = VariantBees,
+	Eggs = Config.Eggs,
+	Rebirth = Config.Rebirth,
+	ShinyChance = Config.Economy.ShinyChance,
+	ShinyMultiplier = Config.Economy.ShinyMultiplier,
+}
 
 local FarmService = {}
+
+-- Random source for eggs and shiny rolls; tests replace it with a scripted sequence.
+local rng = Random.new()
+FarmService.Roll = function(): number
+	return rng:NextNumber()
+end
 
 type Farm = {
 	Player: Player,
@@ -90,18 +112,19 @@ end
 local function encodeBees(state: FarmState.State): string
 	local parts = {}
 	for _, bee in state.Bees do
-		table.insert(parts, bee.Id .. ":" .. bee.Tier)
+		table.insert(parts, bee.Id .. ":" .. FarmState.BeeKey(bee))
 	end
 	return table.concat(parts, ",")
 end
 
 local function encodeDiscovered(state: FarmState.State): string
 	local parts = {}
-	for _, tier in Config.BeeOrder do
-		if state.Discovered[tier] then
-			table.insert(parts, tier)
+	for key, found in state.Discovered do
+		if found then
+			table.insert(parts, key)
 		end
 	end
+	table.sort(parts)
 	return table.concat(parts, ",")
 end
 
@@ -131,12 +154,15 @@ local function replicate(farm: Farm)
 	setAttr(farm, farm.Plot, "BottlingSpeed", s.BottlingPerSecond)
 	setAttr(farm, farm.Plot, "ProductionMultiplier", s.ProductionMultiplier)
 	setAttr(farm, farm.Plot, "Upgrades", encodeUpgrades(s))
+	setAttr(farm, farm.Plot, "RoyalJelly", s.RoyalJelly)
+	setAttr(farm, farm.Plot, "Rebirths", s.Rebirths)
+	setAttr(farm, farm.Plot, "CanRebirth", (s:CanRebirth()))
 	setAttr(farm, farm.Plot, "BeePrice", s:BeePrice())
 	setAttr(farm, farm.Plot, "Bees", encodeBees(s))
 	setAttr(farm, farm.Plot, "Discovered", encodeDiscovered(s))
 end
 
-local PLOT_KEYS = { "HiveStored", "HiveCapacity", "BottlingQueue", "BottlingProgress", "JarsOnBelt", "Unclaimed", "ProductionRate", "BeeCount", "BeeSlots", "BeePrice", "Bees", "Discovered", "BottlingSpeed", "ProductionMultiplier", "Upgrades" }
+local PLOT_KEYS = { "HiveStored", "HiveCapacity", "BottlingQueue", "BottlingProgress", "JarsOnBelt", "Unclaimed", "ProductionRate", "BeeCount", "BeeSlots", "BeePrice", "Bees", "Discovered", "BottlingSpeed", "ProductionMultiplier", "Upgrades", "RoyalJelly", "Rebirths", "CanRebirth" }
 local PLAYER_KEYS = { "Cash", "Carried", "BackpackCapacity", "TutorialStep" }
 
 local function feedback(farm: Farm, kind: string, amount: number, station: string)
@@ -187,7 +213,14 @@ local function spawnBeeModel(farm: Farm, bee: FarmState.Bee, popIn: boolean?)
 		return
 	end
 	local template = beeTemplate()
-	local model = if template then BeeAppearance.Build(template, bee.Tier) else fallbackBee(bee.Tier)
+	local model: Model
+	if not template then
+		model = fallbackBee(if bee.Tier == "Variant" then Config.BeeOrder[1] else bee.Tier)
+	elseif bee.Tier == "Variant" then
+		model = BeeAppearance.BuildVariant(template, VariantBees.Get(bee.Variant :: number))
+	else
+		model = BeeAppearance.Build(template, bee.Tier, bee.Shiny)
+	end
 	model.Name = ("Bee%d"):format(bee.Id)
 	model:SetAttribute("BeeId", bee.Id)
 	if popIn then
@@ -264,6 +297,17 @@ end
 -- Shop actions (from the shop UI)
 ------------------------------------------------------------------------------
 
+-- Is the player standing on their own plot (used by upgrades and rebirth)?
+local function onPlot(player: Player, plot: Model): boolean
+	local character = player.Character
+	if not character then
+		return false
+	end
+	local offset = plot:GetPivot():PointToObjectSpace(character:GetPivot().Position)
+	local half = Config.PlotSize / 2 + 8
+	return math.abs(offset.X) <= half and math.abs(offset.Z) <= half
+end
+
 local function buyBee(farm: Farm)
 	local s = farm.State
 	local price = s:BeePrice()
@@ -287,6 +331,7 @@ local MERGE_MESSAGES = {
 	NotFound = "One of those bees isn't on your farm any more.",
 	DifferentTier = "Only two bees of the same tier can merge.",
 	MaxTier = "Royal Bees are already the top tier and can't be merged.",
+	Variant = "Egg bees are one of a kind: they can't be merged.",
 }
 
 local function mergeBees(farm: Farm, idA: any, idB: any)
@@ -294,7 +339,7 @@ local function mergeBees(farm: Farm, idA: any, idB: any)
 		return
 	end
 	local s = farm.State
-	local bee, isNew, reason = s:MergeBees(idA, idB)
+	local bee, isNew, reason = s:MergeBees(idA, idB, FarmService.Roll())
 	if not bee then
 		notify(farm.Player, MERGE_MESSAGES[reason] or "Those bees can't merge.", "warning")
 		return
@@ -304,12 +349,81 @@ local function mergeBees(farm: Farm, idA: any, idB: any)
 	spawnBeeModel(farm, bee, true)
 	BeeMergedRemote:FireAllClients(farm.Plot:GetAttribute("PlotId"), idA, idB, bee.Id, bee.Tier, isNew)
 	tutorial(farm, 5)
-	local info = Config.Bees[bee.Tier]
-	if isNew then
-		notify(farm.Player, ("✨ New bee discovered: %s! It makes %.1f 🍯/s."):format(info.Name, info.HoneyPerSecond), "success")
+	local name = s:BeeName(bee)
+	local rate = s:BeeRate(bee)
+	if bee.Shiny and isNew then
+		notify(farm.Player, ("🌟 SHINY! You made a %s! It makes %.1f 🍯/s."):format(name, rate), "success")
+	elseif isNew then
+		notify(farm.Player, ("✨ New bee discovered: %s! It makes %.1f 🍯/s."):format(name, rate), "success")
 	else
-		notify(farm.Player, ("Merged into a %s (%.1f 🍯/s)."):format(info.Name, info.HoneyPerSecond), "success")
+		notify(farm.Player, ("Merged into a %s (%.1f 🍯/s)."):format(name, rate), "success")
 	end
+end
+
+local function buyEgg(farm: Farm, eggName: any)
+	if type(eggName) ~= "string" or not Config.Eggs[eggName] then
+		return
+	end
+	local s = farm.State
+	local egg = Config.Eggs[eggName]
+	local bee, isNew, result = s:HatchEgg(eggName, FarmService.Roll(), FarmService.Roll())
+	if not bee then
+		if result == "NoSlots" then
+			notify(farm.Player, ("All %d bee slots are full. Merge two bees or buy the Bee Slots upgrade!"):format(s.BeeSlots), "warning")
+		else
+			notify(farm.Player, ("You need $%s for a %s (you have $%s)."):format(fmt(egg.Price), egg.Name, fmt(s.Cash)), "warning")
+		end
+		return
+	end
+	spawnBeeModel(farm, bee, true)
+	local name = s:BeeName(bee)
+	local rarity = if bee.Tier == "Variant" then VariantBees.Get(bee.Variant :: number).Rarity else "Ladder"
+	EggHatchedRemote:FireAllClients(farm.Plot:GetAttribute("PlotId"), bee.Id, name, rarity, isNew)
+	feedback(farm, "Buy", egg.Price, "BeeShop")
+	if isNew then
+		notify(farm.Player, ("🥚 Hatched: %s (%s) — new to your collection! %.1f 🍯/s"):format(name, rarity, s:BeeRate(bee)), "success")
+	else
+		notify(farm.Player, ("🥚 Hatched: %s (%s). %.1f 🍯/s"):format(name, rarity, s:BeeRate(bee)), "success")
+	end
+end
+
+local function onRebirth(player: Player)
+	if not allowRemote(player) then
+		return
+	end
+	local farm = farms[player]
+	if not farm or farm.Busy then
+		return
+	end
+	if not onPlot(player, farm.Plot) then
+		notify(player, "Go to your farm to rebirth.", "warning")
+		return
+	end
+	farm.Busy = true
+	local s = farm.State
+	local jelly, reason = s:Rebirth()
+	if jelly then
+		-- rebuild the plot: ladder bee models go, egg bees stay, upgrade visuals reset
+		local temp = farm.Plot:FindFirstChild("Temp")
+		if temp then
+			for _, child in temp:GetChildren() do
+				if child:GetAttribute("Bee") and child:GetAttribute("Tier") ~= "Variant" then
+					child:Destroy()
+				end
+			end
+		end
+		for _, bee in s.Bees do
+			if bee.Tier ~= "Variant" then
+				spawnBeeModel(farm, bee, true)
+			end
+		end
+		UpgradeVisuals.Apply(farm.Plot, s)
+		notify(player, ("👑 Rebirth %d! You now hold %d Royal Jelly: all bees make ×%.2f honey forever. The farm starts fresh."):format(s.Rebirths, jelly, s:JellyMultiplier()), "success")
+	elseif reason == "NeedsTier" then
+		notify(player, ("You need a %s Bee on your farm to rebirth."):format(Config.Bees[Config.Rebirth.RequiresTier].Name), "warning")
+	end
+	replicate(farm)
+	farm.Busy = false
 end
 
 local function onShopAction(player: Player, action: any, a: any, b: any)
@@ -327,6 +441,8 @@ local function onShopAction(player: Player, action: any, a: any, b: any)
 	farm.Busy = true
 	if action == "Buy" then
 		buyBee(farm)
+	elseif action == "Egg" then
+		buyEgg(farm, a)
 	elseif action == "Merge" then
 		mergeBees(farm, a, b)
 	end
@@ -337,16 +453,6 @@ end
 ------------------------------------------------------------------------------
 -- Upgrades (from the Upgrades panel; the player must be on their own plot)
 ------------------------------------------------------------------------------
-
-local function onPlot(player: Player, plot: Model): boolean
-	local character = player.Character
-	if not character then
-		return false
-	end
-	local offset = plot:GetPivot():PointToObjectSpace(character:GetPivot().Position)
-	local half = Config.PlotSize / 2 + 8
-	return math.abs(offset.X) <= half and math.abs(offset.Z) <= half
-end
 
 local function formatValue(id: string, value: number): string
 	local u = Config.Upgrades[id]
@@ -398,7 +504,7 @@ local function formatDuration(seconds: number): string
 end
 
 local function newState(): FarmState.State
-	return FarmState.new(Config.Economy, Config.Bees, Config.BeeOrder, Config.Upgrades)
+	return FarmState.new(Config.Economy, Config.Bees, Config.BeeOrder, Config.Upgrades, EXTRAS)
 end
 
 local function startFarm(player: Player, plot: Model)
@@ -423,7 +529,7 @@ local function startFarm(player: Player, plot: Model)
 	local welcome: { [string]: any }? = nil
 
 	if ok and data then
-		state = FarmState.Deserialize(data, Config.Economy, Config.Bees, Config.BeeOrder, Config.Upgrades)
+		state = FarmState.Deserialize(data, Config.Economy, Config.Bees, Config.BeeOrder, Config.Upgrades, EXTRAS)
 		loadedSavedAt = tonumber(data.SavedAt) or 0
 		local away = math.max(0, SaveService.Now() - loadedSavedAt)
 		if loadedSavedAt > 0 and away >= 60 then
@@ -562,6 +668,7 @@ function FarmService.Start()
 	end)
 	ShopActionRemote.OnServerEvent:Connect(onShopAction)
 	UpgradeRemote.OnServerEvent:Connect(onUpgradeAction)
+	RebirthRemote.OnServerEvent:Connect(onRebirth)
 
 	-- players who already own a plot (e.g. script reloaded)
 	for _, player in Players:GetPlayers() do

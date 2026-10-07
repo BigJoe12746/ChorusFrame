@@ -10,7 +10,9 @@
 local FarmState = {}
 FarmState.__index = FarmState
 
-export type Bee = { Id: number, Tier: string }
+-- Ladder bee: { Id, Tier }. Egg bee: { Id, Tier = "Variant", Variant = <VariantBees id> }.
+-- Shiny = true multiplies the rate (merge results only).
+export type Bee = { Id: number, Tier: string, Variant: number?, Shiny: boolean? }
 
 export type EconomyConfig = {
 	StartCash: number,
@@ -28,6 +30,13 @@ export type EconomyConfig = {
 
 export type BeeConfig = { [string]: any } -- Config.Bees: tier -> { Name, HoneyPerSecond, Scale }
 export type UpgradeConfig = { [string]: any } -- Config.Upgrades: Order + id -> { Levels, Prices, ... }
+export type Extras = { -- optional Phase 8 config: eggs, variants, shiny, rebirth
+	Variants: any?, -- VariantBees module
+	Eggs: any?, -- Config.Eggs
+	Rebirth: any?, -- Config.Rebirth
+	ShinyChance: number?,
+	ShinyMultiplier: number?,
+}
 
 export type TickResult = {
 	Produced: number, -- whole honey added to the hive this tick
@@ -57,16 +66,20 @@ export type State = typeof(setmetatable(
 		BeesBought: number, -- shop purchases so far (drives the price)
 		Discovered: { [string]: boolean }, -- tiers this player has owned
 		TutorialStep: number, -- 1-based index into Config.Tutorial.Steps; past the end = finished
+		RoyalJelly: number, -- permanent production bonus earned by rebirths
+		Rebirths: number,
+		EggsHatched: number,
 		Totals: { Produced: number, Lost: number, Jars: number, Earned: number },
 		_eco: EconomyConfig,
 		_bees: BeeConfig,
 		_order: { string },
 		_upg: UpgradeConfig?,
+		_x: Extras,
 	},
 	FarmState
 ))
 
-function FarmState.new(eco: EconomyConfig, bees: BeeConfig, order: { string }, upgrades: UpgradeConfig?): State
+function FarmState.new(eco: EconomyConfig, bees: BeeConfig, order: { string }, upgrades: UpgradeConfig?, extras: Extras?): State
 	local self = setmetatable({
 		Cash = eco.StartCash,
 		Carried = 0,
@@ -87,11 +100,15 @@ function FarmState.new(eco: EconomyConfig, bees: BeeConfig, order: { string }, u
 		BeesBought = 0,
 		Discovered = {},
 		TutorialStep = 1,
+		RoyalJelly = 0,
+		Rebirths = 0,
+		EggsHatched = 0,
 		Totals = { Produced = 0, Lost = 0, Jars = 0, Earned = 0 },
 		_eco = eco,
 		_bees = bees,
 		_order = order,
 		_upg = upgrades,
+		_x = extras or {},
 	}, FarmState)
 	if upgrades then
 		for _, id in upgrades.Order do
@@ -177,15 +194,61 @@ function FarmState.BuyUpgrade(self: State, id: string): (number?, string?)
 	return self.Upgrades[id], nil
 end
 
--- Adds a bee (no cost, no slot check). Returns the bee and whether the tier is new to this player.
-function FarmState.AddBee(self: State, tier: string): (Bee, boolean)
-	assert(self._bees[tier], "Unknown bee tier: " .. tostring(tier))
-	local bee: Bee = { Id = self.NextBeeId, Tier = tier }
+-- Collection key for a bee: "Clover", "Clover*" (shiny) or "V12" (variant #12).
+function FarmState.BeeKey(bee: Bee): string
+	if bee.Tier == "Variant" then
+		return "V" .. tostring(bee.Variant)
+	end
+	return bee.Tier .. (if bee.Shiny then "*" else "")
+end
+
+-- Adds a bee (no cost, no slot check). Returns the bee and whether it's new to the collection.
+-- tier is a ladder tier, or "Variant" with `variant` = a VariantBees id.
+function FarmState.AddBee(self: State, tier: string, variant: number?, shiny: boolean?): (Bee, boolean)
+	local bee: Bee
+	if tier == "Variant" then
+		assert(self._x.Variants and self._x.Variants.Get(variant :: number), "Unknown variant: " .. tostring(variant))
+		bee = { Id = self.NextBeeId, Tier = "Variant", Variant = variant }
+	else
+		assert(self._bees[tier], "Unknown bee tier: " .. tostring(tier))
+		bee = { Id = self.NextBeeId, Tier = tier }
+		if shiny then
+			bee.Shiny = true
+		end
+	end
 	self.NextBeeId += 1
 	table.insert(self.Bees, bee)
-	local isNew = not self.Discovered[tier]
-	self.Discovered[tier] = true
+	local key = FarmState.BeeKey(bee)
+	local isNew = not self.Discovered[key]
+	self.Discovered[key] = true
+	if bee.Shiny then
+		self.Discovered[bee.Tier] = true -- a shiny Clover also counts as having found Clover
+	end
 	return bee, isNew
+end
+
+-- Honey per second of one bee (before the farm-wide multiplier).
+function FarmState.BeeRate(self: State, bee: Bee): number
+	local rate
+	if bee.Tier == "Variant" then
+		local v = self._x.Variants and self._x.Variants.Get(bee.Variant :: number)
+		rate = if v then v.HoneyPerSecond else 0
+	else
+		rate = self._bees[bee.Tier].HoneyPerSecond
+	end
+	if bee.Shiny then
+		rate *= self._x.ShinyMultiplier or 1.5
+	end
+	return rate
+end
+
+-- Display name of a bee.
+function FarmState.BeeName(self: State, bee: Bee): string
+	if bee.Tier == "Variant" then
+		local v = self._x.Variants and self._x.Variants.Get(bee.Variant :: number)
+		return if v then v.Name else "Mystery Bee"
+	end
+	return (if bee.Shiny then "Shiny " else "") .. self._bees[bee.Tier].Name
 end
 
 function FarmState.FindBee(self: State, id: number): (Bee?, number?)
@@ -263,6 +326,9 @@ function FarmState.MergePreview(self: State, idA: number, idB: number): (string?
 	if not a or not b then
 		return nil, "NotFound"
 	end
+	if a.Tier == "Variant" or b.Tier == "Variant" then
+		return nil, "Variant"
+	end
 	if a.Tier ~= b.Tier then
 		return nil, "DifferentTier"
 	end
@@ -273,29 +339,169 @@ function FarmState.MergePreview(self: State, idA: number, idB: number): (string?
 	return nextTier, nil
 end
 
--- Replaces bees a and b with one bee of the next tier.
--- Returns the new bee and whether its tier is a new discovery, or nil, reason.
-function FarmState.MergeBees(self: State, idA: number, idB: number): (Bee?, boolean, string?)
+-- Replaces bees a and b with one bee of the next tier. `roll` (0..1) decides shininess:
+-- the result is shiny if roll < ShinyChance or either parent was shiny.
+-- Returns the new bee and whether it's a new discovery, or nil, reason.
+function FarmState.MergeBees(self: State, idA: number, idB: number, roll: number?): (Bee?, boolean, string?)
 	local nextTier, reason = self:MergePreview(idA, idB)
 	if not nextTier then
 		return nil, false, reason
 	end
-	local _, ia = self:FindBee(idA)
-	local _, ib = self:FindBee(idB)
+	local a, ia = self:FindBee(idA)
+	local b, ib = self:FindBee(idB)
+	local shiny = (a :: Bee).Shiny == true or (b :: Bee).Shiny == true or (roll ~= nil and roll < (self._x.ShinyChance or 0))
 	-- remove the higher index first so the lower one stays valid
 	table.remove(self.Bees, math.max(ia :: number, ib :: number))
 	table.remove(self.Bees, math.min(ia :: number, ib :: number))
-	local bee, isNew = self:AddBee(nextTier)
+	local bee, isNew = self:AddBee(nextTier, nil, shiny)
 	return bee, isNew, nil
+end
+
+------------------------------------------------------------------------------
+-- Eggs
+------------------------------------------------------------------------------
+
+-- Chance (0..1) of each Kind in an egg, for display.
+function FarmState.EggOdds(self: State, eggName: string): { { Kind: string, Chance: number } }
+	local egg = self._x.Eggs and self._x.Eggs[eggName]
+	local out = {}
+	if not egg then
+		return out
+	end
+	local total = 0
+	for _, o in egg.Odds do
+		total += o.Weight
+	end
+	for _, o in egg.Odds do
+		table.insert(out, { Kind = o.Kind, Chance = o.Weight / total })
+	end
+	return out
+end
+
+-- Returns ok, reason ("Unknown" | "NoSlots" | "NoCash").
+function FarmState.CanBuyEgg(self: State, eggName: string): (boolean, string?)
+	local egg = self._x.Eggs and self._x.Eggs[eggName]
+	if not egg then
+		return false, "Unknown"
+	end
+	if self:FreeSlots() <= 0 then
+		return false, "NoSlots"
+	end
+	if self.Cash < egg.Price then
+		return false, "NoCash"
+	end
+	return true, nil
+end
+
+-- Buys and hatches an egg. roll1 picks the Kind, roll2 picks the variant within a rarity (both 0..1).
+-- Returns the new bee, isNew, and the Kind that was rolled, or nil, false, reason.
+function FarmState.HatchEgg(self: State, eggName: string, roll1: number, roll2: number): (Bee?, boolean, string?)
+	local ok, reason = self:CanBuyEgg(eggName)
+	if not ok then
+		return nil, false, reason
+	end
+	local egg = (self._x.Eggs :: any)[eggName]
+	local total = 0
+	for _, o in egg.Odds do
+		total += o.Weight
+	end
+	local pick = math.clamp(roll1, 0, 0.999999) * total
+	local kind = egg.Odds[#egg.Odds].Kind
+	for _, o in egg.Odds do
+		pick -= o.Weight
+		if pick < 0 then
+			kind = o.Kind
+			break
+		end
+	end
+	self.Cash -= egg.Price
+	self.EggsHatched += 1
+	local bee, isNew
+	if self._bees[kind] then
+		bee, isNew = self:AddBee(kind)
+	else
+		local ids = self._x.Variants.ByRarity[kind]
+		assert(ids and #ids > 0, "Egg kind has no variants: " .. tostring(kind))
+		local index = math.clamp(math.floor(roll2 * #ids) + 1, 1, #ids)
+		bee, isNew = self:AddBee("Variant", ids[index])
+	end
+	return bee, isNew, kind
+end
+
+------------------------------------------------------------------------------
+-- Rebirth (Royal Jelly)
+------------------------------------------------------------------------------
+
+function FarmState.OwnsTier(self: State, tier: string): boolean
+	for _, bee in self.Bees do
+		if bee.Tier == tier then
+			return true
+		end
+	end
+	return false
+end
+
+function FarmState.CanRebirth(self: State): (boolean, string?)
+	local cfg = self._x.Rebirth
+	if not cfg then
+		return false, "Unknown"
+	end
+	if not self:OwnsTier(cfg.RequiresTier) then
+		return false, "NeedsTier"
+	end
+	return true, nil
+end
+
+-- Resets the farm (cash, ladder bees, upgrades, honey everywhere) and grants Royal Jelly.
+-- Egg bees and the collection survive. Returns the new jelly total, or nil, reason.
+function FarmState.Rebirth(self: State): (number?, string?)
+	local ok, reason = self:CanRebirth()
+	if not ok then
+		return nil, reason
+	end
+	local cfg = self._x.Rebirth
+	local kept = {}
+	if cfg.KeepVariants then
+		for _, bee in self.Bees do
+			if bee.Tier == "Variant" then
+				table.insert(kept, bee)
+			end
+		end
+	end
+	self.Bees = kept
+	self.Cash = self._eco.StartCash
+	self.Carried = 0
+	self.HiveStored = 0
+	self.ProductionAcc = 0
+	self.BottlingQueue = 0
+	self.BottlingAcc = 0
+	self.Jars = {}
+	self.Unclaimed = 0
+	self.BeesBought = 0
+	for id in self.Upgrades do
+		self.Upgrades[id] = 1
+	end
+	self.RoyalJelly += cfg.JellyPerRebirth
+	self.Rebirths += 1
+	self:Recalculate()
+	for _, tier in self._eco.StartBees do
+		self:AddBee(tier)
+	end
+	return self.RoyalJelly, nil
+end
+
+function FarmState.JellyMultiplier(self: State): number
+	local cfg = self._x.Rebirth
+	return 1 + self.RoyalJelly * (if cfg then cfg.BonusPerJelly else 0)
 end
 
 -- Honey per second from all bees.
 function FarmState.ProductionRate(self: State): number
 	local rate = 0
 	for _, bee in self.Bees do
-		rate += self._bees[bee.Tier].HoneyPerSecond
+		rate += self:BeeRate(bee)
 	end
-	return rate * self.ProductionMultiplier
+	return rate * self.ProductionMultiplier * self:JellyMultiplier()
 end
 
 -- Advance the simulation by dt seconds.
@@ -409,14 +615,15 @@ export type SaveData = { [string]: any }
 function FarmState.Serialize(self: State, now: number): SaveData
 	local bees = {}
 	for _, bee in self.Bees do
-		table.insert(bees, { Id = bee.Id, Tier = bee.Tier })
+		table.insert(bees, { Id = bee.Id, Tier = bee.Tier, Variant = bee.Variant, Shiny = bee.Shiny })
 	end
 	local discovered = {}
-	for _, tier in self._order do
-		if self.Discovered[tier] then
-			table.insert(discovered, tier)
+	for key, found in self.Discovered do
+		if found then
+			table.insert(discovered, key)
 		end
 	end
+	table.sort(discovered)
 	local upgrades = {}
 	for id, level in self.Upgrades do
 		upgrades[id] = level
@@ -438,6 +645,9 @@ function FarmState.Serialize(self: State, now: number): SaveData
 		Upgrades = upgrades,
 		Totals = table.clone(self.Totals),
 		TutorialStep = self.TutorialStep,
+		RoyalJelly = self.RoyalJelly,
+		Rebirths = self.Rebirths,
+		EggsHatched = self.EggsHatched,
 	}
 end
 
@@ -451,8 +661,11 @@ end
 
 -- Rebuilds a state from saved data. Anything odd (unknown tiers, negative numbers,
 -- levels past the table) is clamped or dropped rather than crashing.
-function FarmState.Deserialize(data: SaveData, eco: EconomyConfig, bees: BeeConfig, order: { string }, upgrades: UpgradeConfig?): State
-	local self = FarmState.new(eco, bees, order, upgrades)
+function FarmState.Deserialize(data: SaveData, eco: EconomyConfig, bees: BeeConfig, order: { string }, upgrades: UpgradeConfig?, extras: Extras?): State
+	local self = FarmState.new(eco, bees, order, upgrades, extras)
+	self.RoyalJelly = math.floor(num(data.RoyalJelly, 0, 0))
+	self.Rebirths = math.floor(num(data.Rebirths, 0, 0))
+	self.EggsHatched = math.floor(num(data.EggsHatched, 0, 0))
 	self.Bees = {}
 	self.Discovered = {}
 
@@ -487,15 +700,27 @@ function FarmState.Deserialize(data: SaveData, eco: EconomyConfig, bees: BeeConf
 	local usedIds: { [number]: boolean } = {}
 	if type(data.Bees) == "table" then
 		for _, b in data.Bees do
-			if type(b) == "table" and type(b.Tier) == "string" and bees[b.Tier] then
-				local id = math.floor(num(b.Id, 0, 1))
-				if id < 1 or usedIds[id] then
-					id = maxId + 1
+			if type(b) == "table" and type(b.Tier) == "string" then
+				local isVariant = b.Tier == "Variant" and self._x.Variants ~= nil and self._x.Variants.Get(math.floor(num(b.Variant, 0, 0))) ~= nil
+				if bees[b.Tier] or isVariant then
+					local id = math.floor(num(b.Id, 0, 1))
+					if id < 1 or usedIds[id] then
+						id = maxId + 1
+					end
+					usedIds[id] = true
+					maxId = math.max(maxId, id)
+					local bee: Bee = { Id = id, Tier = b.Tier }
+					if isVariant then
+						bee.Variant = math.floor(num(b.Variant, 0, 0))
+					elseif b.Shiny == true then
+						bee.Shiny = true
+					end
+					table.insert(self.Bees, bee)
+					self.Discovered[FarmState.BeeKey(bee)] = true
+					if bee.Shiny then
+						self.Discovered[bee.Tier] = true
+					end
 				end
-				usedIds[id] = true
-				maxId = math.max(maxId, id)
-				table.insert(self.Bees, { Id = id, Tier = b.Tier })
-				self.Discovered[b.Tier] = true
 			end
 		end
 	end
@@ -511,9 +736,13 @@ function FarmState.Deserialize(data: SaveData, eco: EconomyConfig, bees: BeeConf
 	self.NextBeeId = math.max(maxId + 1, math.floor(num(data.NextBeeId, 1, 1)))
 	self.TutorialStep = math.floor(num(data.TutorialStep, 1, 1))
 	if type(data.Discovered) == "table" then
-		for _, tier in data.Discovered do
-			if type(tier) == "string" and bees[tier] then
-				self.Discovered[tier] = true
+		for _, key in data.Discovered do
+			if type(key) == "string" then
+				local base = key:gsub("%*$", "")
+				local vid = key:match("^V(%d+)$")
+				if bees[base] or (vid and self._x.Variants and self._x.Variants.Get(tonumber(vid) :: number)) then
+					self.Discovered[key] = true
+				end
 			end
 		end
 	end

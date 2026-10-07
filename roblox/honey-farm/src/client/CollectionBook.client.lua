@@ -10,6 +10,7 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("HoneyFarm")
 local Config = require(Shared:WaitForChild("Config"))
 local BeeAppearance = require(Shared:WaitForChild("BeeAppearance"))
+local VariantBees = require(Shared:WaitForChild("VariantBees"))
 
 local C = Config.Colors
 local player = Players.LocalPlayer
@@ -87,9 +88,34 @@ close.Parent = panel
 corner(close, 12)
 stroke(close, C.Text, 2)
 
+-- Tabs: ladder tiers | egg bees
+local tabs = Instance.new("Frame")
+tabs.Position = UDim2.fromOffset(14, 70)
+tabs.Size = UDim2.new(1, -28, 0, 36)
+tabs.BackgroundTransparency = 1
+tabs.Parent = panel
+local tabLayout = Instance.new("UIListLayout")
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.Padding = UDim.new(0, 8)
+tabLayout.Parent = tabs
+local function tabButton(label: string): TextButton
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.fromOffset(170, 36)
+	b.BackgroundColor3 = Color3.fromRGB(230, 220, 200)
+	b.Font = Enum.Font.FredokaOne
+	b.TextSize = 17
+	b.TextColor3 = C.Text
+	b.Text = label
+	b.Parent = tabs
+	corner(b, 10)
+	return b
+end
+local tabTiers = tabButton("🐝 Merge ladder")
+local tabVariants = tabButton("🥚 Egg bees")
+
 local grid = Instance.new("ScrollingFrame")
-grid.Position = UDim2.fromOffset(14, 72)
-grid.Size = UDim2.new(1, -28, 1, -86)
+grid.Position = UDim2.fromOffset(14, 112)
+grid.Size = UDim2.new(1, -28, 1, -126)
 grid.BackgroundTransparency = 1
 grid.ScrollBarThickness = 6
 grid.CanvasSize = UDim2.new()
@@ -134,6 +160,65 @@ for i, tier in Config.BeeOrder do
 	cards[tier] = { Frame = frame, Viewport = vp, World = world, Camera = camera, Model = nil, Name = nameL, Info = infoL, Hint = hintL }
 end
 
+-- Egg-bee list (compact rows grouped by rarity)
+local variantList = Instance.new("ScrollingFrame")
+variantList.Visible = false
+variantList.Position = UDim2.fromOffset(14, 112)
+variantList.Size = UDim2.new(1, -28, 1, -126)
+variantList.BackgroundTransparency = 1
+variantList.ScrollBarThickness = 6
+variantList.CanvasSize = UDim2.new()
+variantList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+variantList.Parent = panel
+local vLayout = Instance.new("UIGridLayout")
+vLayout.CellSize = UDim2.new(0.5, -6, 0, 44)
+vLayout.CellPadding = UDim2.fromOffset(6, 6)
+vLayout.SortOrder = Enum.SortOrder.LayoutOrder
+vLayout.Parent = variantList
+local variantRows: { [number]: TextLabel } = {}
+local rarityRank = {}
+for i, r in VariantBees.Rarities do
+	rarityRank[r.Name] = i
+end
+for _, v in VariantBees.List do
+	local row = text(variantList, {
+		LayoutOrder = rarityRank[v.Rarity] * 100 + v.Id,
+		Text = "",
+		TextSize = 14,
+		Font = Enum.Font.GothamBold,
+		BackgroundTransparency = 0,
+		BackgroundColor3 = Color3.fromRGB(226, 220, 205),
+		TextXAlignment = Enum.TextXAlignment.Left,
+	})
+	corner(row, 10)
+	local pad = Instance.new("UIPadding")
+	pad.PaddingLeft = UDim.new(0, 10)
+	pad.PaddingRight = UDim.new(0, 6)
+	pad.Parent = row
+	local tag = Instance.new("Frame")
+	tag.Size = UDim2.new(0, 6, 1, 0)
+	tag.Position = UDim2.fromOffset(-10, 0)
+	tag.BackgroundColor3 = Color3.fromHex(VariantBees.RarityColor(v.Rarity))
+	tag.BorderSizePixel = 0
+	tag.Parent = row
+	corner(tag, 10)
+	variantRows[v.Id] = row
+end
+
+local function showTab(variants: boolean)
+	grid.Visible = not variants
+	variantList.Visible = variants
+	tabTiers.BackgroundColor3 = if variants then Color3.fromRGB(230, 220, 200) else C.Honey
+	tabVariants.BackgroundColor3 = if variants then C.Honey else Color3.fromRGB(230, 220, 200)
+end
+tabTiers.Activated:Connect(function()
+	showTab(false)
+end)
+tabVariants.Activated:Connect(function()
+	showTab(true)
+end)
+showTab(false)
+
 local function showModel(card: Card, tier: string, silhouette: boolean)
 	if card.Model then
 		card.Model:Destroy()
@@ -164,8 +249,8 @@ local function discoveredSet(): { [string]: boolean }
 	local id = player:GetAttribute("PlotId")
 	local plot = id and plots:FindFirstChild("Plot" .. id)
 	local set = {}
-	for tier in string.gmatch((plot and plot:GetAttribute("Discovered") :: string?) or "", "%a+") do
-		set[tier] = true
+	for key in string.gmatch((plot and plot:GetAttribute("Discovered") :: string?) or "", "[%w%*]+") do
+		set[key] = true
 	end
 	return set
 end
@@ -188,11 +273,23 @@ local function refresh()
 		card.Frame.BackgroundColor3 = if has then Color3.fromRGB(255, 241, 205) else Color3.fromRGB(226, 220, 205)
 		card.Name.Text = if has then ("#%d  %s"):format(i, info.Name) else ("#%d  ???"):format(i)
 		local rate = info.HoneyPerSecond
-		card.Info.Text = if has then ("%s\n%s honey/s"):format(info.Description, if rate < 10 then ("%.1f"):format(rate) else ("%d"):format(rate)) else "Not discovered yet."
+		local shiny = found[tier .. "*"] == true
+		card.Info.Text = if has then ("%s\n%s honey/s%s"):format(info.Description, if rate < 10 then ("%.1f"):format(rate) else ("%d"):format(rate), if shiny then "  ·  ✨ shiny found!" else "") else "Not discovered yet."
 		local prev = Config.BeeOrder[i - 1]
 		card.Hint.Text = if has then "" elseif prev then ("Merge two %ss to find it."):format(Config.Bees[prev].Name) else "Buy one in the Bee Shop."
 	end
-	progress.Text = ("%d of %d bees discovered"):format(n, #Config.BeeOrder)
+	local vFound = 0
+	for _, v in VariantBees.List do
+		local row = variantRows[v.Id]
+		local hasV = found["V" .. v.Id] == true
+		if hasV then
+			vFound += 1
+		end
+		row.Text = if hasV then ("%s  ·  %s  ·  %s/s"):format(v.Name, v.Rarity, if v.HoneyPerSecond < 10 then ("%.1f"):format(v.HoneyPerSecond) else ("%d"):format(v.HoneyPerSecond)) else ("???  ·  %s egg bee"):format(v.Rarity)
+		row.TextColor3 = if hasV then C.Text else Color3.fromRGB(140, 130, 115)
+		row.BackgroundColor3 = if hasV then Color3.fromRGB(255, 241, 205) else Color3.fromRGB(226, 220, 205)
+	end
+	progress.Text = ("%d of %d ladder bees  ·  %d of %d egg bees discovered"):format(n, #Config.BeeOrder, vFound, #VariantBees.List)
 end
 
 -- gentle spin for the visible models

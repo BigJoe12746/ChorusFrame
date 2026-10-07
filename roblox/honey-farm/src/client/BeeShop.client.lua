@@ -12,6 +12,7 @@ local UserInputService = game:GetService("UserInputService")
 local Shared = ReplicatedStorage:WaitForChild("HoneyFarm")
 local Config = require(Shared:WaitForChild("Config"))
 local BeeAppearance = require(Shared:WaitForChild("BeeAppearance"))
+local VariantBees = require(Shared:WaitForChild("VariantBees"))
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local OpenShopRemote = Remotes:WaitForChild("OpenShop") :: RemoteEvent
 local ShopActionRemote = Remotes:WaitForChild("ShopAction") :: RemoteEvent
@@ -86,15 +87,22 @@ local function beeViewport(parent: Instance, size: UDim2, position: UDim2): (Vie
 	local current: Model? = nil
 	local angle = 0
 
-	local function show(tier: string?)
+	local function show(key: string?)
 		if current then
 			current:Destroy()
 			current = nil
 		end
-		if not tier then
+		if not key then
 			return
 		end
-		local model = BeeAppearance.Build(template, tier)
+		local vid = key:match("^V(%d+)$")
+		local model
+		if vid then
+			model = BeeAppearance.BuildVariant(template, VariantBees.Get(tonumber(vid) :: number))
+		else
+			local shiny = key:sub(-1) == "*"
+			model = BeeAppearance.Build(template, key:gsub("%*$", ""), shiny)
+		end
 		model:ScaleTo(1) -- viewport has its own scale
 		model:PivotTo(CFrame.new())
 		model.Parent = world
@@ -140,17 +148,68 @@ text(panel, { Text = "🛒 BEE SHOP", TextSize = 30, Size = UDim2.new(1, -120, 0
 local close = button(panel, { Text = "✕", Size = UDim2.fromOffset(46, 46), Position = UDim2.new(1, -56, 0, 8), BackgroundColor3 = Color3.fromRGB(240, 120, 110), TextSize = 24 })
 
 -- Left: buy
+local leftScroll = Instance.new("ScrollingFrame")
+leftScroll.Position = UDim2.new(0, 14, 0, 58)
+leftScroll.Size = UDim2.new(0.36, -14, 1, -72)
+leftScroll.BackgroundTransparency = 1
+leftScroll.ScrollBarThickness = 6
+leftScroll.CanvasSize = UDim2.new()
+leftScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+leftScroll.Parent = panel
+local leftLayout = Instance.new("UIListLayout")
+leftLayout.Padding = UDim.new(0, 8)
+leftLayout.SortOrder = Enum.SortOrder.LayoutOrder
+leftLayout.Parent = leftScroll
+
 local left = Instance.new("Frame")
-left.Position = UDim2.new(0, 14, 0, 58)
-left.Size = UDim2.new(0.36, -14, 1, -72)
+left.LayoutOrder = 1
+left.Size = UDim2.new(1, -8, 0, 300)
 left.BackgroundColor3 = Color3.fromRGB(255, 241, 205)
-left.Parent = panel
+left.Parent = leftScroll
 corner(left, 14)
-local _, showShopBee = beeViewport(left, UDim2.new(1, -20, 0, 150), UDim2.fromOffset(10, 10))
-text(left, { Text = "Starter Bee", TextSize = 24, Size = UDim2.new(1, -20, 0, 30), Position = UDim2.fromOffset(10, 166) })
-local rateLabel = text(left, { Text = "", TextSize = 16, Font = Enum.Font.GothamBold, TextColor3 = Color3.fromRGB(140, 100, 60), Size = UDim2.new(1, -20, 0, 20), Position = UDim2.fromOffset(10, 196) })
-local slotsLabel = text(left, { Text = "", TextSize = 16, Font = Enum.Font.GothamBold, TextColor3 = Color3.fromRGB(140, 100, 60), Size = UDim2.new(1, -20, 0, 20), Position = UDim2.fromOffset(10, 218) })
+local _, showShopBee = beeViewport(left, UDim2.new(1, -20, 0, 130), UDim2.fromOffset(10, 10))
+text(left, { Text = "Starter Bee", TextSize = 24, Size = UDim2.new(1, -20, 0, 30), Position = UDim2.fromOffset(10, 146) })
+local rateLabel = text(left, { Text = "", TextSize = 16, Font = Enum.Font.GothamBold, TextColor3 = Color3.fromRGB(140, 100, 60), Size = UDim2.new(1, -20, 0, 20), Position = UDim2.fromOffset(10, 176) })
+local slotsLabel = text(left, { Text = "", TextSize = 16, Font = Enum.Font.GothamBold, TextColor3 = Color3.fromRGB(140, 100, 60), Size = UDim2.new(1, -20, 0, 20), Position = UDim2.fromOffset(10, 198) })
 local buyButton = button(left, { Text = "Buy  $25", Size = UDim2.new(1, -20, 0, 54), Position = UDim2.new(0, 10, 1, -64), TextSize = 24 })
+
+-- Egg cards with honest odds
+local eggButtons: { [string]: TextButton } = {}
+for order, eggName in Config.Eggs.Order do
+	local egg = Config.Eggs[eggName]
+	local card = Instance.new("Frame")
+	card.LayoutOrder = 1 + order
+	card.Size = UDim2.new(1, -8, 0, 0)
+	card.AutomaticSize = Enum.AutomaticSize.Y
+	card.BackgroundColor3 = Color3.fromHex(egg.Color)
+	card.Parent = leftScroll
+	corner(card, 14)
+	local cpad = Instance.new("UIPadding")
+	cpad.PaddingTop = UDim.new(0, 10)
+	cpad.PaddingBottom = UDim.new(0, 10)
+	cpad.PaddingLeft = UDim.new(0, 10)
+	cpad.PaddingRight = UDim.new(0, 10)
+	cpad.Parent = card
+	local clayout = Instance.new("UIListLayout")
+	clayout.Padding = UDim.new(0, 4)
+	clayout.SortOrder = Enum.SortOrder.LayoutOrder
+	clayout.Parent = card
+	text(card, { LayoutOrder = 1, Text = ("%s %s"):format(egg.Icon, egg.Name), TextSize = 22, Size = UDim2.new(1, 0, 0, 28), TextXAlignment = Enum.TextXAlignment.Left })
+	-- odds, highest first, as the player will see them
+	local total = 0
+	for _, o in egg.Odds do
+		total += o.Weight
+	end
+	local lines = {}
+	for _, o in egg.Odds do
+		local pct = o.Weight / total * 100
+		local label = if Config.Bees[o.Kind] then Config.Bees[o.Kind].Name else (o.Kind .. " rare bee")
+		table.insert(lines, ("%s  %s"):format(if pct < 1 then ("%.1f%%"):format(pct) else ("%d%%"):format(math.floor(pct + 0.5)), label))
+	end
+	text(card, { LayoutOrder = 2, Text = table.concat(lines, "\n"), TextSize = 13, Font = Enum.Font.GothamBold, TextColor3 = Color3.fromRGB(90, 70, 50), Size = UDim2.new(1, 0, 0, 16 * #lines), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top })
+	local b = button(card, { LayoutOrder = 3, Text = ("Hatch  $%d"):format(egg.Price), Size = UDim2.new(1, 0, 0, 48), TextSize = 20 })
+	eggButtons[eggName] = b
+end
 
 -- Right: my bees + merge
 local right = Instance.new("Frame")
@@ -195,17 +254,45 @@ local selected: { number } = {}
 local cards: { [number]: TextButton } = {}
 local lastSubmit = 0
 
-local function parseBees(s: string?): { { Id: number, Tier: string } }
+type BeeEntry = { Id: number, Key: string, Tier: string, Shiny: boolean, Variant: number? }
+
+-- "3:Clover", "4:Clover*" (shiny), "5:V12" (egg bee #12)
+local function parseBees(s: string?): { BeeEntry }
 	local out = {}
-	for id, tier in string.gmatch(s or "", "(%d+):(%a+)") do
-		table.insert(out, { Id = tonumber(id) :: number, Tier = tier })
+	for id, key in string.gmatch(s or "", "(%d+):([%w%*]+)") do
+		local vid = key:match("^V(%d+)$")
+		local shiny = key:sub(-1) == "*"
+		table.insert(out, {
+			Id = tonumber(id) :: number,
+			Key = key,
+			Tier = if vid then "Variant" else key:gsub("%*$", ""),
+			Shiny = shiny,
+			Variant = if vid then tonumber(vid) else nil,
+		})
 	end
 	return out
 end
 
-local function rate(tier: string): string
-	local r = Config.Bees[tier].HoneyPerSecond
+local function fmtRate(r: number): string
 	return if r < 10 then ("%.1f 🍯/s"):format(r) else ("%d 🍯/s"):format(r)
+end
+
+local function rate(tier: string): string
+	return fmtRate(Config.Bees[tier].HoneyPerSecond)
+end
+
+local function entryName(e: BeeEntry): string
+	if e.Variant then
+		return VariantBees.Get(e.Variant).Name
+	end
+	return (if e.Shiny then "✨ Shiny " else "") .. Config.Bees[e.Tier].Name
+end
+
+local function entryRate(e: BeeEntry): number
+	if e.Variant then
+		return VariantBees.Get(e.Variant).HoneyPerSecond
+	end
+	return Config.Bees[e.Tier].HoneyPerSecond * (if e.Shiny then Config.Economy.ShinyMultiplier else 1)
 end
 
 local function tierIndex(tier: string): number
@@ -239,6 +326,12 @@ local function refreshPreview()
 		refreshPreview()
 		return
 	end
+	if a.Variant then
+		previewTitle.Text = entryName(a) .. " is one of a kind"
+		previewBody.Text = "Egg bees can't be merged. They're yours to keep and show off."
+		showPreviewBee(a.Key)
+		return
+	end
 	if #selected == 1 then
 		local nextTier = Config.BeeOrder[tierIndex(a.Tier) + 1]
 		if nextTier then
@@ -253,6 +346,12 @@ local function refreshPreview()
 		return
 	end
 	local b = find(selected[2])
+	if b and b.Variant then
+		previewTitle.Text = entryName(b) .. " is one of a kind"
+		previewBody.Text = "Egg bees can't be merged."
+		showPreviewBee(nil)
+		return
+	end
 	if not b or a.Tier ~= b.Tier then
 		previewTitle.Text = "Those two don't match"
 		previewBody.Text = "Only two bees of the same tier can merge."
@@ -266,9 +365,10 @@ local function refreshPreview()
 		showPreviewBee(nil)
 		return
 	end
-	previewTitle.Text = ("%s + %s → %s"):format(Config.Bees[a.Tier].Name, Config.Bees[a.Tier].Name, Config.Bees[nextTier].Name)
-	previewBody.Text = ("%s each → %s. %s"):format(rate(a.Tier), rate(nextTier), Config.Bees[nextTier].Description)
-	showPreviewBee(nextTier)
+	local shinyResult = a.Shiny or b.Shiny
+	previewTitle.Text = ("%s + %s → %s%s"):format(Config.Bees[a.Tier].Name, Config.Bees[a.Tier].Name, if shinyResult then "✨ Shiny " else "", Config.Bees[nextTier].Name)
+	previewBody.Text = ("%s each → %s. %s%s"):format(fmtRate(entryRate(a)), fmtRate(Config.Bees[nextTier].HoneyPerSecond * (if shinyResult then Config.Economy.ShinyMultiplier else 1)), Config.Bees[nextTier].Description, if shinyResult then "" else (" %d%% chance of a shiny!"):format(Config.Economy.ShinyChance * 100))
+	showPreviewBee(nextTier .. (if shinyResult then "*" else ""))
 	mergeButton.Visible = true
 end
 
@@ -283,6 +383,10 @@ local function refresh()
 	buyButton.Text = ("Buy  $%d"):format(price)
 	local canBuy = cash >= price and count < slots
 	buyButton.BackgroundColor3 = if canBuy then C.Honey else Color3.fromRGB(215, 205, 185)
+	for eggName, b in eggButtons do
+		local ok = cash >= Config.Eggs[eggName].Price and count < slots
+		b.BackgroundColor3 = if ok then C.Honey else Color3.fromRGB(215, 205, 185)
+	end
 	rateLabel.Text = "Makes " .. rate(Config.BeeOrder[1])
 	slotsLabel.Text = ("Bee slots: %d / %d%s"):format(count, slots, if count >= slots then "  (full — merge!)" else "")
 
@@ -293,21 +397,20 @@ local function refresh()
 	cards = {}
 	local bees = parseBees(myPlot:GetAttribute("Bees") :: string?)
 	table.sort(bees, function(x, y)
-		local tx, ty = tierIndex(x.Tier), tierIndex(y.Tier)
-		return if tx ~= ty then tx > ty else x.Id < y.Id
+		local rx, ry = entryRate(x), entryRate(y)
+		return if rx ~= ry then rx > ry else x.Id < y.Id
 	end)
 	for i, bee in bees do
-		local info = Config.Bees[bee.Tier]
 		local card = button(grid, {
 			LayoutOrder = i,
-			Text = ("%s\n%s"):format(info.Name, rate(bee.Tier)),
+			Text = ("%s\n%s"):format(entryName(bee), fmtRate(entryRate(bee))),
 			TextSize = 16,
 			BackgroundColor3 = Color3.fromRGB(255, 241, 205),
 		})
+		local tagColor = if bee.Variant then Color3.fromHex(VariantBees.RarityColor(VariantBees.Get(bee.Variant).Rarity)) else Color3.fromHex(Config.Bees[bee.Tier].Look.Stripe)
 		local tag = Instance.new("Frame")
-		tag.Size = UDim2.fromOffset(8, 0)
 		tag.Size = UDim2.new(0, 8, 1, 0)
-		tag.BackgroundColor3 = Color3.fromHex(info.Look.Stripe)
+		tag.BackgroundColor3 = tagColor
 		tag.BorderSizePixel = 0
 		tag.Parent = card
 		corner(tag, 12)
@@ -357,6 +460,11 @@ end
 buyButton.Activated:Connect(function()
 	submit("Buy")
 end)
+for eggName, b in eggButtons do
+	b.Activated:Connect(function()
+		submit("Egg", eggName)
+	end)
+end
 mergeButton.Activated:Connect(function()
 	if #selected == 2 then
 		submit("Merge", selected[1], selected[2])
