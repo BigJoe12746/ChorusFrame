@@ -336,7 +336,9 @@ local function buildHive(parent: Instance, cf: CFrame)
 	local m = stationModel(parent, "Hive")
 	-- the Base plate stays in every case: it carries the prompt and the label
 	local base = cyl(m, "Base", 1, 18, cf * CFrame.new(0, 0.5, 0), C.Wood, { Material = Enum.Material.WoodPlanks })
-	local prop = PropLibrary.Place(m, "Hive", cf * CFrame.new(0, 1, 0), 12, "HiveModel")
+	-- level-1 hive prop; UpgradeVisuals swaps in Hive2/Hive3... as the player upgrades
+	m:SetAttribute("PropCFrame", cf * CFrame.new(0, 1, 0))
+	local prop = PropLibrary.PlaceLevel(m, "Hive", 1, cf * CFrame.new(0, 1, 0), Config.HiveHeight, "HiveModel")
 	if not prop then
 		for i = 0, 4 do
 			cyl(m, "Layer", 2.4, 14 - i * 2.2, cf * CFrame.new(0, 2.2 + i * 2.2, 0), i % 2 == 0 and C.Honey or C.DeepHoney)

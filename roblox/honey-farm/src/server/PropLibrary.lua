@@ -49,6 +49,21 @@ function PropLibrary.Variants(kind: string): { Model }
 	return out
 end
 
+-- Leveled props: "Hive" = level 1, "Hive2" = level 2, ... Returns the model for the highest
+-- level that is <= `level`, or nil when the kind has no props at all.
+function PropLibrary.ForLevel(kind: string, level: number): Model?
+	local best: Model? = nil
+	local bestLevel = 0
+	for _, m in PropLibrary.Variants(kind) do
+		local n = if m.Name == kind then 1 else tonumber(m.Name:match("^" .. kind .. "(%d+)$"))
+		if n and n <= level and n > bestLevel then
+			best = m
+			bestLevel = n
+		end
+	end
+	return best
+end
+
 function PropLibrary.Has(kind: string): boolean
 	return #PropLibrary.Variants(kind) > 0
 end
@@ -64,15 +79,7 @@ local function stripScripts(model: Instance): number
 	return removed
 end
 
--- Clones a random variant of `kind`, standing on the ground at `cf` (cf.Position = ground point,
--- cf rotation = facing), scaled so its bounding box is `height` studs tall.
--- Returns the model, or nil when there is no prop for this kind.
-function PropLibrary.Place(parent: Instance, kind: string, cf: CFrame, height: number, nameOverride: string?): Model?
-	local variants = PropLibrary.Variants(kind)
-	if #variants == 0 then
-		return nil
-	end
-	local source = variants[rng:NextInteger(1, #variants)]
+local function placeSource(source: Model, kind: string, parent: Instance, cf: CFrame, height: number, nameOverride: string?): Model
 	local model = source:Clone()
 	local removed = stripScripts(model)
 	if removed > 0 then
@@ -106,6 +113,26 @@ function PropLibrary.Place(parent: Instance, kind: string, cf: CFrame, height: n
 	model:SetAttribute("Prop", source.Name)
 	model.Parent = parent
 	return model
+end
+
+-- Clones a random variant of `kind`, standing on the ground at `cf` (cf.Position = ground point,
+-- cf rotation = facing), scaled so its bounding box is `height` studs tall.
+-- Returns the model, or nil when there is no prop for this kind.
+function PropLibrary.Place(parent: Instance, kind: string, cf: CFrame, height: number, nameOverride: string?): Model?
+	local variants = PropLibrary.Variants(kind)
+	if #variants == 0 then
+		return nil
+	end
+	return placeSource(variants[rng:NextInteger(1, #variants)], kind, parent, cf, height, nameOverride)
+end
+
+-- Like Place, but picks the prop for an upgrade level ("Hive", "Hive2", "Hive3"...).
+function PropLibrary.PlaceLevel(parent: Instance, kind: string, level: number, cf: CFrame, height: number, nameOverride: string?): Model?
+	local source = PropLibrary.ForLevel(kind, level)
+	if not source then
+		return nil
+	end
+	return placeSource(source, kind, parent, cf, height, nameOverride)
 end
 
 return PropLibrary

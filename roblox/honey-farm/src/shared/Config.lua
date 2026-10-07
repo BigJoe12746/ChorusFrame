@@ -72,6 +72,8 @@ Config.Stations = {
 	Bottling = { Label = "🍯 Bottling", Action = "Deposit Honey" },
 	SellStand = { Label = "💰 Honey Stand", Action = "Collect Cash" },
 }
+Config.HiveHeight = 12 -- a Creator Store hive prop is scaled to this at level 1...
+Config.HiveGrowthPerLevel = 0.08 -- ...and grows this much per Hive Storage level (max +60%)
 Config.PromptDistance = 12 -- studs; the server also checks this (+ a little slack)
 
 -- Economy (Phase 2). Prices/rates live here so they're easy to rebalance. -----

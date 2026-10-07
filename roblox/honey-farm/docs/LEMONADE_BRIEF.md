@@ -47,6 +47,7 @@ If `Workspace.HoneyFarmMap` already exists, the game keeps it and does **not** r
 1. **Props (preferred way).** Build or insert nice models, then name them and put them in `ReplicatedStorage.Props`:
    - `Flower` (and `Flower2`, `Flower3`… for variety), `Tree`, `Cottage`, `Fountain`, `Hive`, `MiniHive`.
    - The game clones them, strips any scripts, anchors them, **scales them to the spot** (flowers 5–18 studs tall, trees ~19–34, cottages 22, fountain 16, hive 12, mini hives 7) and stands them on the ground facing the right way. Pivot/size don't matter.
+   - Upgraded hive looks: `Hive` (level 1), `Hive2`, `Hive3`… are swapped in as the player upgrades Hive Storage. Make each one look richer than the last (more tiers, gold trim, a chimney, flags).
    - Optional attributes on a prop: `HeightScale` (number), `KeepSize` (true = don't rescale), `CanCollide` (bool).
 2. **Decorate the baked map.** Bake it (command above), then add lamp posts, signs, crates, bushes, paths detail, terrain touches, lighting, skybox, anywhere in `Workspace.HoneyFarmMap`. Keep walkways clear.
 3. **Re-skin stations** by adding parts around them. Fine to add roofs, flags, barrels, honeycomb textures to the hive, pipes to the bottling machine, awnings to the stands.

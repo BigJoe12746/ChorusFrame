@@ -607,6 +607,7 @@ local function stopFarm(player: Player, plot: Model)
 			farm.Player:SetAttribute(key, nil)
 		end
 	end
+	UpgradeVisuals.Apply(plot, nil) -- hive back to level 1 for the next owner
 	-- PlotService clears plot.Temp (bee models) when it releases the plot.
 end
 

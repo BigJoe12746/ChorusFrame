@@ -32,6 +32,8 @@ local props = ReplicatedStorage.Props
 fakeProp("Flower", 3, 10, 3, true).Parent = props -- 10 tall; slots want 5–18
 fakeProp("Flower2", 6, 2, 6, false).Parent = props -- variant
 fakeProp("Hive", 8, 30, 8, true).Parent = props -- way too big; must shrink to 12
+fakeProp("Hive2", 8, 20, 8, false).Parent = props -- upgraded looks for Hive Storage level 2 and 3+
+fakeProp("Hive3", 8, 10, 8, false).Parent = props
 fakeProp("Cottage", 20, 40, 20, false).Parent = props
 -- no Tree / Fountain prop: those must fall back to the block versions
 
@@ -154,6 +156,30 @@ local panda = BeeAppearance.BuildVariant(assets.BeeTemplate, VariantBees.ByName[
 check(panda:GetAttribute("Custom") == "Panda Bee" and panda:GetAttribute("Tier") == "Variant" and panda:GetAttribute("Variant") == VariantBees.ByName["Panda Bee"].Id, "egg bee uses its hand-made model")
 check(beeModels["Clover Bee"]:FindFirstChild("FreeModelVirus", true) ~= nil, "original BeeModels entry untouched")
 
+-- upgraded hive looks: Hive -> Hive2 -> Hive3 as Hive Storage levels up, growing a little each level
+local hiveStation = plots.Plot1.Stations.Hive
+check(hiveStation.HiveModel:GetAttribute("Prop") == "Hive", "level 1 uses the base Hive prop")
+local upgradeAlice = M.newPlayer(game, 1002, "Upgrader")
+upgradeAlice.spawnCharacter()
+local plotU = plots["Plot" .. upgradeAlice:GetAttribute("PlotId")]
+local su = req(game:GetService("ServerScriptService").HoneyFarm.FarmService).GetState(upgradeAlice)
+su.Cash = 1000000
+local function hiveHeight()
+	local _, sz = plotU.Stations.Hive.HiveModel:GetBoundingBox()
+	return sz.Y
+end
+check(plotU.Stations.Hive.HiveModel:GetAttribute("Prop") == "Hive" and math.abs(hiveHeight() - 12) < 0.05, "fresh owner: base hive at 12 studs")
+ReplicatedStorage.Remotes.UpgradeAction.OnServerEvent:Fire(upgradeAlice, "HiveStorage")
+check(plotU.Stations.Hive.HiveModel:GetAttribute("Prop") == "Hive2" and math.abs(hiveHeight() - 12 * 1.08) < 0.05, "level 2: Hive2 prop, 8% taller")
+ReplicatedStorage.Remotes.UpgradeAction.OnServerEvent:Fire(upgradeAlice, "HiveStorage")
+check(plotU.Stations.Hive.HiveModel:GetAttribute("Prop") == "Hive3" and math.abs(hiveHeight() - 12 * 1.16) < 0.05, "level 3: Hive3 prop, 16% taller")
+ReplicatedStorage.Remotes.UpgradeAction.OnServerEvent:Fire(upgradeAlice, "HiveStorage")
+check(plotU.Stations.Hive.HiveModel:GetAttribute("Prop") == "Hive3" and math.abs(hiveHeight() - 12 * 1.24) < 0.05, "level 4: no Hive4, keeps Hive3 but grows again")
+check(plotU.Temp.Upgrades:FindFirstChild("GoldBand") == nil, "no block-hive gold bands on a prop hive")
+check(#plotU.Stations.Hive:GetChildren() >= 2 and plotU.Stations.Hive:FindFirstChild("Base") ~= nil and plotU.Stations.Hive:FindFirstChild("BeeExit") ~= nil, "prompt base and bee exit survive the swap")
+M.removePlayer(game, upgradeAlice)
+check(plotU.Stations.Hive.HiveModel:GetAttribute("Prop") == "Hive" and math.abs(hiveHeight() - 12) < 0.05, "plot released: hive back to level 1 for the next owner")
+
 -- upgrades: a MiniHive falls back to the Hive prop
 local alice = M.newPlayer(game, 1001, "Alice")
 alice.spawnCharacter()
@@ -161,6 +187,6 @@ local s = req(game:GetService("ServerScriptService").HoneyFarm.FarmService).GetS
 s.Cash = 1000
 ReplicatedStorage.Remotes.UpgradeAction.OnServerEvent:Fire(alice, "HiveStorage")
 local mini = plots.Plot1.Temp.Upgrades:FindFirstChild("MiniHive")
-check(mini ~= nil and mini:GetAttribute("Prop") == "Hive", "mini hive uses the Hive prop when there's no MiniHive prop")
+check(mini ~= nil and mini:GetAttribute("Prop") == "Hive", "mini hive uses the level-1 Hive prop when there's no MiniHive prop")
 local _, msize = mini:GetBoundingBox()
 check(math.abs(msize.Y - 7) < 0.05, "mini hive scaled to 7 tall")

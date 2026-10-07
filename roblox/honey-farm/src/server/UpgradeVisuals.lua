@@ -40,7 +40,7 @@ end
 -- Small beehive standing on `cf` (ground).
 local function miniHive(parent: Instance, cf: CFrame, level: number)
 	-- a "MiniHive" prop, or the main "Hive" prop shrunk down, replaces the block version
-	local prop = PropLibrary.Place(parent, if PropLibrary.Has("MiniHive") then "MiniHive" else "Hive", cf, 7, "MiniHive")
+	local prop = if PropLibrary.Has("MiniHive") then PropLibrary.Place(parent, "MiniHive", cf, 7, "MiniHive") else PropLibrary.PlaceLevel(parent, "Hive", 1, cf, 7, "MiniHive")
 	if prop then
 		return
 	end
@@ -70,9 +70,41 @@ local function tankModule(parent: Instance, cf: CFrame, index: number)
 	m.Parent = parent
 end
 
+-- Swaps the main hive prop for the one matching `level` (Hive, Hive2, Hive3...) and grows it a
+-- little per level. Does nothing when the farm uses the block-built hive.
+local function applyHiveModel(plot: Model, level: number)
+	local hive = plot:FindFirstChild("Hive", true)
+	local cf = hive and hive:GetAttribute("PropCFrame")
+	if not hive or cf == nil or not PropLibrary.Has("Hive") then
+		return
+	end
+	local wanted = PropLibrary.ForLevel("Hive", level)
+	local current = hive:FindFirstChild("HiveModel")
+	local growth = 1 + math.min(0.6, (level - 1) * Config.HiveGrowthPerLevel)
+	if current and current:GetAttribute("Prop") == (wanted and wanted.Name) and current:GetAttribute("Level") == level then
+		return
+	end
+	if current then
+		current:Destroy()
+	end
+	local model = PropLibrary.PlaceLevel(hive, "Hive", level, cf, Config.HiveHeight * growth, "HiveModel")
+	if model then
+		model:SetAttribute("Level", level)
+	end
+end
+
+-- `state` may be nil (plot released): everything goes back to level 1.
 function UpgradeVisuals.Apply(plot: Model, state: any)
 	local temp = plot:FindFirstChild("Temp")
 	if not temp then
+		return
+	end
+	if state == nil then
+		local old = temp:FindFirstChild("Upgrades")
+		if old then
+			old:Destroy()
+		end
+		applyHiveModel(plot, 1)
 		return
 	end
 	local old = temp:FindFirstChild("Upgrades")
@@ -84,6 +116,8 @@ function UpgradeVisuals.Apply(plot: Model, state: any)
 
 	-- Hive storage: one mini hive per level above 1 in the hive yard, plus gold bands on the main hive
 	local hiveLevel = state:UpgradeLevel("HiveStorage")
+	applyHiveModel(plot, hiveLevel)
+	local usingHiveProp = PropLibrary.Has("Hive")
 	local hivePad = plot:FindFirstChild("HiveExpansion", true) :: BasePart?
 	if hivePad then
 		local slots = { { -7, -5 }, { 0, -5 }, { 7, -5 }, { -7, 4 }, { 0, 4 }, { 7, 4 }, { -3.5, -0.5 }, { 3.5, -0.5 }, { -9, -0.5 } }
@@ -94,7 +128,7 @@ function UpgradeVisuals.Apply(plot: Model, state: any)
 	end
 	local mainHive = plot:FindFirstChild("Hive", true)
 	local hiveBase = mainHive and mainHive:FindFirstChild("Base") :: BasePart?
-	if hiveBase and hiveLevel > 1 then
+	if hiveBase and hiveLevel > 1 and not usingHiveProp then -- bands are shaped for the block hive
 		for i = 1, math.min(hiveLevel - 1, 5) do
 			cyl(folder, hiveBase.CFrame * CFrame.Angles(0, 0, -math.pi / 2) * CFrame.new(0, 1.0 + i * 2.2, 0), 0.5, 14.6 - (i - 1) * 2.2, Color3.fromRGB(255, 225, 120), { Name = "GoldBand", Material = Enum.Material.Metal, Reflectance = 0.3 })
 		end
@@ -126,7 +160,7 @@ function UpgradeVisuals.Apply(plot: Model, state: any)
 
 	-- Bee slots: extra landing boards on the main hive
 	local slotLevel = state:UpgradeLevel("BeeSlots")
-	if hiveBase and slotLevel > 1 then
+	if hiveBase and slotLevel > 1 and not usingHiveProp then
 		for i = 1, math.min(slotLevel - 1, 6) do
 			local a = i / 7 * math.pi * 1.4 + 0.3
 			cyl(folder, hiveBase.CFrame * CFrame.Angles(0, 0, -math.pi / 2) * CFrame.Angles(0, a, 0) * CFrame.new(0, 2.6 + (i % 2) * 2.2, -8.2) * CFrame.Angles(math.pi / 2, 0, 0), 0.3, 2.2, C.Wood, { Name = "LandingBoard", Material = Enum.Material.Wood })

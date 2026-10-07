@@ -189,6 +189,8 @@ The flowers, trees, cottages, fountain and hives are built from basic parts so t
 
 What the game does with each prop: clones it, **removes any scripts hidden inside** (free models sometimes carry malicious code), anchors it, scales it to the height of the spot it fills (flowers 5–18 studs, trees ~19–34, cottages 22, fountain 16, hive 12, mini hives 7), and stands it on the ground facing the right way. Optional attributes on a prop: `HeightScale` (e.g. 1.3 for a taller tree), `KeepSize = true` (don't rescale), `CanCollide` (force on/off).
 
+**Upgraded looks for the hive.** Name edited copies `Hive` (level 1), `Hive2`, `Hive3`… and the farm shows the best one for the player's Hive Storage level (missing levels keep the last one you made). The hive also grows 8% per level (max +60%, `Config.HiveGrowthPerLevel`), so even a single `Hive` model visibly upgrades. Mini hives in the yard use `MiniHive` if you made one, else the level‑1 `Hive`. When the plot is released the hive goes back to level 1 for the next owner.
+
 Kinds you don't add keep the block version, so you can replace one thing at a time. The bees stay yours either way: they're built from your `BeeTemplate`.
 
 ### Your own bee models (`ReplicatedStorage.BeeModels`)
